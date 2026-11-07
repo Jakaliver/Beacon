@@ -11,6 +11,8 @@ import simd
 /// user faces where the phone points, and later head turns are applied relative to that.
 final class AudioGuide {
     private let headMotion = CMHeadphoneMotionManager()
+    /// For the status line: whether AirPods head motion is arriving.
+    private(set) var headTrackingLive = false
     private var headReference: CMAttitude?
     private var latestHead: CMAttitude?
     private var baseForward = SIMD3<Float>(0, 0, -1)
@@ -22,9 +24,10 @@ final class AudioGuide {
     private let probe = AVAudioPlayerNode()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
 
-    private lazy var beaconBuffer = tone([(520, 0.14), (780, 0.06)], harmonic: 0.5)
-    private lazy var pulseBuffer = tone([(1400, 0.035)], harmonic: 0)
-    private lazy var confirmBuffer = tone([(880, 0.09), (1320, 0.14)], harmonic: 0.2)
+    // Broadband "knocks", not pure beeps: the ear can only place a sound in space if it has a wide spectrum.
+    private lazy var beaconBuffer = knock(base: 420, seconds: 0.16)
+    private lazy var pulseBuffer = knock(base: 900, seconds: 0.09)
+    private lazy var confirmBuffer = sequence([knock(base: 900, seconds: 0.09), knock(base: 1350, seconds: 0.12)])
     private lazy var stopBuffer = tone([(660, 0.1), (440, 0.18)], harmonic: 0.2)
     private lazy var rescanBuffer = tone([(700, 0.06), (0, 0.05), (700, 0.06)], harmonic: 0.2)
 
@@ -42,11 +45,17 @@ final class AudioGuide {
             player.renderingAlgorithm = algorithm
             player.sourceMode = .pointSource
             player.pointSourceInHeadMode = .bypass
+            player.reverbBlend = 0.3
         }
+        // A little room reverb moves binaural sound out of the head and into the room.
+        environment.reverbParameters.enable = true
+        environment.reverbParameters.loadFactoryReverbPreset(.mediumRoom)
+        environment.reverbParameters.level = -8
         environment.isListenerHeadTrackingEnabled = Self.automaticHeadTracking
         environment.distanceAttenuationParameters.distanceAttenuationModel = .inverse
-        environment.distanceAttenuationParameters.referenceDistance = 1
-        environment.distanceAttenuationParameters.rolloffFactor = 0.5
+        environment.distanceAttenuationParameters.referenceDistance = 0.5
+        environment.distanceAttenuationParameters.maximumDistance = 10
+        environment.distanceAttenuationParameters.rolloffFactor = 1.2
     }
 
     func start() {
@@ -62,6 +71,7 @@ final class AudioGuide {
         headMotion.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
             guard let self, let attitude = motion?.attitude else { return }
             self.latestHead = attitude
+            self.headTrackingLive = true
             if self.headReference == nil { self.headReference = attitude.copy() as? CMAttitude }
             self.applyHead()
         }
@@ -138,6 +148,44 @@ final class AudioGuide {
     private func play(_ buffer: AVAudioPCMBuffer, on player: AVAudioPlayerNode) {
         guard engine.isRunning else { return }
         player.scheduleBuffer(buffer, at: nil, options: .interrupts)
+    }
+
+    /// A short wood-block-like hit: a noise transient plus inharmonic partials that decay quickly.
+    private func knock(base: Double, seconds: Double) -> AVAudioPCMBuffer {
+        let rate = format.sampleRate
+        let n = Int(seconds * rate)
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(n))!
+        buffer.frameLength = AVAudioFrameCount(n)
+        let out = buffer.floatChannelData![0]
+        let partials: [(ratio: Double, gain: Double, decay: Double)] = [(1, 1, 18), (2.76, 0.5, 30), (5.4, 0.3, 45)]
+        var noise: Float = 0
+        for i in 0..<n {
+            let t = Double(i) / rate
+            var v = 0.0
+            for p in partials { v += p.gain * exp(-p.decay * t) * sin(2 * .pi * base * p.ratio * t) }
+            noise = 0.6 * noise + 0.4 * Float.random(in: -1...1)  // softened white noise
+            let transient = Float(exp(-250 * t)) * noise
+            let attack = Float(min(1, t / 0.002))
+            out[i] = attack * (0.35 * Float(v) + 0.5 * transient)
+        }
+        return buffer
+    }
+
+    private func sequence(_ parts: [AVAudioPCMBuffer]) -> AVAudioPCMBuffer {
+        let gap = Int(0.05 * format.sampleRate)
+        let total = parts.reduce(0) { $0 + Int($1.frameLength) + gap }
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(total))!
+        buffer.frameLength = AVAudioFrameCount(total)
+        let out = buffer.floatChannelData![0]
+        var i = 0
+        for p in parts {
+            let src = p.floatChannelData![0]
+            for j in 0..<Int(p.frameLength) { out[i + j] = src[j] }
+            i += Int(p.frameLength)
+            for j in 0..<gap { out[i + j] = 0 }
+            i += gap
+        }
+        return buffer
     }
 
     /// Mono tone sequence; a frequency of 0 is silence. `harmonic` adds a second partial for a softer timbre.

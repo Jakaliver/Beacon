@@ -60,6 +60,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var stopReason: String?
     @Published private(set) var recording = false
     @Published private(set) var choices: [Choice] = []
+    @Published private(set) var headTracking = false
 
     private let control = Connection(path: "/ws/control")
     private let sensor = Connection(path: "/ws/sensor")
@@ -98,7 +99,7 @@ final class AppModel: ObservableObject {
     var statusSummary: String {
         let link = controlUp && sensorUp ? "Mac connected" : controlUp || sensorUp ? "Mac partly connected" : "Mac not connected"
         let state = stopReason.map { "Stopped, \($0.replacingOccurrences(of: "_", with: " "))" } ?? "Mode \(mode)"
-        return "\(link). Tracking \(tracking.replacingOccurrences(of: "_", with: " ")). \(state)."
+        return "\(link). Tracking \(tracking.replacingOccurrences(of: "_", with: " ")). \(state). Head tracking \(headTracking ? "on" : "off")."
     }
 
     func start() {
@@ -318,6 +319,7 @@ final class AppModel: ObservableObject {
 
     private func tick() {
         let now = Date()
+        if audio.headTrackingLive != headTracking { headTracking = audio.headTrackingLive }
         let fresh = now.timeIntervalSince(guidanceAt) < 1
         if !fresh { autoStop("stale") }
         guard stopReason == nil, fresh, tracking == "normal", let g = guidance else { return resetProbe() }
@@ -395,7 +397,8 @@ final class AppModel: ObservableObject {
 
     /// 0.08 s at ≤ 0.15 m to 1.2 s at ≥ 3 m, exponential so that small changes near the object are audible.
     nonisolated static func pulseInterval(forDistance d: Float) -> Double {
-        let near = 0.15, far = 3.0, fastest = 0.08, slowest = 1.2
+        // Calm range: distance is also heard as loudness, so the knocks need not race like a metal detector.
+        let near = 0.15, far = 3.0, fastest = 0.22, slowest = 1.0
         let u = (min(max(Double(d), near), far) - near) / (far - near)
         return fastest * pow(slowest / fastest, u)
     }
