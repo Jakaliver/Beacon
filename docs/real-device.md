@@ -141,6 +141,9 @@ Trident keeps the iPhone screen awake while open. Manually locking it or leaving
 pauses capture. The viewer keeps the last scan and labels it paused until fresh frames return.
 All speech and spatial guidance play on the iPhone. The browser never opens an audio or
 microphone session and cannot change the phone's guidance state.
+Guidance uses short, warm taps with distance attenuation and a subtle small-room reverb.
+With AirPods on, face where the phone points and press **Calibrate** so head turns keep
+the sound aligned with the object. The reverb is a room preset, not measured room acoustics.
 
 ## Troubleshooting
 

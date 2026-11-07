@@ -4,7 +4,7 @@ import PHASE
 import simd
 
 /// Spatial guidance sounds, rendered with PHASE (Apple's Physical Audio Spatialization Engine): each sound
-/// has a direct path, early reflections and a late reverb tail in a room model, plus geometric distance
+/// has a direct path and a short room-preset reverb tail, plus geometric distance
 /// spreading. Positions are ARKit world coordinates; ARKit and PHASE are both right-handed, +Y up, −Z forward.
 ///
 /// Head tracking: Apple's automatic head tracking needs the Head Pose capability, which personal (free)
@@ -54,7 +54,7 @@ final class AudioGuide {
     private var listenerUp = SIMD3<Float>(0, 1, 0)
 
     init() {
-        engine.defaultReverbPreset = .mediumRoom
+        engine.defaultReverbPreset = .smallRoom
         listener = PHASEListener(engine: engine)
         targetSource = PHASESource(engine: engine)
         beaconSource = PHASESource(engine: engine)
@@ -66,10 +66,12 @@ final class AudioGuide {
         if Self.automaticHeadTracking, #available(iOS 18.0, *) {
             listener.automaticHeadTrackingFlags = .orientation
         }
-        // Beeps with soft harmonics: a pure sine cannot be placed in space; harmonics give the ear direction cues.
-        register("pulse", Self.beep(hz: 1000, seconds: 0.09))
-        register("confirm", Self.beep(hz: 1000, seconds: 0.09) + Self.silence(0.05) + Self.beep(hz: 1000, seconds: 0.09))
-        register("beacon", Self.beep(hz: 660, seconds: 0.16))
+        // A compact, damped tap: the broadband onset supplies direction cues,
+        // while a warmer resonant body gives the source a small physical presence.
+        let tap = Self.tap(hz: 620, seconds: 0.14)
+        register("pulse", tap)
+        register("confirm", tap + Self.silence(0.05) + tap)
+        register("beacon", Self.tap(hz: 430, seconds: 0.20))
         register("stop", Self.tone([(660, 0.1), (440, 0.18)], harmonic: 0.2))
         register("rescan", Self.tone([(700, 0.06), (0, 0.05), (700, 0.06)], harmonic: 0.2))
         headLock.withLock { updateListener() }
@@ -83,8 +85,11 @@ final class AudioGuide {
                                                             normalizationMode: .dynamic)
             guard let pipeline = PHASESpatialPipeline(flags: [.directPathTransmission, .earlyReflections, .lateReverb])
             else { return }
-            pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = 0.6
-            pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = 0.3
+            // Keep the transient clearly attached to the source. A modest, short
+            // room tail adds space without washing successive taps together.
+            pipeline.entries[PHASESpatialCategory.directPathTransmission]?.sendLevel = 1.0
+            pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = 0.3
+            pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = 0.14
             let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "\(name)-mixer")
             let distance = PHASEGeometricSpreadingDistanceModelParameters()
             distance.rolloffFactor = 1.0
@@ -317,16 +322,29 @@ final class AudioGuide {
 
     private static let rate = 44_100.0
 
-    /// A rounded beep: fundamental plus decaying harmonics up to ~8 kHz, smooth attack and release.
-    private static func beep(hz: Double, seconds: Double) -> [Float] {
+    /// A soft impact with inharmonic resonances and a brief, band-limited contact
+    /// sound. Higher modes decay first, like a small damped physical object.
+    private static func tap(hz: Double, seconds: Double) -> [Float] {
         let n = Int(seconds * rate)
-        let harmonics = (1...8).filter { Double($0) * hz < 8_000 }
+        let modes: [(ratio: Double, gain: Double, decay: Double)] = [
+            (1.0, 1.0, 0.045), (1.53, 0.42, 0.027), (2.11, 0.24, 0.019),
+            (2.89, 0.13, 0.012), (4.17, 0.07, 0.008), (6.31, 0.035, 0.005),
+        ]
+        var noiseState: UInt32 = 0x74726964
+        var contact = 0.0
+        var low = 0.0
         return (0..<n).map { i in
             let t = Double(i) / rate
-            var v = 0.0
-            for k in harmonics { v += sin(2 * .pi * hz * Double(k) * t) / Double(k * k) * (k == 1 ? 1 : 1.6) }
-            let envelope = min(1, t / 0.006, (seconds - t) / 0.025)
-            return Float(0.4 * envelope * v)
+            noiseState = 1_664_525 &* noiseState &+ 1_013_904_223
+            let noise = Double(noiseState >> 8) / 8_388_608 - 1
+            contact += 0.55 * (noise - contact)
+            low += 0.035 * (contact - low)
+            var value = 0.28 * (contact - low) * exp(-t / 0.009)
+            for mode in modes {
+                value += mode.gain * sin(2 * .pi * hz * mode.ratio * t) * exp(-t / mode.decay)
+            }
+            let envelope = min(1, t / 0.0018, (seconds - t) / 0.018)
+            return Float(0.42 * envelope * value)
         }
     }
 
