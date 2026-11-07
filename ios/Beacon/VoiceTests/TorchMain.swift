@@ -44,10 +44,10 @@ struct TorchTests {
         check(torch.update(camera: camera(at: .zero, yaw: 0.44), centre: door, extent: 0.9, surface: [door]).aim == .on,
               "large objects have a wider cone")
 
-        check(abs(Torch.gain(forDistance: 0.05) - 0.7) < 1e-6 && abs(Torch.gain(forDistance: 2) - 0.12) < 1e-6,
-              "loudness spans arm's reach")
-        check(Torch.gain(forDistance: 0.3) > Torch.gain(forDistance: 0.6) * 1.6,
-              "30 cm is clearly louder than 60 cm")
+        check(Torch.interval(forDistance: 0.05) == 0.07 && abs(Torch.interval(forDistance: 2) - 0.6) < 1e-9,
+              "interval spans arm's reach")
+        check(Torch.interval(forDistance: 0.3) < Torch.interval(forDistance: 0.6) * 0.7,
+              "30 cm and 60 cm sound clearly different")
         print("torch ok")
     }
 }

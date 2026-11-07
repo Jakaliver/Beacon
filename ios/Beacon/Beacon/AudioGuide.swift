@@ -25,15 +25,8 @@ final class AudioGuide {
     private let listener: PHASEListener
     private let targetSource: PHASESource
     private let targetLoopSource: PHASESource
-    private let torchSource: PHASESource
-    // Probe-mode torch: one looping note per Torch.Aim (off, near, on). All run together and only the
-    // current aim's note is audible, so a change of aim fades between notes without clicks.
-    private static let torchHz = [392.0, 587.0, 880.0]
     // 12 dB quieter per doubling of distance (physical spreading is 6 dB): nearer sounds stand out more.
     private static let rolloff = 2.0
-    private var torchMixerIDs: [String] = []
-    private var torchEvents: [PHASESoundEvent] = []
-    private var torchGains: [Float] = []
     private let beaconSource: PHASESource
     private let cueSource: PHASESource
     // Events are asynchronous: .stopped also describes an event still preparing.
@@ -80,10 +73,9 @@ final class AudioGuide {
         listener = PHASEListener(engine: engine)
         targetSource = PHASESource(engine: engine)
         targetLoopSource = PHASESource(engine: engine)
-        torchSource = PHASESource(engine: engine)
         beaconSource = PHASESource(engine: engine)
         cueSource = PHASESource(engine: engine)
-        for object in [listener, targetSource, targetLoopSource, torchSource, beaconSource, cueSource] as [PHASEObject] {
+        for object in [listener, targetSource, targetLoopSource, beaconSource, cueSource] as [PHASEObject] {
             do { try engine.rootObject.addChild(object) }
             catch { diagnostic("scene setup failed: \(error)") }
         }
@@ -95,11 +87,14 @@ final class AudioGuide {
         let tap = Self.tap(hz: 620, seconds: 0.14)
         register("pulse", tap)
         register("confirm", tap + Self.silence(0.05) + tap)
+        // Probe-mode torch: low when the phone points away, middle when close, high when on the object.
+        register("torch-off", Self.tap(hz: 392, seconds: 0.12))
+        register("torch-near", Self.tap(hz: 587, seconds: 0.12))
+        register("torch-on", Self.tap(hz: 880, seconds: 0.10))
         register("beacon", Self.tap(hz: 430, seconds: 0.20))
         register("stop", Self.tone([(660, 0.1), (440, 0.18)], harmonic: 0.2))
         register("rescan", Self.tone([(700, 0.06), (0, 0.05), (700, 0.06)], harmonic: 0.2))
         registerTargetLoop()
-        registerTorch()
         headLock.withLock { updateListener() }
     }
 
@@ -127,74 +122,6 @@ final class AudioGuide {
             _ = try engine.assetRegistry.registerSoundEventAsset(rootNode: sampler, identifier: "\(name)-event")
             mixerIDs[name] = mixer.identifier
         } catch { diagnostic("register \(name) failed: \(error)") }
-    }
-
-    private func registerTorch() {
-        for (aim, hz) in Self.torchHz.enumerated() {
-            let name = "torch-\(aim)"
-            let samples = Self.drone(hz: hz)
-            do {
-                _ = try engine.assetRegistry.registerSoundAsset(data: samples.withUnsafeBufferPointer { Data(buffer: $0) },
-                                                                identifier: name, format: format, normalizationMode: .dynamic)
-                guard let pipeline = PHASESpatialPipeline(flags: [.directPathTransmission, .earlyReflections, .lateReverb])
-                else { return }
-                pipeline.entries[PHASESpatialCategory.directPathTransmission]?.sendLevel = 1.0
-                pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = 0.3
-                pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = 0.14
-                let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "\(name)-mixer")
-                let distance = PHASEGeometricSpreadingDistanceModelParameters()
-                distance.rolloffFactor = Self.rolloff
-                distance.fadeOutParameters = PHASEDistanceModelFadeOutParameters(cullDistance: 20)
-                mixer.distanceModelParameters = distance
-                mixer.gainMetaParameterDefinition = PHASENumberMetaParameterDefinition(value: 0, minimum: 0, maximum: 1,
-                                                                                       identifier: "\(name)-gain")
-                let sampler = PHASESamplerNodeDefinition(soundAssetIdentifier: name, mixerDefinition: mixer)
-                sampler.playbackMode = .looping
-                sampler.cullOption = .sleepWakeAtRealtimeOffset
-                sampler.setCalibrationMode(calibrationMode: .relativeSpl, level: 0)
-                _ = try engine.assetRegistry.registerSoundEventAsset(rootNode: sampler, identifier: "\(name)-event")
-                torchMixerIDs.append(mixer.identifier)
-            } catch { diagnostic("register \(name) failed: \(error)") }
-        }
-    }
-
-    /// Continuous probe tone from the object: the note says the aim, `gain` (0...1) how near the phone is.
-    /// A nil aim keeps the notes running but silent.
-    func setTorch(_ aim: Torch.Aim?, gain: Float, at position: SIMD3<Float>) {
-        var transform = matrix_identity_float4x4
-        transform.columns.3 = SIMD4(position, 1)
-        torchSource.transform = transform
-        guard torchMixerIDs.count == Self.torchHz.count, ensureRunning() else { return }
-        if torchEvents.isEmpty {
-            for (aim, mixerID) in torchMixerIDs.enumerated() {
-                let parameters = PHASEMixerParameters()
-                parameters.addSpatialMixerParameters(identifier: mixerID, source: torchSource, listener: listener)
-                guard let event = try? PHASESoundEvent(engine: engine, assetIdentifier: "torch-\(aim)-event",
-                                                       mixerParameters: parameters) else {
-                    diagnostic("torch tone creation failed")
-                    return stopTorch()
-                }
-                torchEvents.append(event)
-                event.start { [weak self] reason in
-                    guard reason == .failure else { return }
-                    DispatchQueue.main.async { self?.diagnostic("torch tone failed") }
-                }
-            }
-            torchGains = Array(repeating: 0, count: torchEvents.count)
-        }
-        for (index, event) in torchEvents.enumerated() {
-            let value = aim?.rawValue == index ? gain : 0
-            guard abs(value - torchGains[index]) > 0.01,
-                  let parameter = event.metaParameters["torch-\(index)-gain"] as? PHASENumberMetaParameter else { continue }
-            parameter.fade(value: Double(value), duration: 0.05)
-            torchGains[index] = value
-        }
-    }
-
-    func stopTorch() {
-        let events = torchEvents
-        torchEvents = []
-        events.forEach { $0.stopAndInvalidate() }
     }
 
     private func registerTargetLoop() {
@@ -356,7 +283,6 @@ final class AudioGuide {
     func silence() {
         playbackCheckGeneration += 1
         stopTargetLoop()
-        stopTorch()
         let active = Array(playing.values)
         playing.removeAll()
         active.forEach { $0.stopAndInvalidate() }
@@ -448,6 +374,9 @@ final class AudioGuide {
     /// Without a position they come from just in front of the listener.
     func pulse(at position: SIMD3<Float>?) { play("pulse", from: targetSource, at: position) }
     func confirm(at position: SIMD3<Float>?) { play("confirm", from: targetSource, at: position) }
+    func torch(_ aim: Torch.Aim, at position: SIMD3<Float>) {
+        play(["torch-off", "torch-near", "torch-on"][aim.rawValue], from: targetSource, at: position)
+    }
 
     func cue(_ name: String) {
         switch name {
@@ -494,7 +423,7 @@ final class AudioGuide {
     }
 
     private func source(for name: String) -> PHASESource {
-        name == "beacon" ? beaconSource : ["pulse", "confirm"].contains(name) ? targetSource : cueSource
+        name == "beacon" ? beaconSource : ["pulse", "confirm"].contains(name) || name.hasPrefix("torch") ? targetSource : cueSource
     }
 
     private func makeEvent(_ name: String) -> (UUID, PHASESoundEvent)? {
@@ -566,17 +495,6 @@ final class AudioGuide {
             }
             let envelope = min(1, t / 0.0018, (seconds - t) / 0.018)
             return Float(0.42 * envelope * value)
-        }
-    }
-
-    /// One second of a steady note with soft harmonics (they help the ear place it). Whole cycles only,
-    /// so it loops without a click; `hz` must be a whole number.
-    private static func drone(hz: Double) -> [Float] {
-        (0..<Int(rate)).map { i in
-            let t = Double(i) / rate
-            let value = sin(2 * .pi * hz * t) + 0.5 * sin(4 * .pi * hz * t) + 0.25 * sin(6 * .pi * hz * t)
-                + 0.12 * sin(8 * .pi * hz * t)
-            return Float(0.3 * value)
         }
     }
 

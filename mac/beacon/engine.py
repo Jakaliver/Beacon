@@ -158,7 +158,7 @@ class Engine:
             self.audio_yaw_offset = None
             self.selected = None
             if was_active:
-                self.stop("world_reset", "Tracking was reset. The map is cleared. Scan again, then say resume.")
+                self.stop("world_reset", "Tracking reset. Scan again.")
 
     # Sensor input ----------------------------------------------------------
     def on_pose(self, msg: dict) -> None:
@@ -286,8 +286,7 @@ class Engine:
                 self.calibrate(quiet=True)
             self.say(f"Looking for {self.spoken(self.want_label)}.")
         elif cmd == "unsupported":
-            self.say(f"Sorry, I can't recognise {c['spoken'] or 'that'}. "
-                     "I can find bottles, cups, chairs, doors, light switches, keys and other common objects.")
+            self.say(f"I can't find {c['spoken'] or 'that'}.")
         elif cmd == "stop":
             self.stop("user", "Stopped.")
         elif cmd == "cancel":
@@ -310,7 +309,7 @@ class Engine:
             self.navigation = c["on"]
             self.say(f"Route guidance {'on' if c['on'] else 'off'}.")
         else:
-            self.say("Say find, then an object. Or stop, cancel, repeat, inspect or resume.")
+            self.say("Say find, then an object.")
 
     def spoken(self, label: str) -> str:
         if label == self.want_label and self.want_word:
@@ -321,7 +320,7 @@ class Engine:
     def calibrate(self, quiet: bool) -> None:
         if self.pose is None:
             if not quiet:
-                self.say("No phone pose yet.")
+                self.say("Phone not ready.")
             return
         phone_yaw = yaw_of(forward(self.pose.T))
         if self.pose.head_q is not None:
@@ -330,11 +329,11 @@ class Engine:
         else:
             self.audio_yaw_offset = 0.0
         if not quiet:
-            self.say("Calibrated. Audio forward now matches where the phone points.")
+            self.say("Calibrated.")
 
     def choose(self, index: int) -> None:
         if not 1 <= index <= len(self.choice_ids):
-            self.say("That number is not one of the choices.")
+            self.say("Not a choice.")
             return
         self.selected = self.choice_ids[index - 1]
         self.choice_ids = []
@@ -365,7 +364,7 @@ class Engine:
             self.start_guidance()
         elif self.want_label:
             self.mode = "searching"
-            self.say(f"Resumed. Looking for {self.spoken(self.want_label)}.")
+            self.say("Resumed.")
         else:
             self.mode = "idle"
             self.say("Resumed.")
@@ -477,17 +476,17 @@ class Engine:
         if self.mode not in ACTIVE and self.mode not in {"searching", "choosing"}:
             return
         if not self.sensor_connected or now - self.pose.received > CONFIG.pose_timeout_s:
-            self.stop("connection", "Stopped. Connection to the phone was lost.")
+            self.stop("connection", "Stopped. Connection lost.")
         elif self.clock_offset is not None and now - (self.pose.t + self.clock_offset) > CONFIG.max_pose_latency_s:
-            self.stop("stale", "Stopped. Phone updates are arriving late.")
+            self.stop("stale", "Stopped. Updates late.")
         elif self.pose.tracking != "normal":
-            self.stop("tracking_lost", "Stopped. Phone tracking was lost. Hold still and point at the floor.")
+            self.stop("tracking_lost", "Stopped. Tracking lost.")
         elif not self.audio_ok:
-            self.stop("audio", "Stopped. Audio output is unavailable.")
+            self.stop("audio", "Stopped. No audio.")
         elif self.interrupted:
-            self.stop("interrupted", "Stopped. The app was interrupted.")
+            self.stop("interrupted", "Stopped. Interrupted.")
         elif self.mode == "walking" and now - self.last_frame_processed > CONFIG.walking_perception_timeout_s:
-            self.stop("stale", "Stopped. Obstacle information is out of date.")
+            self.stop("stale", "Stopped. Map out of date.")
 
     def _update_target_state(self, now: float) -> None:
         if self.mode == "searching" and self.want_label:
@@ -510,11 +509,11 @@ class Engine:
                 self.mode = "searching"
                 self.selected = None
                 self.cue("rescan")
-                self.say(f"{self.spoken(self.want_label).capitalize()} is not where I expected. Scan to find it again.")
+                self.say(f"Lost {self.spoken(self.want_label)}. Scan again.")
             elif not t.valid_at(now):
                 self.mode = "searching"
                 self.cue("rescan")
-                self.say(f"My estimate of {self.spoken(t.label)} is too old. Point the phone towards it again.")
+                self.say(f"Lost {self.spoken(t.label)}. Point towards it.")
 
     def _update_mode(self, target) -> None:
         phone = self.pose.T[:3, 3]
@@ -580,8 +579,7 @@ class Engine:
             self._last_plan = (now, self.map.version)
             if cells is None:
                 self.path, self.waypoint = [], None
-                self.stop("route_blocked", "Stopped. I have no safe route yet. "
-                          "Scan the floor around you, then say resume.")
+                self.stop("route_blocked", "Stopped. No safe route. Scan the floor.")
                 return None
             self.path = [self.map.centre_of(rr, cc) for rr, cc in cells]
             self.path[0] = phone[[0, 2]].copy()

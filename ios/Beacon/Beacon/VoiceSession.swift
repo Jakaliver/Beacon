@@ -89,7 +89,7 @@ final class VoiceSession: ObservableObject {
         // An older permission/start operation must not stop or greet a newer session.
         guard lifecycleGeneration == generation, isEnabled, foreground else { return }
         if listener.isListening {
-            if greet { say(requiresWakeWord ? "Ready." : "Hi. What would you like to find?") }
+            if greet { say(requiresWakeWord ? "Ready." : "What are you looking for?") }
             awaitingObject = !requiresWakeWord
             onEnabledChanged?(true)
         } else {

@@ -143,7 +143,7 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
 
     func previewVoice() {
         hush()
-        say("Hi. Tell me what you’re looking for, and I’ll help you find it.")
+        say("What are you looking for?")
     }
 
     private static func isSuitable(_ voice: AVSpeechSynthesisVoice) -> Bool {

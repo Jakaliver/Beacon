@@ -87,14 +87,14 @@ final class AppModel: ObservableObject {
     private var lastBeacon = Date.distantPast
 
     private static let reasonText = [
-        "connection": "Connection to the Mac lost.",
-        "tracking_lost": "Tracking lost. Move the phone slowly.",
-        "stale": "Guidance or phone updates are out of date.",
+        "connection": "Connection lost.",
+        "tracking_lost": "Tracking lost.",
+        "stale": "Updates late.",
         "route_blocked": "No safe route.",
-        "world_reset": "Tracking was reset.",
-        "rescan": "Target needs a rescan.",
+        "world_reset": "Tracking reset.",
+        "rescan": "Scan again.",
         "audio": "Audio output changed.",
-        "interrupted": "Audio was interrupted.",
+        "interrupted": "Interrupted.",
     ]
 
     private var isGuiding: Bool { mode == "walking" || mode == "probe" || mode == "hotcold" }
@@ -175,15 +175,15 @@ final class AppModel: ObservableObject {
     func calibrate() {
         guard let pose, pose.tracking == "normal" else {
             ar.reset()
-            voice.say("Resetting tracking. Hold the phone ahead, then say Beacon, calibrate.")
+            voice.say("Resetting. Point ahead, then calibrate.")
             return
         }
         guard alignAudioForward() else {
-            voice.say("Hold the phone upright, pointing ahead, then say Beacon, calibrate.")
+            voice.say("Point ahead, then calibrate.")
             return
         }
         control.sendJSON(["type": "calibrate"])
-        voice.say("Calibrated. Ahead is where the phone points.")
+        voice.say("Calibrated.")
     }
 
     /// Audio "ahead" = the phone's current horizontal heading in the AR world.
@@ -211,19 +211,19 @@ final class AppModel: ObservableObject {
         case .finish: resetSearch(resetTracking: false)
         case .choose(let index):
             if let choice = choices.first(where: { $0.index == index }) { choose(choice) }
-            else { voice.say("That choice is not available. Say Beacon, status to hear the current state.") }
+            else { voice.say("Not available.") }
         case .chooseSide(let side):
             let matches = choices.filter {
                 VoiceCommand.normalized($0.description).split(separator: " ").contains(Substring(side.rawValue))
             }
             if matches.count == 1, let choice = matches.first { choose(choice) }
-            else if choices.isEmpty { voice.say("I haven't found any matches to choose from yet.") }
-            else { voice.say("I can't pick out a single match on your \(side.rawValue). Tell me which option you mean.") }
+            else if choices.isEmpty { voice.say("No matches yet.") }
+            else { voice.say("Which one?") }
         case .repeatLast: voice.repeatResponse()
         case .status: voice.say(statusSummary)
         case .inspect: self.command("inspect")
         case .help:
-            voice.say("Say Beacon, followed by find an object, calibrate, pause, resume, or start over. Say Beacon, status for progress, or Beacon, found it to finish.")
+            voice.say("Say Beacon, then find, calibrate, pause, resume, or found it.")
         case .disableVoice: voice.disable()
         }
     }
@@ -241,13 +241,13 @@ final class AppModel: ObservableObject {
         searchCleared = true
         control.sendJSON(["type": "command", "text": "cancel"])
         if resetTracking { ar.reset() }
-        voice.say(resetTracking ? "Starting fresh. Say Beacon, find, then the object." : "Finished. Say Beacon when you need another object.", urgent: true)
+        voice.say(resetTracking ? "Starting fresh." : "Done.", urgent: true)
     }
 
     func resume() {
         cancelTranscription()
         guard !searchCleared else {
-            voice.say("There is no search to resume. Say Beacon, find, then the object.")
+            voice.say("Nothing to resume.")
             return
         }
         let blocker: String? =
@@ -279,8 +279,7 @@ final class AppModel: ObservableObject {
             if let parsed { handleVoice(parsed) }
             return
         case .inspect where searchCleared || stopReason != nil:
-            voice.say(searchCleared ? "There is no target to inspect. Say Beacon, find, then the object."
-                      : "Search paused. Say Beacon, resume before inspecting the target.")
+            voice.say(searchCleared ? "No target." : "Paused. Resume first.")
             return
         default: break
         }
@@ -307,7 +306,7 @@ final class AppModel: ObservableObject {
 
     func choose(_ choice: Choice) {
         guard !searchCleared, stopReason == nil else {
-            voice.say("Resume your search before choosing a match.")
+            voice.say("Resume first.")
             return
         }
         control.sendJSON(["type": "choose", "index": choice.index])
@@ -384,7 +383,7 @@ final class AppModel: ObservableObject {
             guard !Task.isCancelled, self.foreground else { return }
             self.buttonRequest = nil
             guard allowed else {
-                self.voice.say("Allow microphone access for Beacon in iPhone Settings.")
+                self.voice.say("Allow microphone access in Settings.")
                 return
             }
             self.startTalking()
@@ -418,7 +417,7 @@ final class AppModel: ObservableObject {
         let generation = transcriptionGeneration
         resumeVoiceAfterRecording()
         guard let wav else {
-            voice.say("No recording was captured. Please try again.")
+            voice.say("Nothing recorded.")
             return
         }
         transcribing = true
@@ -429,7 +428,7 @@ final class AppModel: ObservableObject {
                 transcribing = false
                 transcription = nil
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    voice.say("I did not hear a request.")
+                    voice.say("Didn't catch that.")
                 } else {
                     voice.submit(text)
                 }
@@ -437,7 +436,7 @@ final class AppModel: ObservableObject {
                 guard !Task.isCancelled, transcriptionGeneration == generation else { return }
                 transcribing = false
                 transcription = nil
-                voice.say("Speech recognition failed. Check the Mac connection.")
+                voice.say("Speech failed.")
             }
         }
     }
@@ -656,25 +655,24 @@ final class AppModel: ObservableObject {
         wasConfirming = confirming
     }
 
-    /// Within reach the phone is a torch: a steady tone whose pitch says whether it points at the object
-    /// and whose loudness says how near it is.
-    /// Computed from the phone's own pose every tick, so it has no network delay.
+    /// Within reach the phone is a torch: the beep's pitch says whether it points at the object
+    /// (low, middle, high), its rate how near it is. Computed from the phone's own pose every tick.
     private func torchTick(_ g: Guidance, now: Date) {
         guard let target = g.target, target.valid, let pose, pose.tracking == "normal", pose.epoch == g.epoch,
-              let c = target.position, c.count == 3 else {
-            audio.stopTorch()
-            return probeTick(g, now: now)
-        }
+              let c = target.position, c.count == 3 else { return probeTick(g, now: now) }
         let centre = SIMD3(c[0], c[1], c[2])
         let surface = (target.surface ?? []).filter { $0.count == 3 }.map { SIMD3($0[0], $0[1], $0[2]) }
         let out = torch.update(camera: pose.transform, centre: centre, extent: target.extent?.max() ?? 0.1,
                                surface: surface)
         let threshold = g.proximity?.threshold ?? 0.2
         phoneConfirm = phoneConfirm ? out.distance < threshold * 1.3 : out.distance < threshold
-        // Reached: the tone stops and the double beep repeats, so arrival cannot be mistaken for aim.
-        audio.setTorch(phoneConfirm ? nil : out.aim, gain: out.gain, at: centre)
-        if phoneConfirm, !wasConfirming || now.timeIntervalSince(lastPulse) >= 0.8 {
-            audio.confirm(at: centre)
+        if phoneConfirm {
+            if !wasConfirming || now.timeIntervalSince(lastPulse) >= 0.8 {
+                audio.confirm(at: centre)
+                lastPulse = now
+            }
+        } else if now.timeIntervalSince(lastPulse) >= out.interval {
+            audio.torch(out.aim, at: centre)
             lastPulse = now
         }
         wasConfirming = phoneConfirm
@@ -682,7 +680,6 @@ final class AppModel: ObservableObject {
 
     private func resetProbe() {
         torch.reset()
-        audio.stopTorch()
         smoothedDistance = nil
         phoneInterval = nil
         phoneConfirm = false

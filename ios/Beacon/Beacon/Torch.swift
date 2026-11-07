@@ -1,7 +1,7 @@
 import simd
 
-/// Probe-mode feedback: the phone's camera axis is a torch beam. A steady tone's pitch says whether the
-/// beam is on the object, its loudness how near the phone is. Pointing feedback by aim error, rather than by
+/// Probe-mode feedback: the phone's camera axis is a torch beam. The beep's pitch says whether the beam
+/// is on the object, its rate says how near the phone is. Pointing feedback by aim error, rather than by
 /// distance alone, is what lets blind users home in on a target (smartphone pointing studies, AIDEN).
 struct Torch {
     enum Aim: Int, Comparable {
@@ -12,7 +12,7 @@ struct Torch {
     struct Output: Equatable {
         let aim: Aim
         let distance: Float
-        let gain: Float
+        let interval: Double
     }
 
     private(set) var aim = Aim.off
@@ -36,7 +36,7 @@ struct Torch {
         let nearest = surface.map { simd_distance(origin, $0) }.min() ?? range
         let distance = smoothedDistance.map { $0 + 0.4 * (nearest - $0) } ?? nearest
         smoothedDistance = distance
-        return Output(aim: aim, distance: distance, gain: Self.gain(forDistance: distance))
+        return Output(aim: aim, distance: distance, interval: Self.interval(forDistance: distance))
     }
 
     mutating func reset() {
@@ -44,9 +44,10 @@ struct Torch {
         smoothedDistance = nil
     }
 
-    /// 0.12 at 1 m and beyond to 0.7 at 10 cm, rising faster near the object: the range is arm's reach.
-    static func gain(forDistance d: Float) -> Float {
-        let u = (min(max(d, 0.1), 1.0) - 0.1) / 0.9
-        return 0.12 + 0.58 * (1 - u) * (1 - u)
+    /// 0.07 s at 10 cm to 0.6 s at 1 m and beyond: the whole range lies within arm's reach.
+    static func interval(forDistance d: Float) -> Double {
+        let near = 0.1, far = 1.0, fastest = 0.07, slowest = 0.6
+        let u = (min(max(Double(d), near), far) - near) / (far - near)
+        return fastest * pow(slowest / fastest, u)
     }
 }
