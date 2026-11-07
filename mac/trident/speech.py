@@ -36,7 +36,7 @@ class Speech:
 
 # Spoken words → YOLO (COCO) class names.
 SYNONYMS = {
-    "bottle": "bottle", "water bottle": "bottle", "water": "bottle", "drink": "bottle",
+    "bottle": "bottle", "water bottle": "bottle", "waterbottle": "bottle", "flask": "bottle", "thermos": "bottle", "water": "bottle", "drink": "bottle",
     "cup": "cup", "mug": "cup", "glass": "cup", "teacup": "cup", "coffee": "cup",
     "chair": "chair", "seat": "chair", "stool": "chair",
     "sofa": "couch", "couch": "couch", "settee": "couch",
@@ -79,6 +79,8 @@ if __name__ == "__main__":
     labels = {"bottle", "cup", "chair", "couch", "dining table"}
     assert parse_command("Find the bottle.", labels) == {"cmd": "find", "label": "bottle", "spoken": "bottle"}
     assert parse_command("find my mugs", labels)["label"] == "cup"
+    assert parse_command("Find waterbottle", labels)["label"] == "bottle"
+    assert parse_command("find the water bottle", labels)["label"] == "bottle"
     assert parse_command("Find the sofa", labels)["label"] == "couch"
     assert parse_command("find a giraffe", labels)["cmd"] == "unsupported"
     assert parse_command("Stop!", labels) == {"cmd": "stop"}
