@@ -9,7 +9,7 @@ Hands-free voice mode recognizes commands on the iPhone. Say "find the bottle",
 Found objects play spatial beeps by default; choose **Beeps** or **Chest** in Settings.
 Within reach (probe mode) Beeps switch to a steady torch tone: its pitch rises from low to
 middle to high as the phone points nearer to the object, and it gets louder as the phone
-gets closer. A double beep means you have reached it. See the [voice and audio branch test guide](docs/voice-audio-testing.md)
+gets closer. A double beep means you have reached it. See the [voice and audio test guide](docs/voice-audio-testing.md)
 for installation, expected behavior and checks on a real iPhone.
 
 The browser is a **read-only room visualization**: grey LiDAR-style dots, a white iPhone
@@ -26,6 +26,10 @@ scripts/dev.sh     # backend on :8787, room view on :5173
 Open <http://localhost:5173>. Keep Trident open on an iPhone connected to the same Wi-Fi.
 See [iPhone setup](docs/real-device.md) for signing, installation and connection settings.
 
+On the iPhone, tap **Calibrate**, then **Hold to navigate**: say what to find and release.
+**Stop** appears during active requests or guidance. Connection settings live behind the gear.
+You can also assign **Trident → Push to Talk** to the iPhone's Action button in Settings.
+Press to start, speak, then pause to send; press again to send early.
 Use the iPhone app to find an object. Its selected target appears automatically in the room
 view. **3D** slowly circles the scan at 30° above horizontal, completing a turn in 90
 seconds. Drag or zoom to pause and inspect; press **3D** to resume. **Overhead** shows a

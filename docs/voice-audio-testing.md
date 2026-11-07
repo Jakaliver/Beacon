@@ -1,23 +1,22 @@
-# Voice and spatial audio branch test
+# Voice and spatial audio testing
 
-Test branch: **`codex/voice-mode`**, based on main commit `f1acf4f`.
-The changes are integrated into the full **Trident** app. Main has not been merged with
-this branch. Use a physical iPhone; simulator testing is not part of this handoff.
+Hands-free voice and spatial chest audio are integrated into **Trident** on `main`.
+The main screen has Calibrate and Hold to navigate; hands-free controls are in Settings.
+Use a physical iPhone for microphone, spatial audio and AR tracking checks.
 
-## Get the branch and install
+## Get the app and install
 
 In a checkout with no uncommitted work:
 
 ```sh
 git fetch origin
-git switch codex/voice-mode
-git pull --ff-only origin codex/voice-mode
+git switch main
+git pull --ff-only origin main
 open ios/Trident/Trident.xcodeproj
 ```
 
 If the repository is not on the test Mac yet, clone
-`git@github.com:Jakaliver/Trident.git` first. `git switch` creates the local tracking
-branch when only `origin/codex/voice-mode` exists.
+`git@github.com:Jakaliver/Trident.git` first.
 
 Select scheme **Trident**, choose the tester's signing team and a unique bundle
 identifier, then build and run on their iPhone. The checked-in signing team belongs to
@@ -26,8 +25,7 @@ the existing project; each tester should replace it locally. Follow
 
 On the Mac running perception, run `scripts/setup.sh` once, then `scripts/dev.sh`.
 Set **Mac host** in the phone app to that Mac's local hostname or IP, without a URL scheme
-or port. Both devices need the same reachable network. Confirm **Mac connected** and
-**Tracking: normal** before testing object guidance. The installation Mac and backend
+or port. Both devices need the same reachable network. Confirm **Connected** and **Ready** on the main screen before testing object guidance. The installation Mac and backend
 Mac can be different computers.
 
 ## Full-app acceptance checks
@@ -36,10 +34,11 @@ Use a well-lit room, a bottle or another object supported by the current detecto
 and headphones paired with the iPhone. Start at a low camera frame rate if the test
 Mac is slow. Stay in a clear area while checking spatial audio.
 
-1. Tap **Start voice mode**, allow Microphone and Speech Recognition access, and wait
+1. Open Settings → **Hands-free voice**, tap **Start voice mode**, allow Microphone and Speech Recognition access, and wait
    for listening. The app should greet you once. Say **"calibrate"** with the phone
    held ahead. With compatible AirPods, face the same direction as the phone.
-2. Say **"find the bottle"**. Check the **Heard:** text and that the Mac starts a search.
+2. Say **"find the bottle"**. Check the **Heard:** text in Settings and that the Mac starts a search.
+   Close Settings to return to the main controls; hands-free listening continues.
    Once a valid target is acquired, a single continuous chest sound should come from
    its position. There should be no repeating guidance beeps in Chest mode. Searching
    without a valid target should not start the chest loop.
@@ -55,8 +54,7 @@ Mac is slow. Stay in a clear area while checking spatial audio.
    Settings without changing Mac host should preserve the connection and target.
    Relaunch and confirm the selected sound style is remembered.
 6. Say **"pause"**, then **"resume"**. Audio should stop promptly and resume only when
-   connection and tracking are ready. Repeat using the large **Stop** and **Resume**
-   buttons. A partially heard command must not restart guidance after Stop.
+   connection and tracking are ready. Repeat using **Stop**, then hold **Hold to navigate**, say **"resume"** and release. A partially heard command must not restart guidance after Stop.
 7. Say **"start over"**. The target and old guidance should clear and tracking should
    reset. Say **"resume"**: it should ask for a new search, without restoring the old
    sound. Start another find, then say **"found it"**; this ends the search without
@@ -66,13 +64,13 @@ Mac is slow. Stay in a clear area while checking spatial audio.
    should report the reason where applicable. Restore the condition and explicitly
    resume. Confirm there is no leftover chest loop or delayed command after stopping.
 9. Check **"repeat"**, **"inspect"**, **"help"**, and **"turn off voice mode"**.
-   The hold-to-talk button and typed commands should still work. Disabling voice mode
+   The **Hold to navigate** button should still work with voice mode off or on. Disabling voice mode
    stops listening; use **"pause"** or **Stop** to stop object guidance.
 
 The current backend automatically selects targets; it does not currently emit a
 multiple-object choice prompt. The phone supports **"left"**, **"right"**, and
 **"the one on the left/right"** if choices are provided. Exercise that dialogue in
-Voice Lab below; this branch does not add backend object disambiguation.
+Voice Lab below; voice mode does not add backend object disambiguation.
 
 ## Speaking voice
 
@@ -104,8 +102,8 @@ network behavior or world alignment in the full app.
 
 ## Validation and feedback
 
-Before handoff, both **Trident** and **TridentVoiceLab** passed unsigned Debug builds
-for generic iOS devices using Xcode 26.3 / iOS 26.2 SDK. These focused checks also passed:
+The voice branch originally passed unsigned Debug builds for both **Trident** and
+**TridentVoiceLab** with Xcode 26.3 / iOS 26.2 SDK. Run these focused checks after changes:
 
 - `scripts/test-voice-directions.sh`: 74 utterances and 4 semantic checks.
 - `scripts/test-voice-session.sh`: 50 speech coordination checks.
@@ -113,8 +111,8 @@ for generic iOS devices using Xcode 26.3 / iOS 26.2 SDK. These focused checks al
 - `scripts/test-voice-lab-sound.sh`: 32 audio lifecycle checks using a fake audio output.
 
 These checks do not exercise a real microphone, speech voice, PHASE playback or ARKit.
-**This branch's integrated voice/chest changes still need the physical-device checks
-above. They have not been run on a simulator or installed for this handoff.**
+Run the physical-device checks above to validate microphone recognition and spatial
+playback; a successful build or unit test does not cover those behaviors.
 
 For feedback, include `git rev-parse --short HEAD`, iPhone/iOS version, headphone model,
 the command spoken, the displayed **Heard:** text, and expected versus actual behavior.

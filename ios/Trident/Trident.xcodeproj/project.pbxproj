@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA01B2C3D4E5F60718293041 /* VoiceRequestEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01B2C3D4E5F60718293042 /* VoiceRequestEndpoint.swift */; };
 		003664E3FC270F86549FEEDD /* VoiceLabModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 247917A730008C5656BD9E75 /* VoiceLabModel.swift */; };
 		103EEC9C2E5B1B70D4813886 /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B59A25BACFD98E15CDA2E09 /* Model.swift */; };
 		10A563FCF00234DE6D614054 /* VoiceModeControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26BDB727AAE491B1B3CDD97 /* VoiceModeControls.swift */; };
@@ -37,6 +38,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		AA01B2C3D4E5F60718293042 /* VoiceRequestEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRequestEndpoint.swift; sourceTree = "<group>"; };
 		00888A4EF1F1884442A5E887 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		19926C6AF4279DD4FAE9AED0 /* Torch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Torch.swift; sourceTree = "<group>"; };
 		216132FC9DCA6503179AA09A /* VoiceLabApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceLabApp.swift; sourceTree = "<group>"; };
@@ -95,6 +97,7 @@
 				604702D284EFE94A88B04A53 /* Speech.swift */,
 				19926C6AF4279DD4FAE9AED0 /* Torch.swift */,
 				E9D3606D4B91643D76C2EE34 /* TridentApp.swift */,
+				AA01B2C3D4E5F60718293042 /* VoiceRequestEndpoint.swift */,
 				83E5CB0422209FAD39344FB7 /* VoiceCommand.swift */,
 				517AC3B0527BB348E37B989E /* VoiceListener.swift */,
 				A26BDB727AAE491B1B3CDD97 /* VoiceModeControls.swift */,
@@ -226,6 +229,7 @@
 				D462A44B3408A13B8F314499 /* Speech.swift in Sources */,
 				8AB4A90F0B0A6BC9EF3BCD2D /* Torch.swift in Sources */,
 				AF642317531D6E0CFEE9ADFD /* TridentApp.swift in Sources */,
+				AA01B2C3D4E5F60718293041 /* VoiceRequestEndpoint.swift in Sources */,
 				4C94184990D710D6E49D9745 /* VoiceCommand.swift in Sources */,
 				F45AA76CEF87253158F578BC /* VoiceListener.swift in Sources */,
 				CE25236A5DA80643629DA457 /* VoiceModeControls.swift in Sources */,

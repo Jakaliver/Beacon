@@ -42,12 +42,15 @@ private struct Incoming: Decodable {
 
 @MainActor
 final class AppModel: ObservableObject {
+    static let shared = AppModel()
     @Published private(set) var controlUp = false
     @Published private(set) var sensorUp = false
     @Published private(set) var tracking = "not_available"
     @Published private(set) var mode = "idle"
     @Published private(set) var stopReason: String?
     @Published private(set) var recording = false
+    @Published private(set) var recordingFromActionButton = false
+    @Published private(set) var transcribing = false
     @Published private(set) var choices: [Choice] = []
     @Published private(set) var headTracking = false
 
@@ -58,6 +61,8 @@ final class AppModel: ObservableObject {
     let voice = VoiceSession()
     private var transcription: Task<Void, Never>?
     private var transcriptionGeneration = 0
+    private var actionButtonRequest: Task<Void, Never>?
+    private var actionButtonRecording: Task<Void, Never>?
     // A reset remains authoritative until a new search. Network latency must never
     // let old guidance, choices or speech restart a cancelled session.
     private var searchCleared = false
@@ -145,7 +150,7 @@ final class AppModel: ObservableObject {
 
     func applySettings() {
         ar.setFrameRate(Settings.frameRate)
-        if connectedHost != Settings.host { connect() }
+        if connectedHost != Settings.host || !controlUp || !sensorUp { connect() }
         refreshGuidanceSound()
     }
 
@@ -306,10 +311,13 @@ final class AppModel: ObservableObject {
     }
 
     func startTalking() {
-        guard !recording else { return }
+        guard !recording, !transcribing else { return }
+        guard controlUp && sensorUp else { return voice.say("Not connected to the Mac.") }
         cancelTranscription(resumeVoice: false)
         voice.listener.suspend()
         voice.hush()
+        audio.silence()
+        resetProbe()
         recording = talk.start()
         if !recording {
             voice.say("Microphone not available.")
@@ -317,8 +325,72 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Shortcuts receives an activation, not hardware down/up events. A second
+    /// activation sends early; otherwise a pause in speech ends this request.
+    func actionButtonPushToTalk() {
+        if recording { stopTalking(); return }
+        guard !transcribing else { return }
+        if actionButtonRequest != nil {
+            cancelTranscription()
+            return
+        }
+        actionButtonRequest = Task { [weak self] in
+            guard let self else { return }
+            defer { if !Task.isCancelled { self.actionButtonRequest = nil } }
+            let deadline = ProcessInfo.processInfo.systemUptime + 8
+            // A cold launch may invoke the intent before SwiftUI appears. Use the
+            // same model as the screen and wait for foreground camera access.
+            while UIApplication.shared.applicationState != .active {
+                guard !Task.isCancelled else { return }
+                if ProcessInfo.processInfo.systemUptime >= deadline {
+                    self.actionButtonRequest = nil
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            guard !Task.isCancelled else { return }
+            self.start()
+            while !(self.controlUp && self.sensorUp) {
+                guard !Task.isCancelled else { return }
+                if ProcessInfo.processInfo.systemUptime >= deadline {
+                    self.actionButtonRequest = nil
+                    self.voice.say("Not connected to the Mac.")
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            let allowed = await AVAudioApplication.requestRecordPermission()
+            guard !Task.isCancelled, self.foreground else { return }
+            self.actionButtonRequest = nil
+            guard allowed else {
+                self.voice.say("Allow microphone access for Trident in iPhone Settings.")
+                return
+            }
+            self.startTalking()
+            guard self.recording else { return }
+            self.recordingFromActionButton = true
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            self.actionButtonRecording = Task { [weak self] in
+                var endpoint = VoiceRequestEndpoint()
+                let began = ProcessInfo.processInfo.systemUptime
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(50))
+                    guard !Task.isCancelled, let self, self.recordingFromActionButton else { return }
+                    if endpoint.shouldFinish(at: ProcessInfo.processInfo.systemUptime - began,
+                                             power: self.talk.averagePower, isRecording: self.talk.isRecording) {
+                        self.stopTalking()
+                        return
+                    }
+                }
+            }
+        }
+    }
+
     func stopTalking() {
         guard recording else { return }
+        actionButtonRecording?.cancel()
+        actionButtonRecording = nil
+        recordingFromActionButton = false
         recording = false
         let wav = talk.stop()
         transcriptionGeneration += 1
@@ -328,10 +400,13 @@ final class AppModel: ObservableObject {
             voice.say("No recording was captured. Please try again.")
             return
         }
+        transcribing = true
         transcription = Task {
             do {
                 let text = try await PushToTalk.transcribe(wav, host: Settings.host)
                 guard !Task.isCancelled, transcriptionGeneration == generation else { return }
+                transcribing = false
+                transcription = nil
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     voice.say("I did not hear a request.")
                 } else {
@@ -339,15 +414,23 @@ final class AppModel: ObservableObject {
                 }
             } catch {
                 guard !Task.isCancelled, transcriptionGeneration == generation else { return }
+                transcribing = false
+                transcription = nil
                 voice.say("Speech recognition failed. Check the Mac connection.")
             }
         }
     }
 
     private func cancelTranscription(resumeVoice: Bool = true) {
+        actionButtonRequest?.cancel()
+        actionButtonRequest = nil
+        actionButtonRecording?.cancel()
+        actionButtonRecording = nil
+        recordingFromActionButton = false
         transcriptionGeneration += 1
         transcription?.cancel()
         transcription = nil
+        transcribing = false
         if recording {
             _ = talk.stop()
             recording = false
@@ -382,7 +465,8 @@ final class AppModel: ObservableObject {
 
     private func connectionLost(control isControl: Bool) {
         if isControl { controlUp = false } else { sensorUp = false }
-        autoStop("connection")
+        if recording || transcribing { localStop("connection") }
+        else { autoStop("connection") }
     }
 
     func enteredBackground() {
@@ -425,7 +509,7 @@ final class AppModel: ObservableObject {
                 guard let self else { return }
                 self.interrupted = began
                 if began {
-                    if self.stopReason == nil { self.localStop("interrupted") }
+                    if self.recording || self.transcribing || self.stopReason == nil { self.localStop("interrupted") }
                 } else {
                     try? AVAudioSession.sharedInstance().setActive(true)
                     self.audio.restart()
@@ -478,7 +562,7 @@ final class AppModel: ObservableObject {
         if audio.headTrackingLive != headTracking { headTracking = audio.headTrackingLive }
         let fresh = now.timeIntervalSince(guidanceAt) < 1
         if !fresh { autoStop("stale") }
-        guard foreground, !searchCleared, stopReason == nil, fresh, tracking == "normal", let g = guidance else {
+        guard !recording, !transcribing, foreground, !searchCleared, stopReason == nil, fresh, tracking == "normal", let g = guidance else {
             audio.stopTargetLoop()
             return resetProbe()
         }

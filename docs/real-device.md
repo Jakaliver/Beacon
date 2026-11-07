@@ -92,8 +92,8 @@ file will restore the checked-in developer's signing settings.
    then tap **Done**. Enter only the host, **without** `http://`, `ws://` or `:8787`.
    The app currently defaults to another developer's Mac, so you must change this.
 4. Allow Camera, Microphone, Motion and Local Network permissions when requested.
-   **Start voice mode** also requests Speech Recognition permission for on-device commands.
-5. The phone should show **Mac connected** and **Tracking: normal**. The health endpoint
+   Settings → **Hands-free voice** → **Start voice mode** also requests Speech Recognition permission for on-device commands.
+5. The phone should show **Connected** and **Ready**. The health endpoint
    should now show `sensor_connected: true`.
 
 To diagnose connectivity before changing code, open
@@ -104,21 +104,44 @@ Allow incoming connections for the backend if macOS prompts. Use the Mac's Wi-Fi
 
 ## 5. First camera and target test
 
-1. Keep Trident open in the foreground. Start at **5 frames/sec** in its Settings on a
+1. Keep Trident open in the foreground. Start at **5 frames/sec** under Settings → Advanced on a
    MacBook Air; raise the rate only while the displayed camera age remains low.
 2. Sweep slowly across a well-lit floor and nearby furniture. A floor patch of about 1 m²
    helps ARKit establish the floor height. The Mac view should show **Live**
    and an increasing point count.
 3. Hold the phone ahead of your torso, facing forward, and tap **Calibrate**. If testing
    head tracking, wear compatible AirPods paired with the phone during calibration.
-4. For the first object test, type **find the bottle** and tap **Send**. This isolates
-   camera/detection setup from microphone setup. Once working, hold **Find object**, say
-   the same request and release to send.
+4. Press and hold **Hold to navigate**, say **find the bottle**, then release. The button
+   shows when it is listening and sending your request. With VoiceOver, double-tap to
+   start recording and double-tap again to send.
 5. The selected target appears red in the Mac view. Keep it visible while moving closer:
    consistent new sightings refine its position and surface. Larger corrections require
    three agreeing observations so a single bad depth frame does not move the target.
-6. **Stop** silences guidance locally; **Resume** restarts when the connection and tracking
-   are ready. Audio changes and app interruptions can also stop guidance.
+6. **Stop** appears while a request or guidance is active. It silences guidance and cancels
+   any pending voice request. To continue, hold the main button and say **resume**, or ask
+   for another object. Audio changes and app interruptions can also stop guidance.
+
+### iPhone Action button
+
+In iPhone **Settings → Action Button → Shortcut → Choose a Shortcut**, choose
+**Trident → Push to Talk**. This App Shortcut is available after installing Trident;
+no custom shortcut needs to be created. iOS requires the user to choose the assignment.
+
+Press and hold the Action button to open Trident and start a request. A haptic marks
+the start of recording. Say what to find, then pause: roughly one second of silence
+after speech sends the request. Activate the Action button again to send early.
+Recording is capped at six seconds. **Stop** cancels the request without sending it.
+The on-screen **Hold to navigate** keeps its hold/release behavior.
+
+This uses Apple's App Shortcut activation, which does not supply a button-release
+event. Unlock the iPhone when prompted: Trident needs its foreground camera session
+and a reachable Mac. If disconnected, it waits up to eight seconds before reporting
+the connection problem. Leaving the app cancels pending recording and transcription.
+
+Check a cold launch, a second press to send, silence after speaking, and Stop while
+recording or sending. `bash scripts/test-action-button.sh` checks the automatic
+end-of-request timing; the physical button assignment and microphone need an iPhone.
+See [Apple's Action button setup](https://support.apple.com/guide/iphone/use-and-customize-the-action-button-iphe89d61d66/ios).
 
 ### Reading the room view
 
@@ -139,7 +162,7 @@ framing after dragging or zooming. **Locate** centres the selected target.
 **First person** places the view at the iPhone camera and follows its direction, including
 looking up and down. Move the phone to look around; a paused scan holds the last valid
 camera position. Select **3D** or **Overhead** to return to the external room views.
-Use **Find object** in the iPhone app to select a target; the browser is read-only.
+Use **Hold to navigate** in the iPhone app to select a target; the browser is read-only.
 The geometry comes from monocular depth estimates, not a hardware LiDAR scan.
 
 Trident keeps the iPhone screen awake while open. Manually locking it or leaving the app
@@ -150,7 +173,7 @@ Guidance plays a continuous chest sound at the found object's position by defaul
 distance attenuation and a subtle small-room reverb. Settings → **Object sound** switches
 between **Chest** and the original **Beeps**. The chest sound lowers while the app speaks.
 For the hands-free controls and audio acceptance checks, use the
-[voice and audio branch test guide](voice-audio-testing.md).
+[voice and audio test guide](voice-audio-testing.md).
 With AirPods on, face where the phone points and press **Calibrate** so head turns keep
 the sound aligned with the object. The reverb is a room preset, not measured room acoustics.
 
@@ -165,7 +188,7 @@ the sound aligned with the object. The reverb is a room preset, not measured roo
 | `vision_ready: false` / `speech_ready: false` | Wait for model loading and check the backend terminal. Re-run setup online if downloads did not finish. |
 | Connected, but no room points | Allow Camera/Local Network access, wait for normal tracking, scan the floor, and check `vision_ready`. |
 | Room stops changing | Check the camera age in the viewer and keep the iPhone app foregrounded. |
-| Speech works, but guidance is silent | Connect AirPods to the **iPhone**, check its audio output, then send a new **find** command or tap **Resume**. Check the displayed stop reason if guidance pauses. |
+| Speech works, but guidance is silent | Connect AirPods to the **iPhone**, check its audio output, then send a new **find** command or hold the main button and say **resume**. Listen for the spoken stop reason if guidance pauses. |
 | Sounds turn the wrong way with your head | Recalibrate while facing ahead; try the app's **Reverse head turn** setting. |
 
 For a playback check independent of camera detection, launch an installed **Debug** build

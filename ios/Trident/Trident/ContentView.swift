@@ -2,119 +2,170 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var model: AppModel
-    @State private var typed = ""
     @State private var showSettings = false
     @AppStorage(Settings.guidanceSoundStyleKey) private var soundStyle = GuidanceSoundStyle.chest.rawValue
 
+    private var connected: Bool { model.controlUp && model.sensorUp }
+    private var guiding: Bool { ["walking", "probe", "hotcold"].contains(model.mode) && model.stopReason == nil }
+    private var canStop: Bool {
+        model.recording || model.transcribing || (model.stopReason == nil && ["searching", "choosing", "walking", "probe", "hotcold"].contains(model.mode))
+    }
+
     var body: some View {
-        NavigationStack {
+        GeometryReader { geometry in
             ScrollView {
-                VStack(spacing: 14) {
-                    status
-                    VoiceModeControls(voice: model.voice)
-                    BigButton(title: "Calibrate", hint: "Face ahead and hold the phone in front of you, then double tap.",
-                              color: .indigo) { model.calibrate() }
-                    findButton
-                    HStack(spacing: 14) {
-                        BigButton(title: "Repeat", hint: "Repeats the last instruction.", color: .teal) {
-                            model.command("repeat", confirmation: "Repeat")
+                VStack(alignment: .leading, spacing: 0) {
+                    header
+                    Spacer(minLength: 48)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(statusTitle)
+                            .font(.largeTitle.weight(.semibold))
+                            .accessibilityAddTraits(.isHeader)
+                        Text(statusDetail)
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
+                    if !model.choices.isEmpty {
+                        VStack(spacing: 8) {
+                            ForEach(model.choices) { choice in
+                                Button { model.choose(choice) } label: {
+                                    HStack {
+                                        Text(choice.description).multilineTextAlignment(.leading)
+                                        Spacer(minLength: 12)
+                                        Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                                    }
+                                    .padding(16)
+                                    .frame(maxWidth: .infinity, minHeight: 52)
+                                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityHint("Selects this object for guidance.")
+                            }
                         }
-                        BigButton(title: "Inspect", hint: "Describes what the camera sees.", color: .teal) {
-                            model.command("inspect", confirmation: "Inspecting")
+                        .padding(.top, 24)
+                    }
+                    Spacer(minLength: 40)
+                    VStack(spacing: 12) {
+                        Button { model.calibrate() } label: {
+                            Label("Calibrate", systemImage: "scope")
+                                .font(.body.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 56)
+                                .contentShape(RoundedRectangle(cornerRadius: 16))
                         }
-                    }
-                    BigButton(title: "Stop", hint: "Silences all guidance immediately.", color: .red, height: 160) {
-                        model.stop()
-                    }
-                    BigButton(title: "Resume", hint: "Restarts guidance when the connection and tracking are ready.",
-                              color: .green) { model.resume() }
-                    ForEach(model.choices) { choice in
-                        BigButton(title: "\(choice.index). \(choice.description)", hint: "Selects this object.",
-                                  color: .orange, height: 64) { model.choose(choice) }
-                    }
-                    HStack {
-                        TextField("Type a command", text: $typed)
-                            .textFieldStyle(.roundedBorder)
-                            .submitLabel(.send)
-                            .onSubmit(sendTyped)
-                        Button("Send", action: sendTyped)
-                            .accessibilityHint("Sends the typed command to the Mac.")
+                        .buttonStyle(.plain)
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.primary.opacity(0.16), lineWidth: 1))
+                        .disabled(model.recording || model.transcribing)
+                        .accessibilityHint("Face ahead with the phone pointing forwards, then activate to align the audio.")
+                        navigateButton
+                        Button("Stop", role: .destructive) { model.stop() }
+                            .font(.body.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .opacity(canStop ? 1 : 0)
+                            .disabled(!canStop)
+                            .accessibilityHidden(!canStop)
+                            .accessibilityHint("Stops recording, cancels a pending request and silences guidance immediately.")
                     }
                 }
-                .padding()
+                .frame(minHeight: max(0, geometry.size.height - 48))
+                .padding(24)
             }
-            .navigationTitle("Trident")
-            .toolbar {
-                Button { showSettings = true } label: { Image(systemName: "gearshape") }
-                    .accessibilityLabel("Settings")
-            }
-            .sheet(isPresented: $showSettings, onDismiss: model.applySettings) { SettingsView() }
-            .onChange(of: soundStyle) { _, _ in model.refreshGuidanceSound() }
+            .scrollIndicators(.hidden)
+        }
+        .background(Color(.systemBackground))
+        .sheet(isPresented: $showSettings, onDismiss: model.applySettings) { SettingsView(voice: model.voice) }
+        .onChange(of: soundStyle) { _, _ in model.refreshGuidanceSound() }
+        .onChange(of: model.recordingFromActionButton) { _, recording in
+            if recording { showSettings = false }
         }
     }
 
-    private var status: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label(model.controlUp && model.sensorUp ? "Mac connected" : "Mac not connected",
-                  systemImage: model.controlUp && model.sensorUp ? "wifi" : "wifi.slash")
-            Text("Tracking: \(model.tracking)")
-            Text(model.stopReason.map { "Stopped: \($0)" } ?? "Mode: \(model.mode)")
-                .foregroundStyle(model.stopReason == nil ? Color.primary : Color.red)
+    private var header: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Trident").font(.title2.weight(.semibold))
+                HStack(spacing: 6) {
+                    Circle().fill(connected ? Color.green : Color.secondary).frame(width: 5, height: 5)
+                    Text(connected ? "Connected" : "Not connected")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(connected ? "Mac connected" : "Mac not connected")
+            }
+            Spacer()
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(model.recording || model.transcribing)
+            .accessibilityLabel("Settings")
         }
-        .font(.title3.weight(.semibold))
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var navigateButton: some View {
+        VStack(spacing: 16) {
+            Image(systemName: model.recording ? "waveform" : model.transcribing ? "ellipsis" : "mic.fill")
+                .font(.system(size: 28, weight: .medium))
+                .accessibilityHidden(true)
+            VStack(spacing: 6) {
+                Text(model.recordingFromActionButton ? "Listening…" : model.recording ? "Release to navigate" : model.transcribing ? "Sending request…" : "Hold to navigate")
+                    .font(.title2.weight(.semibold))
+                Text(model.recordingFromActionButton ? "Pause to send, or press Action again" : model.recording ? "Listening…" : model.transcribing ? "One moment" : "Say “find the bottle”, then release")
+                    .font(.subheadline)
+                    .opacity(0.7)
+            }
+            .multilineTextAlignment(.center)
+        }
+        .foregroundStyle(Color(.systemBackground))
+        .padding(24)
+        .frame(maxWidth: .infinity, minHeight: 190)
+        .background(Color.primary.opacity(connected ? 1 : 0.35), in: RoundedRectangle(cornerRadius: 22))
+        .contentShape(RoundedRectangle(cornerRadius: 22))
+        .gesture(DragGesture(minimumDistance: 0)
+            .onChanged { _ in model.startTalking() }
+            .onEnded { _ in model.stopTalking() })
+        .disabled(!connected || model.transcribing)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(model.statusSummary)
-        .accessibilityAddTraits(.updatesFrequently)
+        .accessibilityLabel(model.recordingFromActionButton ? "Listening. Double tap to send" : model.recording ? "Release to navigate. Listening" : model.transcribing ? "Sending request" : "Hold to navigate")
+        .accessibilityHint("Double tap to start speaking, then double tap again to send. Say the object you want to find, or say resume.")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { model.toggleTalking() }
     }
 
-    private var findButton: some View {
-        Text(model.recording ? "Listening… release to send" : "Hold to find object")
-            .font(.title2.bold())
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, minHeight: 110)
-            .background(model.recording ? Color.orange : Color.blue, in: RoundedRectangle(cornerRadius: 18))
-            .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { _ in model.startTalking() }
-                .onEnded { _ in model.stopTalking() })
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(model.recording ? "Listening. Find object" : "Find object")
-            .accessibilityHint("Double tap to start speaking, and double tap again to send. You can also hold.")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { model.toggleTalking() }
+    private var statusTitle: String {
+        if model.recording { return "What are you looking for?" }
+        if model.transcribing { return "Processing your request" }
+        if !connected { return "Connect to your Mac" }
+        if model.tracking != "normal" { return "Hold the phone steady" }
+        if !model.choices.isEmpty { return "Choose your object" }
+        if guiding { return "Follow the sound" }
+        if model.mode == "searching" { return "Looking for your object" }
+        if model.stopReason != nil || model.mode == "stopped" { return "Paused" }
+        return "Ready"
     }
 
-    private func sendTyped() {
-        let text = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        model.command(text, confirmation: "Sent")
-        typed = ""
-    }
-}
-
-private struct BigButton: View {
-    let title: String
-    let hint: String
-    let color: Color
-    var height: CGFloat = 90
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.title2.bold())
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, minHeight: height)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(color)
-        .accessibilityHint(hint)
+    private var statusDetail: String {
+        if model.recordingFromActionButton { return "Say what to find. Your request sends when you pause." }
+        if model.recording { return "Speak your request, then release the button." }
+        if model.transcribing { return "You can tap Stop to cancel." }
+        if !connected { return "Connect to the same Wi-Fi and add your Mac’s address in Settings." }
+        if model.tracking != "normal" { return "Point the camera at the room and move slowly while tracking settles." }
+        if !model.choices.isEmpty { return "More than one match is in view." }
+        if guiding { return "Follow the object’s sound. Tap Stop whenever you need to pause." }
+        if model.mode == "searching" { return "Slowly scan the room with the camera." }
+        if model.stopReason != nil || model.mode == "stopped" { return "Hold the button to say “resume”, or ask for a different object." }
+        return "Calibrate, then hold the button and say what you want to find."
     }
 }
 
 private struct SettingsView: View {
+    @ObservedObject var voice: VoiceSession
     @AppStorage(Settings.hostKey) private var host = Settings.defaultHost
     @AppStorage(Settings.frameRateKey) private var frameRate = Settings.defaultFrameRate
     @AppStorage(Settings.reverseHeadTurnKey) private var reverseHeadTurn = false
@@ -125,25 +176,40 @@ private struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                GuidanceSoundSettings()
-                TextField("Mac host", text: $host)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.URL)
-                Stepper("Frame rate: \(Int(frameRate)) per second", value: $frameRate, in: 2...30)
-                Toggle("Reverse head turn", isOn: $reverseHeadTurn)
-                    .accessibilityHint("Turn on if sounds move the wrong way when you turn your head")
-                Toggle("Reverse head tilt", isOn: $reverseHeadTilt)
-                    .accessibilityHint("Turn on if sounds move the wrong way when you look up or down")
-                VStack(alignment: .leading) {
-                    Text("Sound height: \(soundHeight > 0 ? "+" : "")\(Int((soundHeight * 100).rounded())) cm")
-                    Slider(value: $soundHeight, in: -0.6...0.6, step: 0.05)
+                Section("Hands-free voice") {
+                    VoiceModeControls(voice: voice)
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityHint("Moves all guidance sounds up or down to match where objects are")
+                GuidanceSoundSettings()
+                Section("Action button") {
+                    Text("In iPhone Settings → Action Button, choose Shortcut → Trident → Push to Talk.")
+                    Text("Press and hold to start. Speak, then pause to send. Press again to send early. Unlock your iPhone so Trident can use the camera.")
+                        .foregroundStyle(.secondary)
+                }
+                Section("Connection") {
+                    TextField("Mac host", text: $host)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                }
+                Section {
+                    DisclosureGroup("Advanced") {
+                        Stepper("Frame rate: \(Int(frameRate)) per second", value: $frameRate, in: 2...30)
+                        Toggle("Reverse head turn", isOn: $reverseHeadTurn)
+                            .accessibilityHint("Turn on if sounds move the wrong way when you turn your head")
+                        Toggle("Reverse head tilt", isOn: $reverseHeadTilt)
+                            .accessibilityHint("Turn on if sounds move the wrong way when you look up or down")
+                        VStack(alignment: .leading) {
+                            Text("Sound height: \(soundHeight > 0 ? "+" : "")\(Int((soundHeight * 100).rounded())) cm")
+                            Slider(value: $soundHeight, in: -0.6...0.6, step: 0.05)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityHint("Moves guidance sounds up or down to match the objects")
+                    }
+                }
             }
             .navigationTitle("Settings")
-            .toolbar { Button("Done") { dismiss() } }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
     }
 }
