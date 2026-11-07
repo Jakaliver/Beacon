@@ -19,6 +19,13 @@ from .config import CONFIG
 from .engine import DEBUG_DIR, Engine
 
 log = logging.getLogger("trident")
+# Event log: what the user sent and what Trident answered. Goes to the server's stderr.
+events = logging.getLogger("trident.events")
+_handler = logging.StreamHandler()
+_handler.setFormatter(logging.Formatter("%(asctime)s %(message)s", "%H:%M:%S"))
+events.addHandler(_handler)
+events.setLevel(logging.INFO)
+events.propagate = False
 faulthandler.register(signal.SIGUSR1)  # `kill -USR1 <pid>` prints all thread stacks
 engine = Engine()
 control_clients: set[WebSocket] = set()
@@ -51,9 +58,19 @@ async def broadcast(clients: set[WebSocket], msgs: list[dict]) -> None:
             clients.discard(ws)
 
 
+last_logged_mode = {"mode": None}
+
+
 async def publish_guidance() -> None:
     g = engine.step()
     msgs = engine.drain()
+    for m in msgs:
+        events.info("-> %s %s", m["type"], m.get("text") or m.get("name") or m.get("options"))
+    if g and (g["mode"], g["stop_reason"]) != last_logged_mode["mode"]:
+        last_logged_mode["mode"] = (g["mode"], g["stop_reason"])
+        target = g["target"]
+        events.info("mode %s%s target=%s", g["mode"], f" ({g['stop_reason']})" if g["stop_reason"] else "",
+                    target and f"{target['id']} at {target['position']} locked={target.get('locked')}")
     if g:
         msgs.append(g)
     if msgs:
@@ -138,6 +155,7 @@ async def transcribe(request: Request) -> dict:
     if len(body) > 2_000_000:
         return {"text": "", "error": "recording too long"}
     text = await asyncio.to_thread(speech["model"].transcribe_wav, body)
+    events.info("heard (%.1f s of audio): %r", max(0, len(body) - 44) / 32000, text)
     return {"text": text}
 
 
@@ -156,6 +174,7 @@ def parse_frame(data: bytes) -> tuple[dict, bytes, np.ndarray | None]:
 @app.websocket("/ws/sensor")
 async def sensor(ws: WebSocket) -> None:
     await ws.accept()
+    events.info("sensor connected from %s", ws.client.host if ws.client else "?")
     active_sensor["ws"] = ws
     engine.sensor_connected = True
     try:
@@ -184,6 +203,7 @@ async def sensor(ws: WebSocket) -> None:
     except WebSocketDisconnect:
         pass
     finally:
+        events.info("sensor disconnected")
         if active_sensor["ws"] is ws:
             active_sensor["ws"] = None
             engine.sensor_connected = False
@@ -198,6 +218,8 @@ async def control(ws: WebSocket) -> None:
         while True:
             m = json.loads(await ws.receive_text())
             kind = m.get("type")
+            if kind != "client_status":
+                events.info("<- %s", {k: v for k, v in m.items() if k != "type"} | {"type": kind})
             with engine.lock:
                 if kind == "command":
                     engine.command(m.get("text", ""))

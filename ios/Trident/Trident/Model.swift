@@ -42,6 +42,7 @@ enum Settings {
     static let frameRateKey = "frameRate"
     static let defaultHost = "Malins-Macbook-Pro-3.local"
     static let reverseHeadTurnKey = "reverseHeadTurn"
+    static let reverseHeadTiltKey = "reverseHeadTilt"
     static let defaultFrameRate = 10.0
 
     static var host: String { UserDefaults.standard.string(forKey: hostKey) ?? defaultHost }
@@ -60,6 +61,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var stopReason: String?
     @Published private(set) var recording = false
     @Published private(set) var choices: [Choice] = []
+    @Published private(set) var headTracking = false
 
     private let control = Connection(path: "/ws/control")
     private let sensor = Connection(path: "/ws/sensor")
@@ -98,7 +100,7 @@ final class AppModel: ObservableObject {
     var statusSummary: String {
         let link = controlUp && sensorUp ? "Mac connected" : controlUp || sensorUp ? "Mac partly connected" : "Mac not connected"
         let state = stopReason.map { "Stopped, \($0.replacingOccurrences(of: "_", with: " "))" } ?? "Mode \(mode)"
-        return "\(link). Tracking \(tracking.replacingOccurrences(of: "_", with: " ")). \(state)."
+        return "\(link). Tracking \(tracking.replacingOccurrences(of: "_", with: " ")). \(state). Head tracking \(headTracking ? "on" : "off")."
     }
 
     func start() {
@@ -147,15 +149,22 @@ final class AppModel: ObservableObject {
             speaker.say("Resetting tracking. Hold the phone ahead of you, then press Calibrate again.")
             return
         }
-        let look = -pose.transform.columns.2
-        let horizontal = SIMD3<Float>(look.x, 0, look.z)
-        guard simd_length(horizontal) > 0.3 else {
+        guard alignAudioForward() else {
             speaker.say("Hold the phone upright, pointing ahead, and press Calibrate again.")
             return
         }
-        audio.setForward(simd_normalize(horizontal))
         control.sendJSON(["type": "calibrate"])
         speaker.say("Calibrated. Ahead is where the phone points.")
+    }
+
+    /// Audio "ahead" = the phone's current horizontal heading in the AR world.
+    private func alignAudioForward() -> Bool {
+        guard let pose, pose.tracking == "normal" else { return false }
+        let look = -pose.transform.columns.2
+        let horizontal = SIMD3<Float>(look.x, 0, look.z)
+        guard simd_length(horizontal) > 0.3 else { return false }
+        audio.setForward(simd_normalize(horizontal))
+        return true
     }
 
     func stop() { localStop("user") }
@@ -178,6 +187,13 @@ final class AppModel: ObservableObject {
 
     func command(_ text: String, confirmation: String? = nil) {
         guard controlUp else { return speaker.say("Not connected to the Mac.") }
+        if text.lowercased().contains("find") {
+            // Asking to find something is a deliberate action: it clears any earlier stop, and
+            // "ahead" for the audio becomes where the phone points now (no separate Calibrate needed).
+            stopReason = nil
+            resetProbe()
+            _ = alignAudioForward()
+        }
         control.sendJSON(["type": "command", "text": text])
         if let confirmation { speaker.say(confirmation) }
     }
@@ -198,7 +214,6 @@ final class AppModel: ObservableObject {
         guard recording else { return }
         recording = false
         guard let wav = talk.stop() else { return }
-        speaker.say("Sending")
         Task {
             do {
                 let text = try await PushToTalk.transcribe(wav, host: Settings.host)
@@ -237,7 +252,12 @@ final class AppModel: ObservableObject {
         if stopReason == nil { localStop("interrupted") }
     }
 
-    func becameActive() { if started { ar.resume() } }
+    func becameActive() {
+        guard started else { return }
+        ar.resume()
+        try? AVAudioSession.sharedInstance().setActive(true)
+        audio.start()
+    }
 
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
@@ -305,6 +325,7 @@ final class AppModel: ObservableObject {
 
     private func tick() {
         let now = Date()
+        if audio.headTrackingLive != headTracking { headTracking = audio.headTrackingLive }
         let fresh = now.timeIntervalSince(guidanceAt) < 1
         if !fresh { autoStop("stale") }
         guard stopReason == nil, fresh, tracking == "normal", let g = guidance else { return resetProbe() }
@@ -382,7 +403,8 @@ final class AppModel: ObservableObject {
 
     /// 0.08 s at ≤ 0.15 m to 1.2 s at ≥ 3 m, exponential so that small changes near the object are audible.
     nonisolated static func pulseInterval(forDistance d: Float) -> Double {
-        let near = 0.15, far = 3.0, fastest = 0.08, slowest = 1.2
+        // Calm range: distance is also heard as loudness, so the knocks need not race like a metal detector.
+        let near = 0.15, far = 3.0, fastest = 0.22, slowest = 1.0
         let u = (min(max(Double(d), near), far) - near) / (far - near)
         return fastest * pow(slowest / fastest, u)
     }

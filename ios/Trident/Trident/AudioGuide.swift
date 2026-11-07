@@ -11,6 +11,8 @@ import simd
 /// user faces where the phone points, and later head turns are applied relative to that.
 final class AudioGuide {
     private let headMotion = CMHeadphoneMotionManager()
+    /// For the status line: whether AirPods head motion is arriving.
+    private(set) var headTrackingLive = false
     private var headReference: CMAttitude?
     private var latestHead: CMAttitude?
     private var baseForward = SIMD3<Float>(0, 0, -1)
@@ -22,9 +24,10 @@ final class AudioGuide {
     private let probe = AVAudioPlayerNode()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
 
-    private lazy var beaconBuffer = tone([(520, 0.14), (780, 0.06)], harmonic: 0.5)
-    private lazy var pulseBuffer = tone([(1400, 0.035)], harmonic: 0)
-    private lazy var confirmBuffer = tone([(880, 0.09), (1320, 0.14)], harmonic: 0.2)
+    // Beeps with soft harmonics: a pure sine cannot be placed in space; harmonics give the ear direction cues.
+    private lazy var beaconBuffer = beep(hz: 660, seconds: 0.16)
+    private lazy var pulseBuffer = beep(hz: 1000, seconds: 0.09)
+    private lazy var confirmBuffer = sequence([beep(hz: 1000, seconds: 0.09), beep(hz: 1000, seconds: 0.09)])
     private lazy var stopBuffer = tone([(660, 0.1), (440, 0.18)], harmonic: 0.2)
     private lazy var rescanBuffer = tone([(700, 0.06), (0, 0.05), (700, 0.06)], harmonic: 0.2)
 
@@ -36,17 +39,22 @@ final class AudioGuide {
         }
         engine.connect(environment, to: engine.mainMixerNode, format: nil)
 
-        let hq = AVAudio3DMixingRenderingAlgorithm.HRTFHQ
-        let algorithm = environment.applicableRenderingAlgorithms.contains(NSNumber(value: hq.rawValue)) ? hq : .auto
+        // .auto: Apple's highest-quality renderer for the current hardware (newer than HRTFHQ on AirPods).
         for player in [beacon, probe] {
-            player.renderingAlgorithm = algorithm
+            player.renderingAlgorithm = .auto
             player.sourceMode = .pointSource
             player.pointSourceInHeadMode = .bypass
+            player.reverbBlend = 0.2
         }
+        // A little room reverb moves binaural sound out of the head and into the room.
+        environment.reverbParameters.enable = true
+        environment.reverbParameters.loadFactoryReverbPreset(.mediumRoom)
+        environment.reverbParameters.level = -8
         environment.isListenerHeadTrackingEnabled = Self.automaticHeadTracking
         environment.distanceAttenuationParameters.distanceAttenuationModel = .inverse
-        environment.distanceAttenuationParameters.referenceDistance = 1
-        environment.distanceAttenuationParameters.rolloffFactor = 0.5
+        environment.distanceAttenuationParameters.referenceDistance = 0.5
+        environment.distanceAttenuationParameters.maximumDistance = 10
+        environment.distanceAttenuationParameters.rolloffFactor = 1.2
     }
 
     func start() {
@@ -62,6 +70,7 @@ final class AudioGuide {
         headMotion.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
             guard let self, let attitude = motion?.attitude else { return }
             self.latestHead = attitude
+            self.headTrackingLive = true
             if self.headReference == nil { self.headReference = attitude.copy() as? CMAttitude }
             self.applyHead()
         }
@@ -69,16 +78,22 @@ final class AudioGuide {
 
     /// Listener forward = calibrated world forward, turned by the head's yaw since calibration.
     private func applyHead() {
-        var yaw: Float = 0
+        var yaw: Float = 0, pitch: Float = 0
         if let head = latestHead?.copy() as? CMAttitude, let reference = headReference {
             head.multiply(byInverseOf: reference)
-            yaw = Float(head.yaw) * (UserDefaults.standard.bool(forKey: Settings.reverseHeadTurnKey) ? -1 : 1)
+            let defaults = UserDefaults.standard
+            yaw = Float(head.yaw) * (defaults.bool(forKey: Settings.reverseHeadTurnKey) ? -1 : 1)
+            pitch = Float(head.pitch) * (defaults.bool(forKey: Settings.reverseHeadTiltKey) ? -1 : 1)
         }
-        // Rotation about +Y: a positive yaw (turn left) swings forward towards −X.
+        // Turn: rotation about +Y; a positive yaw (turn left) swings forward towards −X.
         let c = cos(yaw), s = sin(yaw)
-        let f = SIMD3<Float>(baseForward.x * c + baseForward.z * s, 0, -baseForward.x * s + baseForward.z * c)
+        let flat = SIMD3<Float>(baseForward.x * c + baseForward.z * s, 0, -baseForward.x * s + baseForward.z * c)
+        // Tilt: a positive pitch (look up) lifts forward towards +Y and tips "up" backwards.
+        let worldUp = SIMD3<Float>(0, 1, 0)
+        let f = flat * cos(pitch) + worldUp * sin(pitch)
+        let u = worldUp * cos(pitch) - flat * sin(pitch)
         environment.listenerVectorOrientation = AVAudio3DVectorOrientation(
-            forward: AVAudio3DVector(x: f.x, y: 0, z: f.z), up: AVAudio3DVector(x: 0, y: 1, z: 0))
+            forward: AVAudio3DVector(x: f.x, y: f.y, z: f.z), up: AVAudio3DVector(x: u.x, y: u.y, z: u.z))
     }
 
     func restart() {
@@ -95,8 +110,9 @@ final class AudioGuide {
         }
     }
 
+    /// `position` is the body estimate at phone height; the ears are higher, so a table-top target sounds below.
     func setListener(_ position: SIMD3<Float>) {
-        environment.listenerPosition = AVAudio3DPoint(x: position.x, y: position.y, z: position.z)
+        environment.listenerPosition = AVAudio3DPoint(x: position.x, y: position.y + 0.3, z: position.z)
     }
 
     /// Call while the user faces where the phone points: that world direction becomes "ahead".
@@ -136,8 +152,50 @@ final class AudioGuide {
     }
 
     private func play(_ buffer: AVAudioPCMBuffer, on player: AVAudioPlayerNode) {
-        guard engine.isRunning else { return }
+        // The engine can fail to start (app launched in the background) or stop (route or interruption
+        // changes). Recover here, or every guidance sound is silently lost while speech still works.
+        if !engine.isRunning {
+            try? AVAudioSession.sharedInstance().setActive(true)
+            start()
+            guard engine.isRunning else { return }
+        }
+        if !player.isPlaying { player.play() }
         player.scheduleBuffer(buffer, at: nil, options: .interrupts)
+    }
+
+    /// A rounded beep: fundamental plus decaying harmonics up to ~8 kHz, smooth attack and release.
+    private func beep(hz: Double, seconds: Double) -> AVAudioPCMBuffer {
+        let rate = format.sampleRate
+        let n = Int(seconds * rate)
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(n))!
+        buffer.frameLength = AVAudioFrameCount(n)
+        let out = buffer.floatChannelData![0]
+        let harmonics = (1...8).filter { Double($0) * hz < 8_000 }
+        for i in 0..<n {
+            let t = Double(i) / rate
+            var v = 0.0
+            for k in harmonics { v += sin(2 * .pi * hz * Double(k) * t) / Double(k * k) * (k == 1 ? 1 : 1.6) }
+            let envelope = min(1, t / 0.006, (seconds - t) / 0.025)
+            out[i] = Float(0.4 * envelope * v)
+        }
+        return buffer
+    }
+
+    private func sequence(_ parts: [AVAudioPCMBuffer]) -> AVAudioPCMBuffer {
+        let gap = Int(0.05 * format.sampleRate)
+        let total = parts.reduce(0) { $0 + Int($1.frameLength) + gap }
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(total))!
+        buffer.frameLength = AVAudioFrameCount(total)
+        let out = buffer.floatChannelData![0]
+        var i = 0
+        for p in parts {
+            let src = p.floatChannelData![0]
+            for j in 0..<Int(p.frameLength) { out[i + j] = src[j] }
+            i += Int(p.frameLength)
+            for j in 0..<gap { out[i + j] = 0 }
+            i += gap
+        }
+        return buffer
     }
 
     /// Mono tone sequence; a frequency of 0 is silence. `harmonic` adds a second partial for a softer timbre.

@@ -257,17 +257,20 @@ class Engine:
     def _handle(self, c: dict) -> None:
         cmd = c["cmd"]
         if cmd == "find":
+            # Always place anew: an earlier sighting may be stale or of another object.
+            label = canonical(c["label"])
+            self.tracker.tracks = {k: t for k, t in self.tracker.tracks.items() if t.label != label}
             for t in self.tracker.tracks.values():
                 t.locked = False
-            self.want_label = canonical(c["label"])
-            self.want_word = c["spoken"] or c["label"]
+            self.want_label = label
+            self.want_word = (c["spoken"] or c["label"]).replace("waterbottle", "water bottle")
             self.selected = None
             self.choice_ids = []
             self.mode = "searching"
             self.stop_reason = None
             if self.audio_yaw_offset is None:
                 self.calibrate(quiet=True)
-            self.say(f"Looking for {self.spoken(self.want_label)}. Scan slowly around you.")
+            self.say(f"Looking for {self.spoken(self.want_label)}.")
         elif cmd == "unsupported":
             self.say(f"Sorry, I can't recognise {c['spoken'] or 'that'}. "
                      "I can find bottles, cups, chairs, sofas, tables and other common objects.")
@@ -331,9 +334,7 @@ class Engine:
         self.listener_anchor = None
         self.path, self.waypoint = [], None
         az, dist = self.relative(t.position)
-        self.say(f"Found {self.spoken(t.label)}, about {dist:.1f} metres {describe_direction(az)}."
-                 + " Its position is now fixed. Say find again to place it anew."
-                + (" Follow the beacon." if self.navigation else " Faster pulses mean closer."))
+        self.say(f"Found it, {dist:.1f} metres {describe_direction(az)}.")
 
     def resume(self) -> None:
         if self.audio_yaw_offset is None:
@@ -479,24 +480,22 @@ class Engine:
             found = self.tracker.confirmed(self.want_label, now)
             if self.selected and any(t.id == self.selected for t in found):
                 self.start_guidance()
-            elif not self.selected and len(found) == 1:
-                self.selected = found[0].id
+            elif not self.selected and found:
+                # No "choose a number" step: take the match the user points the phone at.
+                def pointing_error(t) -> float:
+                    v = t.position - self.pose.T[:3, 3]
+                    cos = float(np.dot(v / (np.linalg.norm(v) + 1e-9), forward(self.pose.T)))
+                    return math.acos(max(-1.0, min(1.0, cos))) + 0.05 * float(np.linalg.norm(v))
+                self.selected = min(found, key=pointing_error).id
                 self.start_guidance()
-            elif not self.selected and len(found) > 1:
-                self.mode = "choosing"
-                self.choice_ids = [t.id for t in sorted(found, key=lambda t: self.relative(t.position)[0])]
-                options = []
-                for i, tid in enumerate(self.choice_ids, 1):
-                    az, dist = self.relative(self.tracker.tracks[tid].position)
-                    options.append({"index": i, "id": tid,
-                                    "description": f"{dist:.1f} metres {describe_direction(az)}"})
-                self.outbox.append({"type": "choices", "options": options})
-                self.say(f"I see {len(found)} {self.want_word or self.want_label}s. "
-                         + ". ".join(f"Number {o['index']}: {o['description']}" for o in options)
-                         + ". Say choose and a number.")
             return
         if self.mode in ACTIVE and self.selected:
             t = self.tracker.tracks.get(self.selected)
+            if t is not None and t.relocated:
+                t.relocated = False
+                self.cue("rescan")
+                self.say("The bottle moved. Updated its position." if t.label == "bottle"
+                         else f"{self.spoken(t.label).capitalize()} moved. Updated its position.")
             if t is None or (not t.locked and t.misses >= CONFIG.misses_to_lose):
                 self.mode = "searching"
                 self.selected = None
