@@ -61,6 +61,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var mode = "idle"
     @Published private(set) var stopReason: String?
     @Published private(set) var recording = false
+    @Published private(set) var transcribing = false
     @Published private(set) var choices: [Choice] = []
     @Published private(set) var headTracking = false
 
@@ -77,6 +78,8 @@ final class AppModel: ObservableObject {
     private var interrupted = false
     private var started = false
     private var ticker: Timer?
+    private var transcriptionTask: Task<Void, Never>?
+    private var connectedHost: String?
 
     private var smoothedDistance: Float?
     private var phoneInterval: Double?
@@ -147,10 +150,11 @@ final class AppModel: ObservableObject {
 
     func applySettings() {
         ar.setFrameRate(Settings.frameRate)
-        connect()
+        if Settings.host != connectedHost || !controlUp || !sensorUp { connect() }
     }
 
     private func connect() {
+        connectedHost = Settings.host
         control.connect(host: Settings.host)
         sensor.connect(host: Settings.host)
     }
@@ -200,6 +204,9 @@ final class AppModel: ObservableObject {
 
     func command(_ text: String, confirmation: String? = nil) {
         guard controlUp else { return speaker.say("Not connected to the Mac.") }
+        let words = text.lowercased().split(whereSeparator: { !$0.isLetter })
+        if words.contains("stop") || words.contains("cancel") { stop(); return }
+        if words.contains("resume") { resume(); return }
         if text.lowercased().contains("find") {
             // Asking to find something is a deliberate action: it clears any earlier stop, and
             // "ahead" for the audio becomes where the phone points now (no separate Calibrate needed).
@@ -218,8 +225,11 @@ final class AppModel: ObservableObject {
     }
 
     func startTalking() {
-        guard !recording else { return }
+        guard !recording, !transcribing else { return }
+        guard controlUp && sensorUp else { return speaker.say("Not connected to the Mac.") }
         speaker.hush()
+        audio.silence()
+        resetProbe()
         recording = talk.start()
         if !recording { speaker.say("Microphone not available.") }
     }
@@ -228,15 +238,22 @@ final class AppModel: ObservableObject {
         guard recording else { return }
         recording = false
         guard let wav = talk.stop() else { return }
-        Task {
+        transcribing = true
+        transcriptionTask = Task {
             do {
                 let text = try await PushToTalk.transcribe(wav, host: Settings.host)
+                guard !Task.isCancelled else { return }
+                transcribing = false
+                transcriptionTask = nil
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     speaker.say("I did not hear a request.")
                 } else {
                     command(text)
                 }
             } catch {
+                guard !Task.isCancelled else { return }
+                transcribing = false
+                transcriptionTask = nil
                 speaker.say("Speech recognition failed. Check the Mac connection.")
             }
         }
@@ -245,6 +262,11 @@ final class AppModel: ObservableObject {
     func toggleTalking() { recording ? stopTalking() : startTalking() }
 
     private func localStop(_ reason: String) {
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
+        if recording { _ = talk.stop() }
+        recording = false
+        transcribing = false
         audio.silence()
         resetProbe()
         stopReason = reason
@@ -259,11 +281,12 @@ final class AppModel: ObservableObject {
 
     private func connectionLost(control isControl: Bool) {
         if isControl { controlUp = false } else { sensorUp = false }
-        autoStop("connection")
+        if recording || transcribing { localStop("connection") }
+        else { autoStop("connection") }
     }
 
     func enteredBackground() {
-        if stopReason == nil { localStop("interrupted") }
+        if recording || transcribing || stopReason == nil { localStop("interrupted") }
     }
 
     func becameActive() {
@@ -297,7 +320,7 @@ final class AppModel: ObservableObject {
                 guard let self else { return }
                 self.interrupted = began
                 if began {
-                    if self.stopReason == nil { self.localStop("interrupted") }
+                    if self.recording || self.transcribing || self.stopReason == nil { self.localStop("interrupted") }
                 } else {
                     try? AVAudioSession.sharedInstance().setActive(true)
                     self.audio.restart()
@@ -348,7 +371,7 @@ final class AppModel: ObservableObject {
         if audio.headTrackingLive != headTracking { headTracking = audio.headTrackingLive }
         let fresh = now.timeIntervalSince(guidanceAt) < 1
         if !fresh { autoStop("stale") }
-        guard stopReason == nil, fresh, tracking == "normal", let g = guidance else { return resetProbe() }
+        guard !recording, !transcribing, stopReason == nil, fresh, tracking == "normal", let g = guidance else { return resetProbe() }
 
         switch g.mode {
         case "walking":

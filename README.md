@@ -19,6 +19,8 @@ scripts/dev.sh     # backend on :8787, room view on :5173
 Open <http://localhost:5173>. Keep Trident open on an iPhone connected to the same Wi-Fi.
 See [iPhone setup](docs/real-device.md) for signing, installation and connection settings.
 
+On the iPhone, tap **Calibrate**, then **Hold to navigate**: say what to find and release.
+**Stop** appears during active requests or guidance. Connection settings live behind the gear.
 Use the iPhone app to find an object. Its selected target appears automatically in the room
 view. **3D** slowly circles the scan at 30° above horizontal, completing a turn in 90
 seconds. Drag or zoom to pause and inspect; press **3D** to resume. **Overhead** shows a

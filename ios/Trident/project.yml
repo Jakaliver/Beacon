@@ -31,7 +31,7 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiredDeviceCapabilities: [arkit]
         NSCameraUsageDescription: Trident uses the camera to map the room and find objects for you.
-        NSMicrophoneUsageDescription: Trident records your spoken request while you hold the Find object button.
+        NSMicrophoneUsageDescription: Trident records your spoken request while you hold the navigation button.
         NSMotionUsageDescription: Trident uses headphone motion to keep guidance sounds fixed in the room.
         NSLocalNetworkUsageDescription: Trident sends camera frames to your Mac on the local network and receives guidance.
         NSAppTransportSecurity:

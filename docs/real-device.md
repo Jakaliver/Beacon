@@ -102,21 +102,22 @@ Allow incoming connections for the backend if macOS prompts. Use the Mac's Wi-Fi
 
 ## 5. First camera and target test
 
-1. Keep Trident open in the foreground. Start at **5 frames/sec** in its Settings on a
+1. Keep Trident open in the foreground. Start at **5 frames/sec** under Settings → Advanced on a
    MacBook Air; raise the rate only while the displayed camera age remains low.
 2. Sweep slowly across a well-lit floor and nearby furniture. A floor patch of about 1 m²
    helps ARKit establish the floor height. The Mac view should show **Live**
    and an increasing point count.
 3. Hold the phone ahead of your torso, facing forward, and tap **Calibrate**. If testing
    head tracking, wear compatible AirPods paired with the phone during calibration.
-4. For the first object test, type **find the bottle** and tap **Send**. This isolates
-   camera/detection setup from microphone setup. Once working, hold **Find object**, say
-   the same request and release to send.
+4. Press and hold **Hold to navigate**, say **find the bottle**, then release. The button
+   shows when it is listening and sending your request. With VoiceOver, double-tap to
+   start recording and double-tap again to send.
 5. The selected target appears red in the Mac view. Keep it visible while moving closer:
    consistent new sightings refine its position and surface. Larger corrections require
    three agreeing observations so a single bad depth frame does not move the target.
-6. **Stop** silences guidance locally; **Resume** restarts when the connection and tracking
-   are ready. Audio changes and app interruptions can also stop guidance.
+6. **Stop** appears while a request or guidance is active. It silences guidance and cancels
+   any pending voice request. To continue, hold the main button and say **resume**, or ask
+   for another object. Audio changes and app interruptions can also stop guidance.
 
 ### Reading the room view
 
@@ -137,7 +138,7 @@ framing after dragging or zooming. **Locate** centres the selected target.
 **First person** places the view at the iPhone camera and follows its direction, including
 looking up and down. Move the phone to look around; a paused scan holds the last valid
 camera position. Select **3D** or **Overhead** to return to the external room views.
-Use **Find object** in the iPhone app to select a target; the browser is read-only.
+Use **Hold to navigate** in the iPhone app to select a target; the browser is read-only.
 The geometry comes from monocular depth estimates, not a hardware LiDAR scan.
 
 Trident keeps the iPhone screen awake while open. Manually locking it or leaving the app
@@ -159,7 +160,7 @@ the sound aligned with the object. The reverb is a room preset, not measured roo
 | `vision_ready: false` / `speech_ready: false` | Wait for model loading and check the backend terminal. Re-run setup online if downloads did not finish. |
 | Connected, but no room points | Allow Camera/Local Network access, wait for normal tracking, scan the floor, and check `vision_ready`. |
 | Room stops changing | Check the camera age in the viewer and keep the iPhone app foregrounded. |
-| Speech works, but guidance is silent | Connect AirPods to the **iPhone**, check its audio output, then send a new **find** command or tap **Resume**. Check the displayed stop reason if guidance pauses. |
+| Speech works, but guidance is silent | Connect AirPods to the **iPhone**, check its audio output, then send a new **find** command or hold the main button and say **resume**. Check the displayed stop reason if guidance pauses. |
 | Sounds turn the wrong way with your head | Recalibrate while facing ahead; try the app's **Reverse head turn** setting. |
 
 For a playback check independent of camera detection, launch an installed **Debug** build
