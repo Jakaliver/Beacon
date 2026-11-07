@@ -11,6 +11,15 @@ import simd
 /// user faces where the phone points, and later head turns are applied relative to that.
 final class AudioGuide {
     private let headMotion = CMHeadphoneMotionManager()
+    // Head motion arrives on its own high-priority queue, not the busy main thread, to cut delay and
+    // jitter. `headLock` guards the state shared with the main thread (setForward).
+    private let headQueue: OperationQueue = {
+        let q = OperationQueue()
+        q.maxConcurrentOperationCount = 1
+        q.qualityOfService = .userInteractive
+        return q
+    }()
+    private let headLock = NSLock()
     /// For the status line: whether AirPods head motion is arriving.
     private(set) var headTrackingLive = false
     private var headReference: CMAttitude?
@@ -67,12 +76,14 @@ final class AudioGuide {
 
     private func startHeadTracking() {
         guard headMotion.isDeviceMotionAvailable, !headMotion.isDeviceMotionActive else { return }
-        headMotion.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
+        headMotion.startDeviceMotionUpdates(to: headQueue) { [weak self] motion, _ in
             guard let self, let attitude = motion?.attitude else { return }
-            self.latestHead = attitude
-            self.headTrackingLive = true
-            if self.headReference == nil { self.headReference = attitude.copy() as? CMAttitude }
-            self.applyHead()
+            self.headLock.withLock {
+                self.latestHead = attitude
+                self.headTrackingLive = true
+                if self.headReference == nil { self.headReference = attitude.copy() as? CMAttitude }
+                self.applyHead()
+            }
         }
     }
 
@@ -117,14 +128,25 @@ final class AudioGuide {
 
     /// Call while the user faces where the phone points: that world direction becomes "ahead".
     func setForward(_ forward: SIMD3<Float>) {
-        baseForward = forward
-        headReference = latestHead?.copy() as? CMAttitude
-        applyHead()
+        headLock.withLock {
+            baseForward = forward
+            headReference = latestHead?.copy() as? CMAttitude
+            applyHead()
+        }
     }
 
     func beaconPing(at position: SIMD3<Float>) {
-        beacon.position = AVAudio3DPoint(x: position.x, y: position.y, z: position.z)
+        place(beacon, at: position)
         play(beaconBuffer, on: beacon)
+    }
+
+    /// Positions a source. Echo grows with distance (the direct-to-reverberant ratio), which is how
+    /// the ear judges how far away a real sound is.
+    private func place(_ player: AVAudioPlayerNode, at p: SIMD3<Float>) {
+        player.position = AVAudio3DPoint(x: p.x, y: p.y, z: p.z)
+        let l = environment.listenerPosition
+        let d = simd_distance(p, SIMD3<Float>(l.x, l.y, l.z))
+        player.reverbBlend = min(0.5, max(0.08, 0.06 + 0.12 * d))
     }
 
     /// Hot/cold pulses come from the estimated target position, so the user hears where it is.
@@ -134,7 +156,7 @@ final class AudioGuide {
 
     private func playAt(_ position: SIMD3<Float>?, _ buffer: AVAudioPCMBuffer) {
         guard let p = position else { return playCentred(buffer) }
-        probe.position = AVAudio3DPoint(x: p.x, y: p.y, z: p.z)
+        place(probe, at: p)
         play(buffer, on: probe)
     }
 
