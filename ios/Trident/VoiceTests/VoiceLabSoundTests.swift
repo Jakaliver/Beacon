@@ -102,6 +102,97 @@ final class VoiceLabSoundSuite {
                "start over cancels every pending guidance sound")
     }
 
+    func lootCommandsPersistAndRespectState() async {
+        let defaults = UserDefaults.standard
+        let key = Settings.guidanceSoundStyleKey
+        let savedValue = defaults.object(forKey: key)
+        defer {
+            if let savedValue { defaults.set(savedValue, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+        Settings.guidanceSoundStyle = .beeps
+        let audio = AudioGuide()
+        // Exercise the production Settings closure, not an injected style that ignores commands.
+        let model = VoiceLabModel(audio: audio)
+        defer { model.handle(.startOver) }
+
+        let idleResponses = model.voice.responses.count
+        model.voice.onCommand?(.lootMode(true))
+        expect(Settings.guidanceSoundStyle == .chest && defaults.string(forKey: key) == "chest",
+               "loot mode on persists chest style in the real settings")
+        expect(model.state == .ready && model.selected == nil && audio.startCount == 0
+               && audio.loopPosition == nil && audio.pulses.isEmpty,
+               "turning loot mode on while idle does not start guidance")
+        expect(model.voice.responses.count == idleResponses + 1,
+               "loot mode on acknowledges the command")
+        model.voice.onCommand?(.lootMode(false))
+        expect(Settings.guidanceSoundStyle == .beeps && defaults.string(forKey: key) == "beeps",
+               "loot mode off persists beep style in the real settings")
+        expect(model.voice.responses.count == idleResponses + 2,
+               "loot mode off acknowledges the command")
+        expect(model.state == .ready && audio.startCount == 0 && audio.pulses.isEmpty,
+               "turning loot mode off while idle does not start guidance")
+
+        model.handle(.calibrate)
+        model.handle(.find("my bottle"))
+        await awaitChoices(model)
+        model.handle(.chooseSide(.right))
+        expect(audio.loopPosition == nil && audio.pulses.last == right,
+               "a new search uses the sound preference saved by the voice command")
+        let beepsBeforeChest = audio.pulses.count
+        model.voice.onCommand?(.lootMode(true))
+        expect(model.state == .guiding && model.target == "my bottle" && model.selected == 2 && model.calibrated,
+               "loot mode on preserves the current search, selected object, and calibration")
+        expect(audio.loopPosition == right && audio.pulses.count == beepsBeforeChest,
+               "loot mode on immediately replaces beeps with a loop at the selected object")
+        let chestStarts = audio.loopStartCount
+        await wait(.milliseconds(900))
+        expect(audio.pulses.count == beepsBeforeChest && audio.loopStartCount == chestStarts,
+               "the cancelled beep timer cannot interrupt the persistent chest loop")
+
+        model.voice.onCommand?(.lootMode(false))
+        expect(model.state == .guiding && model.target == "my bottle" && model.selected == 2 && model.calibrated,
+               "loot mode off preserves the same selected object and workflow")
+        expect(audio.loopPosition == nil && audio.pulses.count == beepsBeforeChest + 1 && audio.pulses.last == right,
+               "loot mode off stops the loop and immediately starts beeps at the same object")
+        await wait(.milliseconds(900))
+        expect(audio.pulses.count >= beepsBeforeChest + 2 && audio.pulses.allSatisfy { $0 == right },
+               "loot mode off keeps repeating beeps at the selected object")
+
+        model.handle(.pause)
+        let pausedStarts = audio.startCount
+        let pausedPulses = audio.pulses.count
+        model.voice.onCommand?(.lootMode(true))
+        expect(model.state == .paused && model.selected == 2 && model.target == "my bottle"
+               && Settings.guidanceSoundStyle == .chest && audio.loopPosition == nil,
+               "a paused loot mode command changes the saved preference without resuming the search")
+        await wait(.milliseconds(900))
+        expect(audio.startCount == pausedStarts && audio.pulses.count == pausedPulses && audio.loopPosition == nil,
+               "no pending guidance sound escapes a paused style change")
+        model.voice.onCommand?(.lootMode(false))
+        expect(model.state == .paused && Settings.guidanceSoundStyle == .beeps
+               && audio.startCount == pausedStarts && audio.pulses.count == pausedPulses,
+               "turning loot mode off while paused also stays silent")
+        model.handle(.resume)
+        expect(model.state == .guiding && model.selected == 2 && audio.loopPosition == nil
+               && audio.pulses.count == pausedPulses + 1 && audio.pulses.last == right,
+               "explicit resume uses the beep preference selected while paused")
+        model.handle(.pause)
+        model.voice.onCommand?(.lootMode(true))
+        model.handle(.resume)
+        expect(model.state == .guiding && model.selected == 2 && audio.loopPosition == right,
+               "explicit resume also uses chest style selected while paused")
+
+        model.handle(.startOver)
+        let resetStarts = audio.startCount
+        let resetPulses = audio.pulses.count
+        model.voice.onCommand?(.lootMode(false))
+        await wait(.milliseconds(900))
+        expect(model.state == .ready && model.selected == nil && model.target.isEmpty
+               && audio.startCount == resetStarts && audio.pulses.count == resetPulses && audio.loopPosition == nil,
+               "a loot mode command after reset cannot resurrect the previous target or audio")
+    }
+
     func speechBackgroundAndInterruptions() async {
         let audio = AudioGuide()
         let model = VoiceLabModel(audio: audio, soundStyle: { .chest })
@@ -148,6 +239,7 @@ struct VoiceLabSoundTests {
         let suite = VoiceLabSoundSuite()
         await suite.chosenAnchorAndLifecycle()
         await suite.liveStyleChangesAndBeepCancellation()
+        await suite.lootCommandsPersistAndRespectState()
         await suite.speechBackgroundAndInterruptions()
         guard suite.failures == 0 else {
             print("Voice Lab sound: \(suite.failures) of \(suite.checks) checks failed")

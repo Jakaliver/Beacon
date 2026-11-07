@@ -248,6 +248,7 @@ final class VoiceListener: NSObject, ObservableObject, SFSpeechRecognizerDelegat
         next.shouldReportPartialResults = true
         next.requiresOnDeviceRecognition = true
         next.taskHint = .dictation
+        next.contextualStrings = ["Trident", "loot mode on", "loot mode off"]
         request = next
         lastTranscript = ""
         utteranceStartedAt = Date()

@@ -216,8 +216,12 @@ final class AppModel: ObservableObject {
         case .repeatLast: voice.repeatResponse()
         case .status: voice.say(statusSummary)
         case .inspect: self.command("inspect")
+        case .lootMode(let enabled):
+            Settings.guidanceSoundStyle = enabled ? .chest : .beeps
+            refreshGuidanceSound()
+            voice.say(enabled ? "Loot mode on." : "Loot mode off. Back to beeps.")
         case .help:
-            voice.say("Ask me to find an object, calibrate, pause, resume, or start over. Say status for progress, repeat to hear me again, or found it to finish.")
+            voice.say("Ask me to find an object, calibrate, pause, resume, or start over. Say status for progress, repeat to hear me again, or found it to finish. Say loot mode on for chest sounds, or loot mode off for beeps.")
         case .disableVoice: voice.disable()
         }
     }
@@ -269,7 +273,7 @@ final class AppModel: ObservableObject {
         case .finish: resetSearch(resetTracking: false); return
         case .resume: resume(); return
         case .calibrate: calibrate(); return
-        case .repeatLast, .status, .help, .choose, .chooseSide, .disableVoice:
+        case .repeatLast, .status, .help, .choose, .chooseSide, .disableVoice, .lootMode:
             if let parsed { handleVoice(parsed) }
             return
         case .inspect where searchCleared || stopReason != nil:

@@ -328,6 +328,7 @@ final class VoiceSession: ObservableObject {
             "i", "i'm", "i've", "i'll", "you", "you're", "we", "they", "he", "she", "it",
             "what", "why", "when", "where", "how", "can", "could", "would", "should",
             "that's", "that", "this", "please", "hey", "trident", "thank", "thanks",
+            "loot", "turn", "enable", "disable",
         ]
         guard !conversationalStarts.contains(String(first)),
               !["yes", "yeah", "okay", "ok", "sure", "alright", "later", "never mind"].contains(reply)

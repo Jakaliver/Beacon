@@ -9,7 +9,10 @@ enum GuidanceSoundStyle: String, CaseIterable, Identifiable {
 enum Settings {
     static let guidanceSoundStyleKey = "guidanceSoundStyle"
     static var guidanceSoundStyle: GuidanceSoundStyle {
-        GuidanceSoundStyle(rawValue: UserDefaults.standard.string(forKey: guidanceSoundStyleKey) ?? "") ?? .chest
+        get {
+            GuidanceSoundStyle(rawValue: UserDefaults.standard.string(forKey: guidanceSoundStyleKey) ?? "") ?? .chest
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: guidanceSoundStyleKey) }
     }
     static let hostKey = "host"
     static let frameRateKey = "frameRate"

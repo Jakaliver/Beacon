@@ -7,7 +7,9 @@ recognition, hold-to-talk speech recognition, mapping and target tracking locall
 Hands-free voice mode recognizes commands on the iPhone. Say "find the bottle",
 "calibrate", "pause", "resume", "start over" or "found it" while the app is open.
 Found objects play a continuous spatial chest sound by default; choose **Chest** or
-**Beeps** in Settings. See the [voice and audio test guide](docs/voice-audio-testing.md)
+**Beeps** in Settings, or say **"loot mode on"** for chest audio and **"loot mode off"**
+for beeps. The choice is remembered and does not resume a paused search.
+See the [voice and audio test guide](docs/voice-audio-testing.md)
 for installation, expected behavior and checks on a real iPhone.
 
 The browser is a **read-only room visualization**: grey LiDAR-style dots, a white iPhone

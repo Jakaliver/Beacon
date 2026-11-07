@@ -1,6 +1,6 @@
 import Foundation
 
-/// Standalone parser regression checks; kept outside the offloaded iCloud checkout.
+/// Standalone parser regression checks; no app, microphone, or audio engine is required.
 @main
 struct DirectionCommandsTests {
     static func main() {
@@ -79,6 +79,36 @@ struct DirectionCommandsTests {
             ("status", .status),
             ("inspect", .inspect),
             ("turn off voice mode", .disableVoice),
+            ("loot mode on", .lootMode(true)),
+            ("turn on loot mode", .lootMode(true)),
+            ("turn loot mode on", .lootMode(true)),
+            ("enable loot mode", .lootMode(true)),
+            ("loot mode off", .lootMode(false)),
+            ("turn off loot mode", .lootMode(false)),
+            ("turn loot mode off", .lootMode(false)),
+            ("disable loot mode", .lootMode(false)),
+            ("Hey Trident, please turn on loot mode!", .lootMode(true)),
+            ("Please, Trident, turn loot mode off.", .lootMode(false)),
+            ("  LOOT\n MODE ON, please! ", .lootMode(true)),
+            ("don't turn on loot mode", nil),
+            ("do not turn loot mode off", nil),
+            ("never disable loot mode", nil),
+            ("not loot mode on", nil),
+            ("I said loot mode off earlier", nil),
+            ("should I enable loot mode", nil),
+            ("turn on loot mode if it is quiet", nil),
+            ("loot mode on and off", nil),
+            ("loot", nil),
+            ("loot mode", nil),
+            ("turn on loot", nil),
+            ("turn off loot", nil),
+            ("turn loot mode", nil),
+            ("enable loot", nil),
+            ("disable loot", nil),
+            ("find the loot mode switch", .find("the loot mode switch")),
+            ("find loot mode on", .find("loot mode on")),
+            ("look for the loot mode off button", .find("the loot mode off button")),
+            ("get the enable loot mode sign", .find("the enable loot mode sign")),
         ]
         var failures = 0
         for (utterance, expected) in cases {
@@ -93,6 +123,8 @@ struct DirectionCommandsTests {
             ("right choice settles", !VoiceCommand.chooseSide(.right).isImmediate),
             ("left remains a semantic side", VoiceCommand.parse("left") != .choose(1)),
             ("right remains a semantic side", VoiceCommand.parse("right") != .choose(2)),
+            ("loot mode on waits for the complete command", !VoiceCommand.lootMode(true).isImmediate),
+            ("loot mode off waits for the complete command", !VoiceCommand.lootMode(false).isImmediate),
         ]
         for (description, passed) in checks where !passed {
             failures += 1

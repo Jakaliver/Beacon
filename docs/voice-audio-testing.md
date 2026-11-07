@@ -4,6 +4,9 @@ Hands-free voice and spatial chest audio are integrated into **Trident** on `mai
 The main screen has Calibrate and Hold to navigate; hands-free controls are in Settings.
 Use a physical iPhone for microphone, spatial audio and AR tracking checks.
 
+The **loot mode voice commands** are available on `codex/loot-mode-commands` for testing.
+To test them before merge, use that branch in place of `main` in the commands below.
+
 ## Get the app and install
 
 In a checkout with no uncommitted work:
@@ -53,6 +56,12 @@ Mac is slow. Stay in a clear area while checking spatial audio.
    Each switch should take effect immediately, with only one style playing. Dismissing
    Settings without changing Mac host should preserve the connection and target.
    Relaunch and confirm the selected sound style is remembered.
+   Also say **"loot mode off"** to switch to beeps, then **"loot mode on"** to restore
+   the chest. **"Turn on/off loot mode"** and **"enable/disable loot mode"** also work.
+   Confirm the Settings selection follows the command, the same object stays selected,
+   and no old sound continues after switching. Try this while paused and before finding
+   an object: it should only change the preference, without starting or resuming guidance.
+   Commands work through hands-free voice mode, Hold to navigate, and Action button requests.
 6. Say **"pause"**, then **"resume"**. Audio should stop promptly and resume only when
    connection and tracking are ready. Repeat using **Stop**, then hold **Hold to navigate**, say **"resume"** and release. A partially heard command must not restart guidance after Stop.
 7. Say **"start over"**. The target and old guidance should clear and tracking should
@@ -105,10 +114,11 @@ network behavior or world alignment in the full app.
 The voice branch originally passed unsigned Debug builds for both **Trident** and
 **TridentVoiceLab** with Xcode 26.3 / iOS 26.2 SDK. Run these focused checks after changes:
 
-- `scripts/test-voice-directions.sh`: 74 utterances and 4 semantic checks.
-- `scripts/test-voice-session.sh`: 50 speech coordination checks.
-- `scripts/test-voice-lab-directional.sh`: 35 dialogue checks.
-- `scripts/test-voice-lab-sound.sh`: 32 audio lifecycle checks using a fake audio output.
+- `scripts/test-voice-directions.sh`: directional choices, loot commands and rejected phrases.
+- `scripts/test-voice-session.sh`: speech coordination, revised commands and cancellation.
+- `scripts/test-voice-lab-directional.sh`: object-selection dialogue.
+- `scripts/test-voice-lab-sound.sh`: sound switching, saved loot preferences and audio lifecycle
+  checks using a fake audio output.
 
 These checks do not exercise a real microphone, speech voice, PHASE playback or ARKit.
 Run the physical-device checks above to validate microphone recognition and spatial

@@ -78,6 +78,27 @@ final class VoiceSessionSuite {
         return session
     }
 
+    func lootModeConversation() async {
+        let session = await ready()
+        var commands: [VoiceCommand] = []
+        session.onCommand = { commands.append($0) }
+        for text in ["loot", "loot mode", "turn loot mode", "don't turn loot mode on"] {
+            session.listener.emit(text, final: true)
+        }
+        expect(commands.isEmpty, "unfinished or negated loot commands cannot become object requests")
+        expect(session.awaitingObject, "unfinished loot commands preserve the object prompt")
+        session.listener.emit("loot mode on", final: false)
+        expect(commands.isEmpty, "loot mode waits for the final on/off choice")
+        session.listener.emit("loot mode off", final: true)
+        expect(commands == [.lootMode(false)], "the revised off command replaces the partial on command")
+        expect(session.awaitingObject, "changing sound does not consume the object prompt")
+        session.submit("turn on loot mode")
+        expect(commands == [.lootMode(false), .lootMode(true)], "submitted commands use the same loot mode action")
+        session.submit("find the loot mode switch")
+        expect(commands.last == .find("the loot mode switch"), "an explicit find preserves the full object description")
+        session.disable()
+    }
+
     func objectConversation() async {
         let session = await ready()
         var commands: [VoiceCommand] = []
@@ -272,6 +293,7 @@ struct VoiceSessionTests {
     @MainActor
     static func main() async {
         let suite = VoiceSessionSuite()
+        await suite.lootModeConversation()
         await suite.objectConversation()
         await suite.revisedUtterances()
         await suite.externalStopCancelsPendingInput()
