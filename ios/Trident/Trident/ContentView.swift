@@ -4,12 +4,14 @@ struct ContentView: View {
     @ObservedObject var model: AppModel
     @State private var typed = ""
     @State private var showSettings = false
+    @AppStorage(Settings.guidanceSoundStyleKey) private var soundStyle = GuidanceSoundStyle.chest.rawValue
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
                     status
+                    VoiceModeControls(voice: model.voice)
                     BigButton(title: "Calibrate", hint: "Face ahead and hold the phone in front of you, then double tap.",
                               color: .indigo) { model.calibrate() }
                     findButton
@@ -47,6 +49,7 @@ struct ContentView: View {
                     .accessibilityLabel("Settings")
             }
             .sheet(isPresented: $showSettings, onDismiss: model.applySettings) { SettingsView() }
+            .onChange(of: soundStyle) { _, _ in model.refreshGuidanceSound() }
         }
     }
 
@@ -122,6 +125,7 @@ private struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                GuidanceSoundSettings()
                 TextField("Mac host", text: $host)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()

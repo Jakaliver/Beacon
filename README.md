@@ -3,7 +3,12 @@
 Trident uses an iPhone camera and local Mac models to locate objects and provide spatial
 audio guidance. The iPhone runs the app, captures ARKit poses and camera frames, accepts
 commands and plays guidance through headphones. The Mac runs depth estimation, object
-recognition, speech recognition, mapping and target tracking locally.
+recognition, hold-to-talk speech recognition, mapping and target tracking locally.
+Hands-free voice mode recognizes commands on the iPhone. Say "find the bottle",
+"calibrate", "pause", "resume", "start over" or "found it" while the app is open.
+Found objects play a continuous spatial chest sound by default; choose **Chest** or
+**Beeps** in Settings. See the [voice and audio branch test guide](docs/voice-audio-testing.md)
+for installation, expected behavior and checks on a real iPhone.
 
 The browser is a **read-only room visualization**: grey LiDAR-style dots, a white iPhone
 marker, and the selected target in red. It connects only to `/ws/viewer`. It has no microphone,

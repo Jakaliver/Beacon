@@ -1,7 +1,8 @@
 # Real iPhone setup
 
 The iPhone sends camera frames and ARKit poses to the Mac. Depth estimation, object
-recognition and speech recognition run on the Mac; the phone receives guidance. The live
+recognition and hold-to-talk speech recognition run on the Mac; hands-free voice mode
+recognizes commands on the iPhone. The phone receives guidance. The live
 3D room is displayed in the Mac's browser. Both devices must stay connected while testing.
 
 ## 1. Install Xcode and prepare the phone
@@ -91,6 +92,7 @@ file will restore the checked-in developer's signing settings.
    then tap **Done**. Enter only the host, **without** `http://`, `ws://` or `:8787`.
    The app currently defaults to another developer's Mac, so you must change this.
 4. Allow Camera, Microphone, Motion and Local Network permissions when requested.
+   **Start voice mode** also requests Speech Recognition permission for on-device commands.
 5. The phone should show **Mac connected** and **Tracking: normal**. The health endpoint
    should now show `sensor_connected: true`.
 
@@ -144,7 +146,11 @@ Trident keeps the iPhone screen awake while open. Manually locking it or leaving
 pauses capture. The viewer keeps the last scan and labels it paused until fresh frames return.
 All speech and spatial guidance play on the iPhone. The browser never opens an audio or
 microphone session and cannot change the phone's guidance state.
-Guidance uses short, warm taps with distance attenuation and a subtle small-room reverb.
+Guidance plays a continuous chest sound at the found object's position by default, with
+distance attenuation and a subtle small-room reverb. Settings → **Object sound** switches
+between **Chest** and the original **Beeps**. The chest sound lowers while the app speaks.
+For the hands-free controls and audio acceptance checks, use the
+[voice and audio branch test guide](voice-audio-testing.md).
 With AirPods on, face where the phone points and press **Calibrate** so head turns keep
 the sound aligned with the object. The reverb is a room preset, not measured room acoustics.
 

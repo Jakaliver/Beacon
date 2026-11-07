@@ -30,9 +30,11 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Trident sends camera frames to your Mac on the local network and receives guidance.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Trident records your spoken request while you hold the Find object button.</string>
+	<string>Trident listens for hands-free commands when voice mode is on, or records while you hold Find object.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Trident uses headphone motion to keep guidance sounds fixed in the room.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Trident uses on-device speech recognition for hands-free commands.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchScreen</key>
