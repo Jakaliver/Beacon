@@ -99,7 +99,7 @@ The backend labels all results from such frames as injected.
 ## Control messages (client → Mac, JSON on `/ws/control`)
 
 ```json
-{"type": "hello", "role": "iphone" | "sim-app"}
+{"type": "hello", "role": "iphone" | "sim-app" | "viewer"}
 {"type": "command", "text": "find the bottle"}
 {"type": "choose", "index": 1}
 {"type": "stop", "reason": "user"}
@@ -111,6 +111,13 @@ The backend labels all results from such frames as injected.
 
 Command text accepts `find [object]`, `stop`, `cancel`, `repeat`, `inspect`,
 `resume`, `calibrate`, `choose N`, `navigation on|off`.
+
+`viewer` clients may send commands but do not contribute audio availability or
+interruption status. Their optional Mac playback is independent of iPhone guidance.
+When an `iphone` control client is connected, only iPhone audio status is used;
+legacy iPhone builds without status messages retain their local audio checks.
+Otherwise, simulator audio status still applies. A browser preview cannot block
+phone audio or hide a failure reported by the phone.
 
 ## Guidance messages (Mac → client, JSON on `/ws/control`)
 

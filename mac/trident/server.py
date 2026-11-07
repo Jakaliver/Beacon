@@ -34,11 +34,18 @@ pending: dict = {"frame": None}
 # The newest sensor connection wins, so a forgotten simulator tab cannot fight a real phone.
 active_sensor: dict = {"ws": None}
 audio_status: dict[WebSocket, tuple[bool, bool]] = {}
+control_roles: dict[WebSocket, str] = {}
 
 
 def apply_audio_status() -> None:
-    engine.audio_ok = not audio_status or any(ok for ok, _ in audio_status.values())
-    engine.interrupted = any(intr for _, intr in audio_status.values())
+    # A browser preview is not the phone's output device. Older viewers identify as
+    # sim-app, so give an actual iPhone precedence over those clients as well.
+    phones = {ws for ws, role in control_roles.items() if role == "iphone"}
+    statuses = [status for ws, status in audio_status.items()
+                if (ws in phones if phones else control_roles.get(ws) != "viewer")]
+    # Existing iPhone builds handle audio failures locally and do not send status.
+    engine.audio_ok = not statuses or any(ok for ok, _ in statuses)
+    engine.interrupted = any(intr for _, intr in statuses)
 frame_ready = asyncio.Event()
 speech = {"model": None}
 process = psutil.Process(os.getpid())
@@ -221,7 +228,12 @@ async def control(ws: WebSocket) -> None:
             if kind != "client_status":
                 events.info("<- %s", {k: v for k, v in m.items() if k != "type"} | {"type": kind})
             with engine.lock:
-                if kind == "command":
+                if kind == "hello" and m.get("role") in {"iphone", "sim-app", "viewer"}:
+                    control_roles[ws] = m["role"]
+                    if m["role"] == "viewer":
+                        audio_status.pop(ws, None)
+                    apply_audio_status()
+                elif kind == "command":
                     engine.command(m.get("text", ""))
                 elif kind == "choose":
                     engine.choose(int(m["index"]))
@@ -237,7 +249,7 @@ async def control(ws: WebSocket) -> None:
                         engine.navigation = bool(m["navigation"])
                     if "probe_offset" in m:
                         engine.probe_offset = np.asarray(m["probe_offset"], float)
-                elif kind == "client_status":
+                elif kind == "client_status" and control_roles.get(ws) != "viewer":
                     audio_status[ws] = (bool(m.get("audio_ok", True)), bool(m.get("interrupted", False)))
                     apply_audio_status()
             await publish_guidance()
@@ -246,6 +258,7 @@ async def control(ws: WebSocket) -> None:
     finally:
         control_clients.discard(ws)
         audio_status.pop(ws, None)
+        control_roles.pop(ws, None)
         with engine.lock:
             apply_audio_status()
 

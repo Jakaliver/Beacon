@@ -159,7 +159,7 @@ async function startPreview() {
 }
 $("previewRoom").onclick = () => { void startPreview(); };
 
-// Virtual phone client: commands, speech, guidance audio.
+// Viewer controls and optional Mac audio preview. The iPhone owns guidance audio status.
 type Guidance = {
   mode: string; stop_reason: string | null; perception: string;
   target: { id: string; sigma: number; age: number; valid: boolean; observed_now: boolean } | null;
@@ -189,7 +189,7 @@ function speak(text: string) {
 function connectControl() {
   if (preview || destroyed) return;
   const ws = new WebSocket(socketURL("/ws/control"));
-  ws.onopen = () => { send({ type: "hello", role: "sim-app" }); reportAudio(); };
+  ws.onopen = () => { send({ type: "hello", role: "viewer" }); };
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
     if (m.type === "guidance") { guidance = m; lastGuidance = performance.now(); onGuidance(m); }
@@ -236,12 +236,10 @@ function showChoices(options: { index: number; description: string }[]) {
   }));
 }
 
-function reportAudio() { send({ type: "client_status", audio_ok: audio.ok, interrupted: false }); }
 $("enableAudio").onclick = async () => {
   audio.start();
   await audio.ctx!.resume();
   $("enableAudio").textContent = "Audio on";
-  reportAudio();
 };
 $<HTMLFormElement>("cmdForm").onsubmit = (e) => {
   e.preventDefault();
