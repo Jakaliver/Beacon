@@ -24,8 +24,15 @@ final class AudioGuide {
     private let targetSource: PHASESource
     private let beaconSource: PHASESource
     private let cueSource: PHASESource
-    private var running = false
-    private var playing: [PHASESoundEvent] = []
+    // Events are asynchronous: .stopped also describes an event still preparing.
+    // Keep each one alive until its completion callback, never prune by renderingState.
+    private var playing: [UUID: PHASESoundEvent] = [:]
+    private var prepared: [String: [(UUID, PHASESoundEvent)]] = [:]
+    private var preparing: [UUID: (String, PHASESoundEvent)] = [:]
+    private var generation = 0
+    private var completedSounds = 0
+    private var playbackCheckGeneration = 0
+    var onDiagnostic: ((String) -> Void)?
     private var mixerIDs: [String: String] = [:]
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
 
@@ -53,7 +60,8 @@ final class AudioGuide {
         beaconSource = PHASESource(engine: engine)
         cueSource = PHASESource(engine: engine)
         for object in [listener, targetSource, beaconSource, cueSource] as [PHASEObject] {
-            try? engine.rootObject.addChild(object)
+            do { try engine.rootObject.addChild(object) }
+            catch { diagnostic("scene setup failed: \(error)") }
         }
         if Self.automaticHeadTracking, #available(iOS 18.0, *) {
             listener.automaticHeadTrackingFlags = .orientation
@@ -70,47 +78,82 @@ final class AudioGuide {
     /// One PHASE sound event per sound: sampler → spatial mixer with direct path, early reflections and late reverb.
     private func register(_ name: String, _ samples: [Float]) {
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
-        _ = try? engine.assetRegistry.registerSoundAsset(data: data, identifier: name, format: format,
-                                                         normalizationMode: .dynamic)
-        guard let pipeline = PHASESpatialPipeline(flags: [.directPathTransmission, .earlyReflections, .lateReverb])
-        else { return }
-        pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = 0.6
-        pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = 0.3
-        let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "\(name)-mixer")
-        let distance = PHASEGeometricSpreadingDistanceModelParameters()
-        distance.rolloffFactor = 1.0
-        distance.fadeOutParameters = PHASEDistanceModelFadeOutParameters(cullDistance: 20)
-        mixer.distanceModelParameters = distance
-        let sampler = PHASESamplerNodeDefinition(soundAssetIdentifier: name, mixerDefinition: mixer)
-        sampler.playbackMode = .oneShot
-        sampler.setCalibrationMode(calibrationMode: .relativeSpl, level: 0)
-        _ = try? engine.assetRegistry.registerSoundEventAsset(rootNode: sampler, identifier: "\(name)-event")
-        mixerIDs[name] = mixer.identifier
+        do {
+            _ = try engine.assetRegistry.registerSoundAsset(data: data, identifier: name, format: format,
+                                                            normalizationMode: .dynamic)
+            guard let pipeline = PHASESpatialPipeline(flags: [.directPathTransmission, .earlyReflections, .lateReverb])
+            else { return }
+            pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = 0.6
+            pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = 0.3
+            let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "\(name)-mixer")
+            let distance = PHASEGeometricSpreadingDistanceModelParameters()
+            distance.rolloffFactor = 1.0
+            distance.fadeOutParameters = PHASEDistanceModelFadeOutParameters(cullDistance: 20)
+            mixer.distanceModelParameters = distance
+            let sampler = PHASESamplerNodeDefinition(soundAssetIdentifier: name, mixerDefinition: mixer)
+            sampler.playbackMode = .oneShot
+            sampler.setCalibrationMode(calibrationMode: .relativeSpl, level: 0)
+            _ = try engine.assetRegistry.registerSoundEventAsset(rootNode: sampler, identifier: "\(name)-event")
+            mixerIDs[name] = mixer.identifier
+        } catch { diagnostic("register \(name) failed: \(error)") }
     }
 
     func start() {
-        ensureRunning()
+        guard ensureRunning() else { return }
+        for name in mixerIDs.keys { replenish(name) }
         if !Self.automaticHeadTracking { startHeadTracking() }
     }
 
     func restart() {
+        generation += 1
+        silence()
+        let pending = Array(preparing.values.map { $0.1 }) + prepared.values.flatMap { $0.map { $0.1 } }
+        preparing.removeAll()
+        prepared.removeAll()
+        pending.forEach { $0.stopAndInvalidate() }
         engine.stop()
-        running = false
         start()
     }
 
     /// The engine can fail to start (app launched in the background) or stop (route or interruption
     /// changes). Recover before playing, or every guidance sound is silently lost while speech still works.
-    private func ensureRunning() {
-        guard !running else { return }
-        try? AVAudioSession.sharedInstance().setActive(true)
-        running = (try? engine.start()) != nil
+    private func ensureRunning() -> Bool {
+        guard engine.renderingState != .started else { return true }
+        do {
+            try AVAudioSession.sharedInstance().setActive(true)
+            try engine.start()
+            diagnostic("engine started; route=\(AVAudioSession.sharedInstance().currentRoute.outputs.map { $0.portType.rawValue }.joined(separator: ","))")
+            return true
+        } catch {
+            diagnostic("engine start failed: \(error)")
+            return false
+        }
     }
 
     func silence() {
-        playing.forEach { $0.stopAndInvalidate() }
+        playbackCheckGeneration += 1
+        let active = Array(playing.values)
         playing.removeAll()
+        active.forEach { $0.stopAndInvalidate() }
     }
+
+    func reportStatus() {
+        diagnostic("state=\(engine.renderingState.rawValue); assets=\(mixerIDs.count); prepared=\(prepared.values.reduce(0) { $0 + $1.count }); active=\(playing.count)")
+    }
+
+    #if DEBUG
+    /// A device-only regression check, invoked explicitly with --audio-self-test.
+    /// No target or camera inference is needed, and Stop cancels the remaining sounds.
+    func runPlaybackCheck() {
+        let check = playbackCheckGeneration
+        for index in 0..<10 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.4) { [weak self] in
+                guard let self, check == self.playbackCheckGeneration else { return }
+                self.pulse(at: nil)
+            }
+        }
+    }
+    #endif
 
     private func startHeadTracking() {
         guard headMotion.isDeviceMotionAvailable, !headMotion.isDeviceMotionActive else { return }
@@ -189,19 +232,85 @@ final class AudioGuide {
     }
 
     private func play(_ name: String, from source: PHASESource, at position: SIMD3<Float>?) {
-        ensureRunning()
-        guard running, let mixerID = mixerIDs[name] else { return }
+        guard ensureRunning() else { return }
         let p = position ?? headLock.withLock { listenerPosition + simd_normalize(listenerForward) * 0.6 }
         var transform = matrix_identity_float4x4
         transform.columns.3 = SIMD4(p, 1)
         source.transform = transform
+        let next: (UUID, PHASESoundEvent)?
+        if var ready = prepared[name], !ready.isEmpty {
+            next = ready.removeFirst()
+            prepared[name] = ready
+        } else {
+            next = makeEvent(name)
+        }
+        guard let (id, event) = next else { return }
+        playing[id] = event
+        let currentGeneration = generation
+        event.start { [weak self] reason in
+            DispatchQueue.main.async {
+                guard let self, self.generation == currentGeneration,
+                      self.playing.removeValue(forKey: id) != nil else { return }
+                if reason == .failure {
+                    self.diagnostic("\(name) playback failed; restarting engine")
+                    self.restart()
+                } else if reason == .finishedPlaying {
+                    self.completedSounds += 1
+                    if self.completedSounds == 1 || self.completedSounds % 10 == 0 {
+                        self.diagnostic("playback finished: \(self.completedSounds) sounds; last=\(name)")
+                    }
+                } else {
+                    self.diagnostic("\(name) playback terminated")
+                }
+            }
+        }
+        replenish(name)
+    }
+
+    private func source(for name: String) -> PHASESource {
+        name == "beacon" ? beaconSource : ["pulse", "confirm"].contains(name) ? targetSource : cueSource
+    }
+
+    private func makeEvent(_ name: String) -> (UUID, PHASESoundEvent)? {
+        guard let mixerID = mixerIDs[name] else {
+            diagnostic("missing sound asset: \(name)")
+            return nil
+        }
         let parameters = PHASEMixerParameters()
-        parameters.addSpatialMixerParameters(identifier: mixerID, source: source, listener: listener)
-        guard let event = try? PHASESoundEvent(engine: engine, assetIdentifier: "\(name)-event",
-                                               mixerParameters: parameters) else { return }
-        playing.removeAll { $0.renderingState == .stopped }
-        playing.append(event)
-        event.start(completion: nil)
+        parameters.addSpatialMixerParameters(identifier: mixerID, source: source(for: name), listener: listener)
+        do {
+            return (UUID(), try PHASESoundEvent(engine: engine, assetIdentifier: "\(name)-event", mixerParameters: parameters))
+        } catch {
+            diagnostic("create \(name) failed: \(error)")
+            return nil
+        }
+    }
+
+    /// Keep the next two one-shot events ready, so asset preparation cannot jitter the pulse rhythm.
+    private func replenish(_ name: String) {
+        let waiting = preparing.values.filter { $0.0 == name }.count
+        let missing = max(0, 2 - (prepared[name]?.count ?? 0) - waiting)
+        for _ in 0..<missing {
+            guard let (id, event) = makeEvent(name) else { return }
+            preparing[id] = (name, event)
+            let currentGeneration = generation
+            event.prepare { [weak self] reason in
+                DispatchQueue.main.async {
+                    guard let self, self.generation == currentGeneration,
+                          let (_, event) = self.preparing.removeValue(forKey: id) else { return }
+                    if reason == .prepared {
+                        self.prepared[name, default: []].append((id, event))
+                    } else {
+                        self.diagnostic("prepare \(name) failed: \(reason.rawValue)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func diagnostic(_ message: String) {
+        NSLog("Trident audio: %@", message)
+        onDiagnostic?(message)
     }
 
     // MARK: Sounds (mono, 44.1 kHz float)

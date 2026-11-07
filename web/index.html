@@ -3,23 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Trident Dev</title>
-  <style>
-    html, body { margin: 0; height: 100%; background: #14161b; }
-    body { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
-    iframe { width: 100%; height: 100%; border: 0; background: #fff; }
-    @media (max-width: 900px) { body { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
-  </style>
+  <title>Trident · Room view</title>
 </head>
 <body>
-  <!-- Two separate pages and data flows: the simulator only sends sensor data to the backend;
-       the reconstruction only receives backend output. -->
-  <iframe id="sim" title="Simulator" allow="autoplay"></iframe>
-  <iframe id="recon" title="Reconstruction" allow="autoplay; microphone"></iframe>
+  <a href="/reconstruction-viewer/">Open room view</a>
   <script>
-    // Pass ?backend=<port> through, to run a second Trident backend side by side.
-    document.getElementById("sim").src = "/simulator/" + location.search;
-    document.getElementById("recon").src = "/reconstruction-viewer/" + location.search;
+    const params = new URLSearchParams(location.search);
+    const viewer = new URL('/reconstruction-viewer/', location.origin);
+    if (params.has('backend')) viewer.searchParams.set('backend', params.get('backend'));
+    location.replace(viewer.pathname + viewer.search);
   </script>
 </body>
 </html>

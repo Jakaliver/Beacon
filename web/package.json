@@ -6,7 +6,7 @@
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "fetch-assets": "node scripts/fetch-assets.mjs"
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
   },
   "dependencies": {
     "three": "0.187.0"

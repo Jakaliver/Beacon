@@ -1,7 +1,7 @@
 # Trident sensor and guidance protocol (v1)
 
-Both sensor sources (the Three.js simulator and the iPhone app) use this
-protocol. The Mac backend runs the same pipeline for both.
+The iPhone sends camera observations and commands to the Mac. The web room view
+only subscribes to `/ws/viewer`; it never opens a control or sensor connection.
 
 Server: `http://<mac-host>:8787`.
 
@@ -36,8 +36,7 @@ intrinsics to match before sending.
 
 ## Timestamps and epochs
 
-- `t`: source monotonic time in seconds (iPhone: `ARFrame.timestamp`;
-  simulator: `(performance.timeOrigin + performance.now()) / 1000`).
+- `t`: source monotonic time in seconds (iPhone: `ARFrame.timestamp`).
 - `seq`: increases by 1 per message of that kind, per session.
 - `session`: random string chosen when the source connects.
 - `epoch`: world-origin epoch. The source increments it when the AR world
@@ -72,7 +71,7 @@ Header:
 `image_transform` is informational (it documents how the transmitted image came
 from the sensor image). The backend uses `intrinsics` as given.
 
-`perception: "injected"` is a debug mode available only in the simulator. Then
+`perception: "injected"` is a legacy debug input supported by the backend for fixtures. Then
 `injected` holds `{"depth_w", "depth_h", "detections": [{"label", "bbox": [x0,y0,x1,y1]}]}` and the
 binary payload after the JPEG holds `depth_w*depth_h` float32 metric depths.
 Layout for injected frames: `[u32 N][header][u32 jpegLen][jpeg][float32 depth]`.
@@ -99,7 +98,7 @@ The backend labels all results from such frames as injected.
 ## Control messages (client → Mac, JSON on `/ws/control`)
 
 ```json
-{"type": "hello", "role": "iphone" | "sim-app"}
+{"type": "hello", "role": "iphone" | "sim-app" | "viewer"}
 {"type": "command", "text": "find the bottle"}
 {"type": "choose", "index": 1}
 {"type": "stop", "reason": "user"}
@@ -111,6 +110,13 @@ The backend labels all results from such frames as injected.
 
 Command text accepts `find [object]`, `stop`, `cancel`, `repeat`, `inspect`,
 `resume`, `calibrate`, `choose N`, `navigation on|off`.
+
+`viewer` clients may send commands but do not contribute audio availability or
+interruption status. Their optional Mac playback is independent of iPhone guidance.
+When an `iphone` control client is connected, only iPhone audio status is used;
+legacy iPhone builds without status messages retain their local audio checks.
+Otherwise, legacy `sim-app` audio status still applies. These roles are retained for
+protocol compatibility; the current room visualization does not send control messages.
 
 ## Guidance messages (Mac → client, JSON on `/ws/control`)
 
@@ -178,3 +184,20 @@ saw it.
 
 Grid cell values: `0` unknown, `1` observed free, `2` occupied, `3` inflated
 (blocked for walking), `4` floor seen but uncertain.
+
+Viewer `stats` also includes `sensor_connected` (boolean), `observation_age_ms`
+(elapsed time since the last processed frame, or null) and `pose_age_ms`
+(elapsed time since the last received pose, or null). These ages are recomputed
+for every snapshot, even when the sensor stops sending. `frame_age_ms` remains
+the capture-to-processing latency measured for the last frame. The room viewer
+uses the elapsed ages plus time since receipt to distinguish live and cached data.
+
+`scan_id` is an opaque string that changes whenever the backend resets its world,
+including reconnects with a new sensor session and tracking resets within the same
+AR epoch. `stats.map_version` increments when depth observations are integrated.
+The viewer uses these to retain a bounded, 4.5 cm voxel display history (up to
+20,000 measured points, expiring after 90 seconds without observation), skipping
+duplicate snapshots and clearing history on a world reset. This display history
+does not affect the occupancy map, target positions, or navigation. Target entries
+also expose `locked`, so the viewer can distinguish a locked position from a fresh
+detection.
