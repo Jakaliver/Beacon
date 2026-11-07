@@ -30,11 +30,9 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Beacon sends camera frames to your Mac on the local network and receives guidance.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Beacon listens for commands addressed to Beacon while the app is open, or records a request when you tap Talk to Beacon.</string>
+	<string>Beacon records a spoken request only when you tap Talk to Beacon.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Beacon uses headphone motion to keep guidance sounds fixed in the room.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Beacon uses on-device speech recognition for hands-free commands.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchScreen</key>

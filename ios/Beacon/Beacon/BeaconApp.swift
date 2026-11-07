@@ -1,9 +1,8 @@
 import SwiftUI
-import AppIntents
 
 @main
 struct BeaconApp: App {
-    @StateObject private var model = AppModel.shared
+    @StateObject private var model = AppModel()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -25,28 +24,5 @@ struct BeaconApp: App {
             default: break
             }
         }
-    }
-}
-
-struct PushToTalkIntent: AppIntent {
-    static var title: LocalizedStringResource = "Talk to Beacon"
-    static var description = IntentDescription("Open Beacon and speak a navigation request. Pause to send, or run again to send early.")
-    static var openAppWhenRun: Bool = true
-
-    @available(iOS 26.0, *)
-    static var supportedModes: IntentModes { .foreground }
-
-    @MainActor
-    func perform() async throws -> some IntentResult {
-        AppModel.shared.talkToBeacon()
-        return .result()
-    }
-}
-
-struct BeaconShortcuts: AppShortcutsProvider {
-    static var appShortcuts: [AppShortcut] {
-        AppShortcut(intent: PushToTalkIntent(),
-                    phrases: ["Talk to \(.applicationName)"],
-                    shortTitle: "Talk to Beacon", systemImageName: "mic.fill")
     }
 }

@@ -4,12 +4,10 @@ Beacon uses an iPhone camera and local Mac models to locate objects and provide 
 audio guidance. The iPhone runs the app, captures ARKit poses and camera frames, accepts
 commands and plays guidance through headphones. The Mac runs depth estimation, object
 recognition, button-request speech recognition, mapping and target tracking locally.
-Hands-free recognition runs on the iPhone while the app is open. Say **"Beacon, find
-the bottle"**, **"Beacon, calibrate"**, **"Beacon, pause"** or **"Beacon, resume"**.
-Microphone and Speech Recognition permissions are requested on first use; hands-free
-listening can be turned off in Settings.
+Voice requests start only when you tap **Talk to Beacon** on the screen. Speak, then
+pause to send, or tap again to send early. The Mac transcribes the recording locally.
 Found objects play spatial beeps by default; choose **Beeps** or **Chest** in Settings.
-Say **"Beacon, loot mode on"** for the chest sound or **"Beacon, loot mode off"** for
+Tap and say **"loot mode on"** for the chest sound or **"loot mode off"** for
 Beeps. The choice is remembered and does not resume a paused search.
 Within reach (probe mode) the phone works like a torch: the beep's pitch rises from low
 to middle to high as the phone points nearer to the object, and it beeps faster as the
@@ -31,10 +29,7 @@ Open <http://localhost:5173>. Keep Beacon open on an iPhone connected to the sam
 See [iPhone setup](docs/real-device.md) for signing, installation and connection settings.
 
 On the iPhone, tap **Calibrate**, then **Talk to Beacon**: speak, then pause to send.
-Or just say **"Beacon"** followed by your request. No button hold is needed.
 **Stop** appears during active requests or guidance. Connection settings live behind the gear.
-You can also assign **Beacon → Talk to Beacon** to the iPhone's Action button in Settings.
-Press to start, speak, then pause to send; press again to send early.
 Use the iPhone app to find an object. Its selected target appears automatically in the room
 view. **3D** slowly circles the scan at 30° above horizontal, completing a turn in 90
 seconds. Drag or zoom to pause and inspect; press **3D** to resume. **Overhead** shows a

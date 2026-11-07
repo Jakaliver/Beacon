@@ -16,7 +16,6 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.trident.app.m9ac3a7n78
-        PRODUCT_MODULE_NAME: Trident # Existing Action button shortcut identity
         TARGETED_DEVICE_FAMILY: "1"
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
@@ -32,8 +31,7 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiredDeviceCapabilities: [arkit]
         NSCameraUsageDescription: Beacon uses the camera to map the room and find objects for you.
-        NSMicrophoneUsageDescription: Beacon listens for commands addressed to Beacon while the app is open, or records a request when you tap Talk to Beacon.
-        NSSpeechRecognitionUsageDescription: Beacon uses on-device speech recognition for hands-free commands.
+        NSMicrophoneUsageDescription: Beacon records a spoken request only when you tap Talk to Beacon.
         NSMotionUsageDescription: Beacon uses headphone motion to keep guidance sounds fixed in the room.
         NSLocalNetworkUsageDescription: Beacon sends camera frames to your Mac on the local network and receives guidance.
         NSAppTransportSecurity:

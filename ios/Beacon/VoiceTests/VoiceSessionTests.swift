@@ -245,6 +245,29 @@ final class VoiceSessionSuite {
         expect(!session.speaker.spoken.contains("After disable"), "disable cancels pending feedback")
     }
 
+    func screenButtonOnly() async {
+        let session = VoiceSession(allowsHandsFree: false)
+        var commands: [VoiceCommand] = []
+        session.onCommand = { commands.append($0) }
+        await session.enable()
+        expect(!session.isEnabled && !session.isListening, "screen-only sessions cannot enable hands-free capture")
+        expect(session.listener.startCount == 0, "screen-only sessions never request recognition or open its microphone")
+        session.listener.emit("Beacon, find the bottle", final: true)
+        expect(commands.isEmpty, "ambient wake commands cannot start a search")
+        session.submit("find the bottle")
+        expect(commands == [.find("the bottle")], "a completed screen recording still starts the search")
+        session.submit("loot mode on")
+        expect(commands.last == .lootMode(true), "screen requests retain loot mode commands")
+        session.enteredBackground()
+        session.becameActive()
+        await wait(.milliseconds(50))
+        expect(session.listener.resumeCount == 0, "returning to the app never resumes a hands-free microphone")
+        await session.enable(greet: false)
+        expect(session.listener.startCount == 0, "a later enable request remains blocked")
+        session.say("Found it.", urgent: true)
+        expect(session.speaker.spoken.last == "Found it.", "spoken guidance stays available")
+    }
+
     func beaconWakeWord() async {
         let session = VoiceSession(requiresWakeWord: true)
         var commands: [VoiceCommand] = []
@@ -357,6 +380,7 @@ struct VoiceSessionTests {
         await suite.feedbackReplacement()
         await suite.echoAndBargeIn()
         await suite.beaconWakeWord()
+        await suite.screenButtonOnly()
         guard suite.failures == 0 else {
             print("Voice session: \(suite.failures) of \(suite.checks) checks failed")
             exit(EXIT_FAILURE)

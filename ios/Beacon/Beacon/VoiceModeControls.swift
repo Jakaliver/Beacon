@@ -2,28 +2,31 @@ import SwiftUI
 
 struct VoiceModeControls: View {
     @ObservedObject var voice: VoiceSession
+    var showsListeningControls = true
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label(voice.status, systemImage: voice.isListening ? "mic.fill" : "mic.slash")
-                .font(.headline)
-                .foregroundStyle(voice.isListening ? .teal : .secondary)
-                .accessibilityIdentifier("voice-status")
-            if let error = voice.errorMessage {
-                Text(error).font(.callout).foregroundStyle(.red)
-                Button("Open iPhone Settings") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+            if showsListeningControls {
+                Label(voice.status, systemImage: voice.isListening ? "mic.fill" : "mic.slash")
+                    .font(.headline)
+                    .foregroundStyle(voice.isListening ? .teal : .secondary)
+                    .accessibilityIdentifier("voice-status")
+                if let error = voice.errorMessage {
+                    Text(error).font(.callout).foregroundStyle(.red)
+                    Button("Open iPhone Settings") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                    }
                 }
+                Button(voice.isEnabled ? "Turn voice mode off" : "Start voice mode") {
+                    if voice.isEnabled { voice.disable() }
+                    else { Task { await voice.enable() } }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .accessibilityHint("Say Beacon followed by your request while the app is open.")
             }
-            Button(voice.isEnabled ? "Turn voice mode off" : "Start voice mode") {
-                if voice.isEnabled { voice.disable() }
-                else { Task { await voice.enable() } }
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .accessibilityHint("Say Beacon followed by your request while the app is open.")
             HStack {
                 Menu {
                     Button {

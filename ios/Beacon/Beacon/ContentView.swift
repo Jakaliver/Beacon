@@ -2,12 +2,6 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var model: AppModel
-    @ObservedObject private var voice: VoiceSession
-
-    init(model: AppModel) {
-        self.model = model
-        self.voice = model.voice
-    }
     @State private var showSettings = false
     @AppStorage(Settings.guidanceSoundStyleKey) private var soundStyle = GuidanceSoundStyle.beeps.rawValue
 
@@ -82,7 +76,7 @@ struct ContentView: View {
         .background(Color(.systemBackground))
         .sheet(isPresented: $showSettings, onDismiss: model.applySettings) { SettingsView(voice: model.voice) }
         .onChange(of: soundStyle) { _, _ in model.refreshGuidanceSound() }
-        .onChange(of: model.recordingFromButton) { _, recording in
+        .onChange(of: model.recording) { _, recording in
             if recording { showSettings = false }
         }
     }
@@ -123,7 +117,7 @@ struct ContentView: View {
                 VStack(spacing: 6) {
                     Text(model.recording ? "Listening…" : model.transcribing ? "Sending request…" : "Talk to Beacon")
                         .font(.title2.weight(.semibold))
-                    Text(model.recording ? "Pause to send, or tap again" : model.transcribing ? "One moment" : voice.isListening ? "Or say “Beacon, find the bottle”" : "Tap, speak, then pause to send")
+                    Text(model.recording ? "Pause to send, or tap again" : model.transcribing ? "One moment" : "Tap, speak, then pause to send")
                         .font(.subheadline)
                         .opacity(0.7)
                 }
@@ -161,9 +155,8 @@ struct ContentView: View {
         if !model.choices.isEmpty { return "More than one match is in view." }
         if guiding { return "Follow the object’s sound. Tap Stop whenever you need to pause." }
         if model.mode == "searching" { return "Slowly scan the room with the camera." }
-        if model.stopReason != nil || model.mode == "stopped" { return "Tap to speak, or say “Beacon, resume”." }
-        if voice.errorMessage != nil { return "Tap below to speak. Allow hands-free access in Settings to use “Beacon” commands." }
-        return voice.isListening ? "Calibrate, then tap below or say “Beacon” followed by your request." : "Calibrate, then tap below and say what you want to find."
+        if model.stopReason != nil || model.mode == "stopped" { return "Tap below and say “resume”, or ask for a different object." }
+        return "Calibrate, then tap below and say what you want to find."
     }
 }
 
@@ -179,15 +172,10 @@ private struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Hands-free voice") {
-                    VoiceModeControls(voice: voice)
+                Section("Speaking voice") {
+                    VoiceModeControls(voice: voice, showsListeningControls: false)
                 }
                 GuidanceSoundSettings()
-                Section("Action button") {
-                    Text("In iPhone Settings → Action Button, choose Shortcut → Beacon → Talk to Beacon.")
-                    Text("Press and hold to start. Speak, then pause to send. Press again to send early. Unlock your iPhone so Beacon can use the camera.")
-                        .foregroundStyle(.secondary)
-                }
                 Section("Connection") {
                     TextField("Mac host", text: $host)
                         .textInputAutocapitalization(.never)

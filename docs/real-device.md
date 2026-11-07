@@ -1,8 +1,8 @@
 # Real iPhone setup
 
 The iPhone sends camera frames and ARKit poses to the Mac. Depth estimation, object
-recognition and button-request speech recognition run on the Mac; hands-free voice mode
-recognizes commands on the iPhone. The phone receives guidance. The live
+recognition and speech recognition run on the Mac. Voice recording starts only from
+the on-screen **Talk to Beacon** button. The phone receives guidance. The live
 3D room is displayed in the Mac's browser. Both devices must stay connected while testing.
 
 ## 1. Install Xcode and prepare the phone
@@ -92,8 +92,6 @@ file will restore the checked-in developer's signing settings.
    then tap **Done**. Enter only the host, **without** `http://`, `ws://` or `:8787`.
    The app currently defaults to another developer's Mac, so you must change this.
 4. Allow Camera, Microphone, Motion and Local Network permissions when requested.
-   Allow Speech Recognition for the on-device **"Beacon"** commands. Hands-free listening
-   starts automatically while the app is open; turn it off in Settings → Hands-free voice.
 5. The phone should show **Connected** and **Ready**. The health endpoint
    should now show `sensor_connected: true`.
 
@@ -113,36 +111,23 @@ Allow incoming connections for the backend if macOS prompts. Use the Mac's Wi-Fi
 3. Hold the phone ahead of your torso, facing forward, and tap **Calibrate**. If testing
    head tracking, wear compatible AirPods paired with the phone during calibration.
 4. Tap **Talk to Beacon**, say **find the bottle**, then pause to send automatically. Tap
-   again to send early. With VoiceOver, double-tap the button. Or say **"Beacon, find
-   the bottle"** without touching the screen. The app must remain open.
+   again to send early. With VoiceOver, double-tap the button. The app must remain open.
 5. The selected target appears red in the Mac view. Keep it visible while moving closer:
    consistent new sightings refine its position and surface. Larger corrections require
    three agreeing observations so a single bad depth frame does not move the target.
 6. **Stop** appears while a request or guidance is active. It silences guidance and cancels
-   any pending voice request. To continue, say **"Beacon, resume"**, or tap to ask
+   any pending voice request. To continue, tap the button and say **"resume"**, or ask
    for another object. Audio changes and app interruptions can also stop guidance.
 
-### iPhone Action button
+### Recording a request
 
-In iPhone **Settings → Action Button → Shortcut → Choose a Shortcut**, choose
-**Beacon → Talk to Beacon**. This App Shortcut is available after installing Beacon;
-no custom shortcut needs to be created. iOS requires the user to choose the assignment.
+Tap **Talk to Beacon**, speak and pause. Roughly one second of silence after speech
+sends the request, or tap again to send early. Recording is capped at six seconds.
+**Stop** cancels without sending. Leaving the app cancels recording and pending requests.
+The microphone stays closed between requests; the main app does not request Speech
+Recognition access or offer an Action button shortcut.
 
-Press and hold the Action button to open Beacon and start a request. A haptic marks
-the start of recording. Say what to find, then pause: roughly one second of silence
-after speech sends the request. Activate the Action button again to send early.
-Recording is capped at six seconds. **Stop** cancels the request without sending it.
-The on-screen **Talk to Beacon** button starts the same request with a single tap.
-
-This uses Apple's App Shortcut activation, which does not supply a button-release
-event. Unlock the iPhone when prompted: Beacon needs its foreground camera session
-and a reachable Mac. If disconnected, it waits up to eight seconds before reporting
-the connection problem. Leaving the app cancels pending recording and transcription.
-
-Check a cold launch, a second press to send, silence after speaking, and Stop while
-recording or sending. `bash scripts/test-action-button.sh` checks the automatic
-end-of-request timing; the physical button assignment and microphone need an iPhone.
-See [Apple's Action button setup](https://support.apple.com/guide/iphone/use-and-customize-the-action-button-iphe89d61d66/ios).
+`bash scripts/test-action-button.sh` checks the shared end-of-request timing.
 
 ### Reading the room view
 
@@ -189,7 +174,7 @@ the sound aligned with the object. The reverb is a room preset, not measured roo
 | `vision_ready: false` / `speech_ready: false` | Wait for model loading and check the backend terminal. Re-run setup online if downloads did not finish. |
 | Connected, but no room points | Allow Camera/Local Network access, wait for normal tracking, scan the floor, and check `vision_ready`. |
 | Room stops changing | Check the camera age in the viewer and keep the iPhone app foregrounded. |
-| Speech works, but guidance is silent | Connect AirPods to the **iPhone**, check its audio output, then send a new **find** command or say **"Beacon, resume"**. Listen for the spoken stop reason if guidance pauses. |
+| Speech works, but guidance is silent | Connect AirPods to the **iPhone**, check its audio output, then send a new **find** command or tap **Talk to Beacon** and say **"resume"**. Listen for the spoken stop reason if guidance pauses. |
 | Sounds turn the wrong way with your head | Recalibrate while facing ahead; try the app's **Reverse head turn** setting. |
 
 For a playback check independent of camera detection, launch an installed **Debug** build

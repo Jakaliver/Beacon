@@ -17,6 +17,7 @@ final class VoiceSession: ObservableObject {
     var onSpeakingChanged: ((Bool) -> Void)?
     var onEnabledChanged: ((Bool) -> Void)?
     private let requiresWakeWord: Bool
+    private let allowsHandsFree: Bool
     private var followUpUntil = Date.distantPast
 
     private var subscriptions: Set<AnyCancellable> = []
@@ -39,8 +40,9 @@ final class VoiceSession: ObservableObject {
     var status: String { isEnabled ? listener.status : "Voice mode off" }
     var errorMessage: String? { listener.errorMessage }
 
-    init(allowsVoiceChat: Bool = false, requiresWakeWord: Bool = false) {
+    init(allowsVoiceChat: Bool = false, requiresWakeWord: Bool = false, allowsHandsFree: Bool = true) {
         self.requiresWakeWord = requiresWakeWord
+        self.allowsHandsFree = allowsHandsFree
         listener = VoiceListener(allowsVoiceChat: allowsVoiceChat)
         listener.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &subscriptions)
         listener.$isListening.removeDuplicates().dropFirst().sink { [weak self] listening in
@@ -74,7 +76,7 @@ final class VoiceSession: ObservableObject {
     }
 
     func enable(greet: Bool = true) async {
-        guard !isEnabled, foreground else { return }
+        guard allowsHandsFree, !isEnabled, foreground else { return }
         lifecycleGeneration += 1
         let generation = lifecycleGeneration
         isEnabled = true
@@ -123,7 +125,7 @@ final class VoiceSession: ObservableObject {
 
     func becameActive() {
         foreground = true
-        guard isEnabled else { return }
+        guard allowsHandsFree, isEnabled else { return }
         let generation = lifecycleGeneration
         Task { [weak self] in
             guard let self, self.isEnabled, self.foreground,
