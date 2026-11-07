@@ -29,6 +29,8 @@ final class AudioGuide {
     // Probe-mode torch: one looping note per Torch.Aim (off, near, on). All run together and only the
     // current aim's note is audible, so a change of aim fades between notes without clicks.
     private static let torchHz = [392.0, 587.0, 880.0]
+    // 12 dB quieter per doubling of distance (physical spreading is 6 dB): nearer sounds stand out more.
+    private static let rolloff = 2.0
     private var torchMixerIDs: [String] = []
     private var torchEvents: [PHASESoundEvent] = []
     private var torchGains: [Float] = []
@@ -116,7 +118,7 @@ final class AudioGuide {
             pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = 0.14
             let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "\(name)-mixer")
             let distance = PHASEGeometricSpreadingDistanceModelParameters()
-            distance.rolloffFactor = 1.0
+            distance.rolloffFactor = Self.rolloff
             distance.fadeOutParameters = PHASEDistanceModelFadeOutParameters(cullDistance: 20)
             mixer.distanceModelParameters = distance
             let sampler = PHASESamplerNodeDefinition(soundAssetIdentifier: name, mixerDefinition: mixer)
@@ -141,7 +143,7 @@ final class AudioGuide {
                 pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = 0.14
                 let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "\(name)-mixer")
                 let distance = PHASEGeometricSpreadingDistanceModelParameters()
-                distance.rolloffFactor = 1.0
+                distance.rolloffFactor = Self.rolloff
                 distance.fadeOutParameters = PHASEDistanceModelFadeOutParameters(cullDistance: 20)
                 mixer.distanceModelParameters = distance
                 mixer.gainMetaParameterDefinition = PHASENumberMetaParameterDefinition(value: 0, minimum: 0, maximum: 1,
@@ -216,7 +218,7 @@ final class AudioGuide {
             pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = 0.14
             let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "chest-loop-mixer")
             let distance = PHASEGeometricSpreadingDistanceModelParameters()
-            distance.rolloffFactor = 1.0
+            distance.rolloffFactor = Self.rolloff
             distance.fadeOutParameters = PHASEDistanceModelFadeOutParameters(cullDistance: 20)
             mixer.distanceModelParameters = distance
             mixer.gainMetaParameterDefinition = PHASENumberMetaParameterDefinition(value: 0.30,

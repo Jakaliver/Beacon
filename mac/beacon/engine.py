@@ -504,12 +504,8 @@ class Engine:
                 self.start_guidance()
             return
         if self.mode in ACTIVE and self.selected:
+            # A moved target is not announced: the beacon moving to the new place is the cue.
             t = self.tracker.tracks.get(self.selected)
-            if t is not None and t.relocated:
-                t.relocated = False
-                self.cue("rescan")
-                self.say("The bottle moved. Updated its position." if t.label == "bottle"
-                         else f"{self.spoken(t.label).capitalize()} moved. Updated its position.")
             if t is None or (not t.locked and t.misses >= CONFIG.misses_to_lose):
                 self.mode = "searching"
                 self.selected = None
@@ -532,15 +528,13 @@ class Engine:
         if self.mode in {"walking", "hotcold"} and near:
             self.mode = "probe"
             self.listener_anchor = self.walking_body()
+            # No speech on entering or leaving: the switch between beeps and the torch tone is the cue.
             self.path, self.waypoint = [], None
-            self.say(f"Stop walking. {self.spoken(target.label).capitalize()} is within reach. "
-                     "Sweep the phone slowly. A high beep means you are pointing at it.")
         elif self.mode == "probe":
             drift = math.hypot(phone[0] - self.listener_anchor[0], phone[2] - self.listener_anchor[2])
             if drift > CONFIG.probe_leave and dh > CONFIG.probe_enter:
                 self.mode = "walking" if self.navigation else "hotcold"
                 self.listener_anchor = None
-                self.say("You moved away. Leaving probe mode.")
 
     def _proximity(self, target, now: float) -> dict:
         d = float(np.min(np.linalg.norm(target.surface - self.probe_point(), axis=1)))

@@ -43,7 +43,6 @@ class Track:
     locked: bool = False
     best_depth: float = 99.0  # closest camera distance of any sighting used so far
     relocate: list = field(default_factory=list)  # recent sightings away from a locked target
-    relocated: bool = False  # set when a locked target moved; the engine announces it
     observed_now: bool = True
     injected: bool = False
     refinements: list = field(default_factory=list)
@@ -208,7 +207,6 @@ class Tracker:
             t.last_seen = now
             t.misses = 0
             t.relocate = []
-            t.relocated = True
             t.observed_now = True
             t.refinements = []
 
@@ -290,5 +288,5 @@ if __name__ == "__main__":
     moved_obs.position = track.position + np.array([1.0, 0.0, 0.0])
     for i in range(3):
         locked.update([moved_obs], depth, K, T, 601.0 + 0.5 * i, False)
-    assert track.relocated and abs(track.position[0] - moved_obs.position[0]) < 1e-6, track.position
+    assert abs(track.position[0] - moved_obs.position[0]) < 1e-6, track.position
     print("targets ok")

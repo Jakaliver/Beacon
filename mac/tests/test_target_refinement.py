@@ -59,7 +59,6 @@ class RefinementTests(unittest.TestCase):
         for i in range(8):
             self.tracker.update([moved], self.depth, self.K, self.T, 10 + i * 0.25, False)
         self.assertLess(np.linalg.norm(self.track.position - moved.position), 1e-6)
-        self.assertTrue(self.track.relocated)
 
     def test_an_empty_old_place_at_arms_length_counts_as_a_miss(self):
         self.T[2, 3] = -2.0  # 0.5 m from the target, which is no longer there
