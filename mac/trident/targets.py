@@ -42,6 +42,8 @@ class Track:
     # Locked: the 3D position is fixed; guidance relies on phone tracking only, not on seeing it again.
     locked: bool = False
     best_depth: float = 99.0  # closest camera distance of any sighting used so far
+    relocate: list = field(default_factory=list)  # recent sightings away from a locked target
+    relocated: bool = False  # set when a locked target moved; the engine announces it
     observed_now: bool = True
     injected: bool = False
     history: list = field(default_factory=list)
@@ -113,11 +115,13 @@ class Tracker:
                     best, best_d = t, d
             if best is not None and best.locked:
                 matched.add(best.id)
-                # Locked targets only learn from clearly closer, nearby views: monocular depth is far
-                # more accurate up close, and far or unrelated sightings must never move the target.
-                near_lock = float(np.linalg.norm(best.position - obs.position)) < 0.35
-                if near_lock and obs.depth < 0.8 * best.best_depth:
-                    self._fuse(best, obs, now, prefer_new=True)
+                # Re-sightings near the lock refine it, weighted by their (distance-dependent) accuracy.
+                self._fuse(best, obs, now)
+                best.relocate = []
+                continue
+            locked = [t for t in self.tracks.values() if t.locked and t.label == obs.label]
+            if best is None and locked:
+                self._consider_relocation(locked[0], obs, now)
                 continue
             if best is None:
                 self._new(obs, now, injected)
@@ -128,7 +132,7 @@ class Tracker:
         # Negative evidence: a track that should be visible and unoccluded but was not detected.
         h, w = depth.shape
         for t in self.tracks.values():
-            if t.id in matched or t.locked:
+            if t.id in matched:
                 continue
             p = project(T, K, t.position)
             if p is None:
@@ -152,6 +156,21 @@ class Tracker:
         tid = f"{obs.label.replace(' ', '-')}-{n}"
         self.tracks[tid] = Track(tid, obs.label, obs.position, obs.extent, obs.surface, obs.sigma,
                                  now, injected=injected, best_depth=obs.depth)
+
+    @staticmethod
+    def _consider_relocation(t: Track, obs: Observation, now: float) -> None:
+        """Move a locked target only after its old place looked empty and several sightings agree elsewhere."""
+        t.relocate = [o for o in t.relocate if now - o[0] < 3.0 and np.linalg.norm(o[1] - obs.position) < 0.2]
+        t.relocate.append((now, obs.position))
+        if len(t.relocate) >= 3 and t.misses >= 2:
+            t.position = np.mean([p for _, p in t.relocate], axis=0)
+            t.surface = obs.surface + (t.position - obs.position)
+            t.sigma = obs.sigma
+            t.best_depth = obs.depth
+            t.last_seen = now
+            t.misses = 0
+            t.relocate = []
+            t.relocated = True
 
     @staticmethod
     def _fuse(t: Track, obs: Observation, now: float, prefer_new: bool = False) -> None:
@@ -211,13 +230,20 @@ if __name__ == "__main__":
     track = next(iter(locked.tracks.values()))
     track.locked = True
     before = track.position.copy()
-    moved = observe("bottle", mask, depth * 1.2, K, T)
-    for i in range(20):
-        locked.update([moved] if i % 2 else [], empty, K, T, 1.0 + i, False)
+    for i in range(20):  # long unseen, many misses: still valid and in place
+        locked.update([], empty, K, T, 1.0 + i, False)
     assert track.valid_at(500.0) and np.allclose(track.position, before) and len(locked.tracks) == 1
-    # A clearly closer, consistent view refines the locked position.
-    closer = observe("bottle", mask, depth * 0.6, K, T)
-    closer.position = before + np.array([0.0, 0.0, 0.1])
-    locked.update([closer], depth * 0.6, K, T, 600.0, False)
-    assert 0.05 < float(np.linalg.norm(track.position - before)) < 0.1, track.position
+    track.misses = 0
+    # A re-sighting near the lock refines it.
+    near = observe("bottle", mask, depth, K, T)
+    near.position = track.position + np.array([0.0, 0.0, 0.1])
+    locked.update([near], depth, K, T, 600.0, False)
+    assert 0.0 < float(np.linalg.norm(track.position - before)) < 0.1, track.position
+    # Moved: the old place looks empty and three sightings agree 1 m away -> the lock moves there.
+    track.misses = 2
+    moved_obs = observe("bottle", mask, depth, K, T)
+    moved_obs.position = track.position + np.array([1.0, 0.0, 0.0])
+    for i in range(3):
+        locked.update([moved_obs], depth, K, T, 601.0 + 0.5 * i, False)
+    assert track.relocated and abs(track.position[0] - moved_obs.position[0]) < 1e-6, track.position
     print("targets ok")

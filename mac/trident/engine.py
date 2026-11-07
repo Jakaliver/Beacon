@@ -491,6 +491,11 @@ class Engine:
             return
         if self.mode in ACTIVE and self.selected:
             t = self.tracker.tracks.get(self.selected)
+            if t is not None and t.relocated:
+                t.relocated = False
+                self.cue("rescan")
+                self.say("The bottle moved. Updated its position." if t.label == "bottle"
+                         else f"{self.spoken(t.label).capitalize()} moved. Updated its position.")
             if t is None or (not t.locked and t.misses >= CONFIG.misses_to_lose):
                 self.mode = "searching"
                 self.selected = None

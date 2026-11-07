@@ -24,10 +24,10 @@ final class AudioGuide {
     private let probe = AVAudioPlayerNode()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
 
-    // Broadband "knocks", not pure beeps: the ear can only place a sound in space if it has a wide spectrum.
-    private lazy var beaconBuffer = knock(base: 420, seconds: 0.16)
-    private lazy var pulseBuffer = knock(base: 900, seconds: 0.09)
-    private lazy var confirmBuffer = sequence([knock(base: 900, seconds: 0.09), knock(base: 1350, seconds: 0.12)])
+    // Beeps with soft harmonics: a pure sine cannot be placed in space; harmonics give the ear direction cues.
+    private lazy var beaconBuffer = beep(hz: 660, seconds: 0.16)
+    private lazy var pulseBuffer = beep(hz: 1000, seconds: 0.09)
+    private lazy var confirmBuffer = sequence([beep(hz: 1000, seconds: 0.09), beep(hz: 1000, seconds: 0.09)])
     private lazy var stopBuffer = tone([(660, 0.1), (440, 0.18)], harmonic: 0.2)
     private lazy var rescanBuffer = tone([(700, 0.06), (0, 0.05), (700, 0.06)], harmonic: 0.2)
 
@@ -45,7 +45,7 @@ final class AudioGuide {
             player.renderingAlgorithm = algorithm
             player.sourceMode = .pointSource
             player.pointSourceInHeadMode = .bypass
-            player.reverbBlend = 0.3
+            player.reverbBlend = 0.2
         }
         // A little room reverb moves binaural sound out of the head and into the room.
         environment.reverbParameters.enable = true
@@ -105,8 +105,9 @@ final class AudioGuide {
         }
     }
 
+    /// `position` is the body estimate at phone height; the ears are higher, so a table-top target sounds below.
     func setListener(_ position: SIMD3<Float>) {
-        environment.listenerPosition = AVAudio3DPoint(x: position.x, y: position.y, z: position.z)
+        environment.listenerPosition = AVAudio3DPoint(x: position.x, y: position.y + 0.3, z: position.z)
     }
 
     /// Call while the user faces where the phone points: that world direction becomes "ahead".
@@ -150,23 +151,20 @@ final class AudioGuide {
         player.scheduleBuffer(buffer, at: nil, options: .interrupts)
     }
 
-    /// A short wood-block-like hit: a noise transient plus inharmonic partials that decay quickly.
-    private func knock(base: Double, seconds: Double) -> AVAudioPCMBuffer {
+    /// A rounded beep: fundamental plus decaying harmonics up to ~8 kHz, smooth attack and release.
+    private func beep(hz: Double, seconds: Double) -> AVAudioPCMBuffer {
         let rate = format.sampleRate
         let n = Int(seconds * rate)
         let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(n))!
         buffer.frameLength = AVAudioFrameCount(n)
         let out = buffer.floatChannelData![0]
-        let partials: [(ratio: Double, gain: Double, decay: Double)] = [(1, 1, 18), (2.76, 0.5, 30), (5.4, 0.3, 45)]
-        var noise: Float = 0
+        let harmonics = (1...8).filter { Double($0) * hz < 8_000 }
         for i in 0..<n {
             let t = Double(i) / rate
             var v = 0.0
-            for p in partials { v += p.gain * exp(-p.decay * t) * sin(2 * .pi * base * p.ratio * t) }
-            noise = 0.6 * noise + 0.4 * Float.random(in: -1...1)  // softened white noise
-            let transient = Float(exp(-250 * t)) * noise
-            let attack = Float(min(1, t / 0.002))
-            out[i] = attack * (0.35 * Float(v) + 0.5 * transient)
+            for k in harmonics { v += sin(2 * .pi * hz * Double(k) * t) / Double(k * k) * (k == 1 ? 1 : 1.6) }
+            let envelope = min(1, t / 0.006, (seconds - t) / 0.025)
+            out[i] = Float(0.4 * envelope * v)
         }
         return buffer
     }
