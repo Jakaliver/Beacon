@@ -8,7 +8,7 @@ const RED = 0xff4b50;
 const decode = (base64: string) => Uint8Array.from(atob(base64), c => c.charCodeAt(0));
 const PALETTE = [[0, 0, 0, 0], [40, 48, 54, 110], [108, 119, 127, 125], [47, 55, 62, 75], [32, 39, 45, 60]];
 
-/** Only consumes reconstruction snapshots. No simulator geometry or inferred furniture. */
+/** Displays measured reconstruction snapshots without inventing unseen surfaces. */
 export class RoomView {
   readonly renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
@@ -23,8 +23,6 @@ export class RoomView {
   private mapVersion: number | boolean | null | undefined;
   private autoFit = true;
   private lastFit = 0;
-  private showDetections = false;
-  private showFloor = true;
   private floor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide }));
   private texture: THREE.DataTexture | null = null;
   private grid = new THREE.GridHelper(40, 40, 0x303b45, 0x1c252d);
@@ -49,7 +47,6 @@ export class RoomView {
   private needsFit = true;
   private dirty = true;
   private lastFrame = 0;
-  private following = false;
   private disposed = false;
   private width = 1;
   private height = 1;
@@ -60,7 +57,6 @@ export class RoomView {
   private label: HTMLElement;
   private scaleBar: HTMLElement;
   private phoneLabel: HTMLElement;
-  onInteract = () => {};
 
   constructor(canvas: HTMLCanvasElement, label: HTMLElement, scaleBar: HTMLElement, phoneLabel: HTMLElement) {
     this.label = label;
@@ -78,7 +74,7 @@ export class RoomView {
     this.controls.minPolarAngle = 0;
     this.controls.screenSpacePanning = false;
     this.controls.addEventListener("change", () => this.invalidate());
-    this.controls.addEventListener("start", () => { this.following = false; this.autoFit = false; this.onInteract(); });
+    this.controls.addEventListener("start", () => { this.autoFit = false; });
     this.setView("3d");
 
     this.cloudGeometry.setAttribute("position", new THREE.BufferAttribute(this.positions, 3).setUsage(THREE.DynamicDrawUsage));
@@ -155,33 +151,13 @@ export class RoomView {
     this.invalidate();
   }
 
-  setFollow(value: boolean) { this.following = value; if (value) { this.autoFit = false; this.follow(); } }
-  setAutoFit(value: boolean) { this.autoFit = value; if (value) { this.following = false; this.fit(); } }
+  setAutoFit(value: boolean) { this.autoFit = value; if (value) this.fit(); }
   resetScan() { this.scan.clear(); this.scanId = undefined; this.mapVersion = undefined; this.needsFit = true; }
   focusTarget() {
     const target = this.recon?.targets.find(t => t.selected);
     if (!target) return;
-    this.following = false;
     this.autoFit = false;
-    this.onInteract();
     this.delta.fromArray(target.position).sub(this.controls.target);
-    this.camera.position.add(this.delta);
-    this.controls.target.add(this.delta);
-    this.controls.update();
-    this.invalidate();
-  }
-  setLayer(layer: "points" | "floor" | "route" | "detections", visible: boolean) {
-    if (layer === "points") this.cloud.visible = visible;
-    if (layer === "floor") { this.showFloor = visible; this.floor.visible = visible && !!this.texture; }
-    if (layer === "route") { this.route.visible = visible; this.waypoint.visible = visible && !!this.recon?.waypoint; }
-    if (layer === "detections") { this.showDetections = visible; if (this.recon) this.updateTargets(this.recon, this.recon.floor_y ?? 0); }
-    this.invalidate();
-  }
-
-  private follow() {
-    const p = this.recon?.phone.position;
-    if (!p) return;
-    this.delta.set(p[0], this.recon?.floor_y ?? 0, p[2]).sub(this.controls.target);
     this.camera.position.add(this.delta);
     this.controls.target.add(this.delta);
     this.controls.update();
@@ -268,7 +244,7 @@ export class RoomView {
       pixels.set(PALETTE[cell] ?? PALETTE[0], ((h - 1 - row) * w + col) * 4);
     }
     this.texture.needsUpdate = true;
-    this.floor.visible = this.showFloor && observed > 0;
+    this.floor.visible = observed > 0;
     this.floor.scale.set(w * res, h * res, 1);
     this.floor.position.set(origin[0] + w * res / 2, floorY - 0.025, origin[1] + h * res / 2);
     this.updateTargets(recon, floorY);
@@ -290,20 +266,20 @@ export class RoomView {
     if (count && (this.needsFit || this.autoFit && now - this.lastFit > 2000)) {
       this.fit(); this.needsFit = false; this.lastFit = now;
     }
-    if (this.following) this.follow();
     this.invalidate();
     return { points: count, area: observed * res * res };
   }
 
   private updateTargets(recon: Recon, floorY: number) {
-    const ids = new Set(recon.targets.map(t => t.id));
+    const selected = recon.targets.filter(t => t.selected);
+    const ids = new Set(selected.map(t => t.id));
     for (const [id, visual] of this.targetVisuals) if (!ids.has(id)) {
       this.targets.remove(visual.group);
       visual.box.material.dispose(); visual.edges.material.dispose(); visual.ring.material.dispose();
       visual.stem.geometry.dispose(); visual.stem.material.dispose();
       this.targetVisuals.delete(id);
     }
-    for (const t of recon.targets) {
+    for (const t of selected) {
       let visual = this.targetVisuals.get(t.id);
       if (!visual) {
         const group = new THREE.Group();
@@ -317,18 +293,16 @@ export class RoomView {
         visual = { group, box, edges, ring, stem };
         this.targetVisuals.set(t.id, visual);
       }
-      const color = t.selected ? RED : 0x8d9aa4;
-      visual.group.visible = t.selected || this.showDetections;
+      const color = RED;
       visual.group.position.fromArray(t.position);
       const size = t.extent.map(v => Math.max(0.06, v));
       visual.box.scale.fromArray(size); visual.edges.scale.fromArray(size);
       visual.box.material.color.setHex(color); visual.edges.material.color.setHex(color); visual.ring.material.color.setHex(color);
-      visual.box.material.opacity = t.valid ? (t.selected ? 0.24 : 0.025) : 0.08;
-      visual.edges.material.opacity = t.valid ? (t.selected ? 1 : 0.45) : 0.25;
-      visual.ring.material.opacity = t.valid ? (t.selected ? 0.95 : 0.2) : 0.35;
+      visual.box.material.opacity = t.valid ? 0.24 : 0.08;
+      visual.edges.material.opacity = t.valid ? 1 : 0.25;
+      visual.ring.material.opacity = t.valid ? 0.95 : 0.35;
       visual.ring.position.y = floorY + 0.065 - t.position[1];
       visual.ring.scale.setScalar(Math.max(t.sigma, size[0] / 2, size[2] / 2, 0.18));
-      visual.stem.visible = t.selected;
       visual.stem.position.y = visual.ring.position.y;
       visual.stem.scale.y = Math.max(0, -visual.ring.position.y);
     }

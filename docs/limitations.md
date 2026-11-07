@@ -1,61 +1,39 @@
 # Limitations
 
-## Verified only in the simulator
+## Current validation
 
-- Everything ran against rendered images on the Mac. The native app compiles, but ARKit
-  capture, intrinsics, Bluetooth audio, AirPods head tracking and Wi-Fi latency are untested.
-- The Web Audio beacon is a stereo-pan preview. It does not verify Apple spatial audio.
+Real iPhone camera capture, ARKit poses, Wi-Fi transport and Mac depth/object inference
+have been exercised with the room viewer. Building the iPhone app does not by itself verify
+perceived sound direction, AirPods head tracking or navigation accuracy. The latest audio
+implementation comes from the main iPhone app and uses PHASE.
 
-## Monocular depth
+## Depth and the room display
 
-- Depth Anything V2 Metric (Hypersim) has a view-dependent scale error. In the simulator it
-  ranged from about 0.7× to 1.6×. Trident corrects each frame with the known floor height
-  (from ARKit plane detection, or simulated plane detection). Frames without enough visible
-  floor (at least 1 m²) reuse a running scale. Objects are also kept from sinking below the floor.
-- Measured in the clear-room scene: target estimates within about 5 cm at 1–2.5 m, and about
-  10–15 cm when the phone is within 0.5 m. The confirm threshold is therefore ≥ 0.2 m and
-  grows with uncertainty. This is phone proximity, not grasp detection.
-- Objects seen only through gaps (for example, under a table between its legs) take the depth of
-  the occluder. Their position can be wrong by more than 0.5 m.
-- Map points are integrated only within 4 m, because far depth noise produced false obstacles.
+- Depth is estimated from camera images. It has view-dependent scale error, especially
+  around occlusions and close or distant objects. ARKit floor height helps correct scale;
+  frames without enough visible floor reuse a running estimate.
+- Only observed surfaces appear. Missing walls, floors or furniture are not filled in.
+  An incomplete point cloud is not a complete room model.
+- The backend integrates map points within 4 m. The viewer retains up to 20,000 points in
+  4.5 cm voxels for up to 90 seconds, which improves continuity while turning but can retain
+  traces of moved objects or depth drift. A new camera world clears the display history.
+- The occupancy grid is 8×8 m with 10 cm cells and recentres as the phone moves. It can show
+  a different footprint from the retained point cloud. It does not model overhangs beyond
+  obstacle heights from 0.15 m to 2.0 m above the floor.
+- Red points lie inside the selected target's estimated box; they are not a separate
+  per-point segmentation result. The floor ring includes position uncertainty.
+- Paused geometry stays visible and is labelled. It is not evidence of current detection.
+- WebGL 2 is required. The browser is read-only and does not control capture or guidance.
 
-## Detection
+## Detection and guidance
 
-- YOLO11n detects the 26 cm bottle reliably from about 2.5 m. Beyond that, the user must walk
-  closer while scanning.
-- Only COCO classes are supported (`find the giraffe` is refused with an explanation). Some
-  labels are imperfect: the simulator sofa is sometimes "bed" or "bench".
-- A target that moved while unseen is noticed only when the phone looks at its old position
-  again, from 0.7–5 m. Very close views do not count as evidence, because the detector often
-  misses cropped objects.
-
-## Mapping and routing
-
-- The grid is 8×8 m with 10 cm cells and re-centres as the user moves. Long walks forget
-  geometry that falls off the edge.
-- Walking guidance needs observed floor. Floor right next to the feet is often not in view
-  while the phone is held ahead, so Trident may stop with "no safe route yet" until the user
-  scans down and around. Cells seen clear of obstacles without a confirmed floor are allowed
-  at triple cost. Cells the body has stood on count as floor.
-- Obstacles smear along view rays because of depth error. Inflation (about 0.46 m in total)
-  covers body radius, clearance, hand/body offset, depth and latency. Narrow gaps can
-  therefore look closed.
-- The body position is estimated as 0.3 m behind the phone along its heading. Deliberate
-  reaching while walking is not detected separately, except through Probe mode.
-- The map has no overhang model beyond obstacle heights from 0.15 m to 2.0 m above the floor.
-
-## Not built
-
-- No Bonjour discovery: the phone needs the Mac host name or IP address.
-- No automated test suite: each module has a small `python -m trident.<module>` self-check.
-
-## Room viewer
-
-- The grey LiDAR appearance visualises estimated monocular depth; it does not add a
-  LiDAR sensor or recover unseen surfaces. The live cloud contains the backend's most
-  recent 6,000 points; the rolling occupancy grid can retain a larger observed footprint.
-- Red points are observations inside the selected target's estimated bounding box,
-  not a separate per-point segmentation result. The floor ring shows position uncertainty.
-- The optional sample room is illustrative, clearly labelled, and never sent to the backend.
-- WebGL 2 is required. The display marks stale observations and unverified targets;
-  the guidance engine remains responsible for navigation and stop decisions.
+- Object recognition is limited to the detector's supported COCO classes. Small, cropped,
+  distant and partly hidden objects may be missed or mislabelled.
+- Depth may fall on an occluder instead of the requested object, shifting the target's
+  estimated position. Proximity confirmation is an estimate, not grasp detection.
+- Walking guidance needs observed floor. Unknown or narrow spaces may have no usable route;
+  depth error and obstacle inflation can make open gaps appear blocked.
+- The body position is estimated behind the phone. Head orientation is measured separately;
+  AirPods do not supply a tracked head position.
+- Local network connectivity and foreground camera capture are required. The phone needs
+  the Mac host name or IP; automatic discovery is not implemented.

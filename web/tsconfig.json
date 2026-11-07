@@ -9,5 +9,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["simulator", "reconstruction-viewer"]
+  "include": ["reconstruction-viewer"]
 }

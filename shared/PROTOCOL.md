@@ -1,7 +1,7 @@
 # Trident sensor and guidance protocol (v1)
 
-Both sensor sources (the Three.js simulator and the iPhone app) use this
-protocol. The Mac backend runs the same pipeline for both.
+The iPhone sends camera observations and commands to the Mac. The web room view
+only subscribes to `/ws/viewer`; it never opens a control or sensor connection.
 
 Server: `http://<mac-host>:8787`.
 
@@ -36,8 +36,7 @@ intrinsics to match before sending.
 
 ## Timestamps and epochs
 
-- `t`: source monotonic time in seconds (iPhone: `ARFrame.timestamp`;
-  simulator: `(performance.timeOrigin + performance.now()) / 1000`).
+- `t`: source monotonic time in seconds (iPhone: `ARFrame.timestamp`).
 - `seq`: increases by 1 per message of that kind, per session.
 - `session`: random string chosen when the source connects.
 - `epoch`: world-origin epoch. The source increments it when the AR world
@@ -72,7 +71,7 @@ Header:
 `image_transform` is informational (it documents how the transmitted image came
 from the sensor image). The backend uses `intrinsics` as given.
 
-`perception: "injected"` is a debug mode available only in the simulator. Then
+`perception: "injected"` is a legacy debug input supported by the backend for fixtures. Then
 `injected` holds `{"depth_w", "depth_h", "detections": [{"label", "bbox": [x0,y0,x1,y1]}]}` and the
 binary payload after the JPEG holds `depth_w*depth_h` float32 metric depths.
 Layout for injected frames: `[u32 N][header][u32 jpegLen][jpeg][float32 depth]`.
@@ -116,8 +115,8 @@ Command text accepts `find [object]`, `stop`, `cancel`, `repeat`, `inspect`,
 interruption status. Their optional Mac playback is independent of iPhone guidance.
 When an `iphone` control client is connected, only iPhone audio status is used;
 legacy iPhone builds without status messages retain their local audio checks.
-Otherwise, simulator audio status still applies. A browser preview cannot block
-phone audio or hide a failure reported by the phone.
+Otherwise, legacy `sim-app` audio status still applies. These roles are retained for
+protocol compatibility; the current room visualization does not send control messages.
 
 ## Guidance messages (Mac → client, JSON on `/ws/control`)
 

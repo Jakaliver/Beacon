@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Starts the Mac backend (port 8787) and the web simulator/viewer (port 5173).
+# Starts the Mac backend (port 8787) and the read-only room view (port 5173).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export HF_HUB_OFFLINE=1 YOLO_OFFLINE=1 PYTORCH_ENABLE_MPS_FALLBACK=1

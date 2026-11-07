@@ -1,93 +1,65 @@
 # Trident
 
-Trident helps a blind user find an object with a handheld iPhone and audio feedback.
-The iPhone captures camera frames, ARKit poses and speech. A Mac on the same Wi-Fi runs
-all heavy work locally: metric depth, object segmentation, speech recognition, mapping,
-target tracking and route planning. No cloud services or paid APIs.
+Trident uses an iPhone camera and local Mac models to locate objects and provide spatial
+audio guidance. The iPhone runs the app, captures ARKit poses and camera frames, accepts
+commands and plays guidance through headphones. The Mac runs depth estimation, object
+recognition, speech recognition, mapping and target tracking locally.
 
-Development happens first in a Three.js simulator that feeds the same backend pipeline as
-the real phone.
+The browser is a **read-only room visualization**: grey measured surfaces, a white iPhone
+marker, and the selected target in red. It connects only to `/ws/viewer`. It has no microphone,
+audio playback, commands, guidance controls or simulated camera.
 
-## Status
-
-| Part | State |
-|---|---|
-| Milestone 1: find an object, hot/cold audio on the Mac | Works in the simulator with real Depth Anything V2 + YOLO11 inference |
-| Milestone 2: obstacle map, A* routing, spoken turns, Probe mode | Works in the simulator; see [limitations](docs/limitations.md) |
-| Milestone 3: native iPhone app with spatial audio | Builds for device and simulator SDKs; **not yet run on a real iPhone** |
-| Local speech (Parakeet) | Works on the Mac (push-to-talk in the browser and the `/api/transcribe` endpoint) |
-
-## Quick start (Mac)
+## Start
 
 ```sh
-scripts/setup.sh   # once, needs internet: Python deps, model weights, 3D assets, warm-up
-scripts/dev.sh     # backend on :8787, simulator + reconstruction on :5173
+scripts/setup.sh   # once: Python dependencies, model weights, warm-up and web dependencies
+scripts/dev.sh     # backend on :8787, room view on :5173
 ```
 
-Open <http://localhost:5173> for the **Live room**: an overhead 3D reconstruction with
-grey scan points, a red selected target, camera position and optional route overlay.
-Drag to orbit, right-drag to pan, and scroll/pinch to zoom. **Top down** switches to an
-orthographic floor plan; **Fit room**, **Locate**, and **Follow camera** control framing.
-The layer switches control scan points, observed floor and route independently.
+Open <http://localhost:5173>. Keep Trident open on an iPhone connected to the same Wi-Fi.
+See [iPhone setup](docs/real-device.md) for signing, installation and connection settings.
 
-**Simulator lab** opens <http://localhost:5173/?lab=1>, with the fake-world simulator
-on the left and reconstruction on the right. Open **Audio preview → Enable audio**, then
-follow [docs/demo-guide.md](docs/demo-guide.md). The simulator is also available directly
-at <http://localhost:5173/simulator/>.
+Use the iPhone app to find an object. Its selected target appears automatically in the room
+view. **3D** shows height, **Overhead** shows the floor plan, **Fit room** restores automatic
+framing, and **Locate** centres the selected target. Drag to orbit, right-drag to pan and
+scroll/pinch to zoom. In Overhead mode, drag to pan.
 
-To preview the graphics without the backend or model downloads:
-
-```sh
-cd web && npm ci && npm run dev
-```
-
-Open <http://localhost:5173/reconstruction-viewer/?preview=1>. This is explicitly labelled
-sample data and disables guidance commands. Live mode never substitutes sample geometry
-for missing camera data; disconnected or stale scans are marked as cached.
-
-Requirements: Apple-silicon Mac, Python 3.11 and [uv](https://docs.astral.sh/uv/), Node 20+,
-Xcode 16+ with XcodeGen for the iPhone app.
+The scan retains up to 20,000 measured points for up to 90 seconds as the camera turns.
+Paused or disconnected scans are labelled. A fresh camera session clears the old room.
+This is estimated monocular depth, not hardware LiDAR or a complete model of unseen surfaces.
 
 ## Layout
 
 ```
-mac/trident/            FastAPI backend: perception, mapping, targets, planner, guidance engine, speech
-web/simulator/          Three.js fake world, simulated phone/head/body, sensor adapter
-web/reconstruction-viewer/  live 3D room view + virtual phone client (commands, push-to-talk, Web Audio)
-ios/Trident/            SwiftUI/ARKit/AVAudioEngine app (XcodeGen project.yml + generated .xcodeproj)
-shared/PROTOCOL.md      sensor, control, guidance and viewer message contracts
-scripts/                setup.sh, dev.sh
-docs/                   demo guide, real-device setup, models and licences, limitations
+mac/trident/               local perception, mapping, targets, guidance, speech and server
+web/reconstruction-viewer/ read-only Three.js room visualization
+ios/Trident/               SwiftUI, ARKit and PHASE spatial audio app
+shared/PROTOCOL.md         sensor, control and reconstruction message contracts
+scripts/                   setup.sh and dev.sh
+docs/                      phone setup, demo guide, model licences and limitations
 ```
 
-## Pipeline
+Camera frames and poses travel from the iPhone to `/ws/sensor`. Commands and audio guidance
+travel between the iPhone and `/ws/control`. The web view receives reconstruction snapshots
+from `/ws/viewer` without controlling either stream.
 
+The renderer reuses a fixed GPU point buffer, one floor texture and simple target outlines.
+It draws at most 30 frames per second, skips unchanged frames and hidden tabs, and needs no
+external model assets, shadows or postprocessing.
+
+## Configuration and checks
+
+- `TRIDENT_PARAKEET`: speech model, default `mlx-community/parakeet-tdt-0.6b-v3`.
+- `TRIDENT_MEMORY_BUDGET_MB`: memory budget reported by `/api/health`, default `16384`.
+- `TRIDENT_DEBUG_DIR`: optional local image, point-cloud and observation logs.
+- Mapping and guidance settings: `mac/trident/config.py`.
+- Requirements: Apple-silicon Mac, Python 3.11, uv, Node and Xcode supporting your iPhone.
+
+```sh
+cd web
+npm test
+npm run build
 ```
-iPhone (ARKit + camera)  ─┐
-                          ├─ /ws/sensor (JPEG + pose metadata) ─→ upright rotation
-Simulator (rendered RGB) ─┘                                       → Depth Anything V2 metric + YOLO11n-seg
-                                                                  → floor-based scale check
-                                                                  → rolling 2.5D grid + target tracks
-                                                                  → guidance engine (modes, stop rules, A*)
-                          /ws/control (guidance, speech, cues) ←──┤
-                          /ws/viewer  (reconstruction only)    ←──┘
-```
 
-The simulator and the reconstruction viewer are separate pages and separate data flows.
-The viewer imports nothing from the simulator and only receives backend output.
-Its point cloud uses a reusable GPU buffer (up to 20,000 points), a single textured floor
-plane and simple target outlines. Rendering is capped at 30 fps, skips unchanged frames
-and hidden tabs, and uses no shadows, postprocessing, external fonts or model assets.
-
-## Configuration
-
-Environment variables for the backend:
-
-- `TRIDENT_MEMORY_BUDGET_MB` (default `16384`): shown against measured RSS in the viewer.
-- `TRIDENT_PARAKEET`: speech model (default `mlx-community/parakeet-tdt-0.6b-v3`).
-- `TRIDENT_DEBUG_DIR`: writes the latest upright frame with detections, sampled point
-  clouds and an observation log there.
-
-Other tuning values (inflation margins, probe radii, timeouts) are in `mac/trident/config.py`.
-
-Self-checks: `cd mac && for m in geometry mapping targets planner speech; do uv run python -m trident.$m; done`
+Backend checks: `cd mac && for m in geometry mapping targets planner; do uv run python -m trident.$m; done`.
+See [limitations](docs/limitations.md) for the practical limits of estimated depth and guidance.

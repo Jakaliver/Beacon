@@ -40,17 +40,13 @@ bash scripts/dev.sh
 ```
 
 `setup.sh` is a one-time online setup. It installs the Python environment, downloads the
-vision and speech models, warms them up, installs web dependencies and downloads simulator
-assets. Let it finish successfully before running `dev.sh`. Model warm-up should report
+vision and speech models, warms them up and installs web dependencies. Let it finish successfully before running `dev.sh`. Model warm-up should report
 `vision warm-up ok on mps` on a supported Apple-silicon Mac.
 
 Keep `dev.sh` running. It starts the backend on **8787** and the viewer on **5173**. Open
 <http://localhost:8787/api/health> and wait for `vision_ready` and `speech_ready` to be `true`.
-Then open <http://localhost:5173/reconstruction-viewer/>. This is live mode: do not add
-`?preview=1`, which displays sample geometry instead.
-
-For a real-phone session, close any **Simulator lab** or `/simulator/` tabs. Opening the
-room viewer alone does not start a simulated sensor. The newest sensor connection wins.
+Then open <http://localhost:5173>. The browser only receives reconstruction snapshots;
+all commands, recording and audio are handled by the iPhone app.
 
 ## 3. Sign and install the iPhone app
 
@@ -107,7 +103,7 @@ Allow incoming connections for the backend if macOS prompts. Use the Mac's Wi-Fi
 ## 5. First camera and target test
 
 1. Keep Trident open in the foreground. Start at **5 frames/sec** in its Settings on a
-   MacBook Air; raise the rate after checking latency in the viewer's **Session details**.
+   MacBook Air; raise the rate only while the displayed camera age remains low.
 2. Sweep slowly across a well-lit floor and nearby furniture. A floor patch of about 1 m²
    helps ARKit establish the floor height. The Mac view should show **Live reconstruction**
    and an increasing point count.
@@ -129,13 +125,14 @@ white **YOU / iPhone** marker shows camera position and direction. Your selected
 has a red box, floor ring and distance label; unrelated detections are hidden by default.
 
 Use **3D** to see height, **Overhead** for a floor plan, and **Fit room** to restore automatic
-framing after dragging or zooming. **View options** contains floor coverage, other detected
-objects and camera-follow controls. Type an object into the visible **Find** field to begin.
+framing after dragging or zooming. **Locate** centres the selected target.
+Use **Find object** in the iPhone app to select a target; the browser is read-only.
 The geometry comes from monocular depth estimates, not a hardware LiDAR scan.
 
 Trident keeps the iPhone screen awake while open. Manually locking it or leaving the app
 pauses capture. The viewer keeps the last scan and labels it paused until fresh frames return.
-Mac speech playback is opt-in under **Mac audio preview**; normal guidance plays on iPhone.
+All speech and spatial guidance play on the iPhone. The browser never opens an audio or
+microphone session and cannot change the phone's guidance state.
 
 ## Troubleshooting
 
@@ -147,7 +144,7 @@ Mac speech playback is opt-in under **Mac audio preview**; normal guidance plays
 | `uv: command not found` | Install `uv` with Homebrew and reopen Terminal if its PATH has not updated. |
 | `vision_ready: false` / `speech_ready: false` | Wait for model loading and check the backend terminal. Re-run setup online if downloads did not finish. |
 | Connected, but no room points | Allow Camera/Local Network access, wait for normal tracking, scan the floor, and check `vision_ready`. |
-| Room stops changing | Check frame/pose age in the viewer, keep the app foregrounded, and close competing simulator tabs. |
+| Room stops changing | Check the camera age in the viewer and keep the iPhone app foregrounded. |
 | Sounds turn the wrong way with your head | Recalibrate while facing ahead; try the app's **Reverse head turn** setting. |
 
 The browser build and backend self-checks can run without Xcode. A successful local

@@ -16,6 +16,5 @@ uv run python -m trident.setup_models
 
 cd "$ROOT/web"
 npm ci
-npm run fetch-assets
 
 echo "Setup complete. Start with: scripts/dev.sh"
