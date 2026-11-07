@@ -21,8 +21,6 @@ struct ContentView: View {
                             model.command("inspect", confirmation: "Inspecting")
                         }
                     }
-                    BigButton(title: "Test 3D sound", hint: "Plays a beep that travels ahead, right, behind and left of you.",
-                              color: .purple, height: 64) { model.testSound() }
                     BigButton(title: "Stop", hint: "Silences all guidance immediately.", color: .red, height: 160) {
                         model.stop()
                     }

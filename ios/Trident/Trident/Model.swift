@@ -169,11 +169,6 @@ final class AppModel: ObservableObject {
 
     func stop() { localStop("user") }
 
-    func testSound() {
-        speaker.say("Test. The beep goes ahead, right, behind, left, then ahead again.")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.5) { [weak self] in self?.audio.testAround() }
-    }
-
     func resume() {
         let blocker: String? =
             !(controlUp && sensorUp) ? "No connection to the Mac."

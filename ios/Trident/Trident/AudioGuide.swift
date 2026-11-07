@@ -96,25 +96,6 @@ final class AudioGuide {
             forward: AVAudio3DVector(x: f.x, y: f.y, z: f.z), up: AVAudio3DVector(x: u.x, y: u.y, z: u.z))
     }
 
-    /// Beeps that travel around the listener, 1.5 m away: ahead, right, behind, left, ahead.
-    /// Relative to the calibrated "ahead", so it checks rendering and head tracking without the Mac.
-    func testAround() {
-        let l = environment.listenerPosition
-        let centre = SIMD3<Float>(l.x, l.y, l.z)
-        let right = SIMD3<Float>(-baseForward.z, 0, baseForward.x)
-        let stops: [SIMD3<Float>] = [baseForward, right, -baseForward, -right, baseForward]
-        for (i, direction) in stops.enumerated() {
-            for k in 0..<3 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 1.6 + Double(k) * 0.35) { [weak self] in
-                    guard let self else { return }
-                    let p = centre + direction * 1.5
-                    self.beacon.position = AVAudio3DPoint(x: p.x, y: p.y, z: p.z)
-                    self.play(self.pulseBuffer, on: self.beacon)
-                }
-            }
-        }
-    }
-
     func restart() {
         engine.stop()
         start()
