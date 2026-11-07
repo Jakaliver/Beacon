@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var model: AppModel
     @State private var showSettings = false
+    @AppStorage(Settings.guidanceSoundStyleKey) private var soundStyle = GuidanceSoundStyle.chest.rawValue
 
     private var connected: Bool { model.controlUp && model.sensorUp }
     private var guiding: Bool { ["walking", "probe", "hotcold"].contains(model.mode) && model.stopReason == nil }
@@ -73,7 +74,8 @@ struct ContentView: View {
             .scrollIndicators(.hidden)
         }
         .background(Color(.systemBackground))
-        .sheet(isPresented: $showSettings, onDismiss: model.applySettings) { SettingsView() }
+        .sheet(isPresented: $showSettings, onDismiss: model.applySettings) { SettingsView(voice: model.voice) }
+        .onChange(of: soundStyle) { _, _ in model.refreshGuidanceSound() }
     }
 
     private var header: some View {
@@ -151,7 +153,7 @@ struct ContentView: View {
         if !connected { return "Connect to the same Wi-Fi and add your Mac’s address in Settings." }
         if model.tracking != "normal" { return "Point the camera at the room and move slowly while tracking settles." }
         if !model.choices.isEmpty { return "More than one match is in view." }
-        if guiding { return "Move towards the taps. Tap Stop whenever you need to pause." }
+        if guiding { return "Follow the object’s sound. Tap Stop whenever you need to pause." }
         if model.mode == "searching" { return "Slowly scan the room with the camera." }
         if model.stopReason != nil || model.mode == "stopped" { return "Hold the button to say “resume”, or ask for a different object." }
         return "Calibrate, then hold the button and say what you want to find."
@@ -159,6 +161,7 @@ struct ContentView: View {
 }
 
 private struct SettingsView: View {
+    @ObservedObject var voice: VoiceSession
     @AppStorage(Settings.hostKey) private var host = Settings.defaultHost
     @AppStorage(Settings.frameRateKey) private var frameRate = Settings.defaultFrameRate
     @AppStorage(Settings.reverseHeadTurnKey) private var reverseHeadTurn = false
@@ -169,6 +172,10 @@ private struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Hands-free voice") {
+                    VoiceModeControls(voice: voice)
+                }
+                GuidanceSoundSettings()
                 Section("Connection") {
                     TextField("Mac host", text: $host)
                         .textInputAutocapitalization(.never)

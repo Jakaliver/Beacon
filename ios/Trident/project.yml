@@ -31,8 +31,39 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiredDeviceCapabilities: [arkit]
         NSCameraUsageDescription: Trident uses the camera to map the room and find objects for you.
-        NSMicrophoneUsageDescription: Trident records your spoken request while you hold the navigation button.
+        NSMicrophoneUsageDescription: Trident listens for hands-free commands when voice mode is on, or records while you hold the navigation button.
+        NSSpeechRecognitionUsageDescription: Trident uses on-device speech recognition for hands-free commands.
         NSMotionUsageDescription: Trident uses headphone motion to keep guidance sounds fixed in the room.
         NSLocalNetworkUsageDescription: Trident sends camera frames to your Mac on the local network and receives guidance.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+
+  TridentVoiceLab:
+    type: application
+    platform: iOS
+    sources:
+      - VoiceLab
+      - Trident/VoiceCommand.swift
+      - Trident/VoiceSession.swift
+      - Trident/VoiceListener.swift
+      - Trident/VoiceModeControls.swift
+      - Trident/Speech.swift
+      - Trident/Settings.swift
+      - Trident/GuidanceSoundSettings.swift
+      - Trident/AudioGuide.swift
+      - Trident/chest_loop.wav
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.trident.voicelab.m9ac3a7n78
+        TARGETED_DEVICE_FAMILY: "1"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+    info:
+      path: VoiceLab/Info.plist
+      properties:
+        CFBundleDisplayName: Trident Voice Lab
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSMicrophoneUsageDescription: Voice Lab listens for your commands while voice mode is on.
+        NSSpeechRecognitionUsageDescription: Voice Lab uses on-device speech recognition to test hands-free controls.
+        NSMotionUsageDescription: Voice Lab uses headphone motion to keep the sample object sound in one place.

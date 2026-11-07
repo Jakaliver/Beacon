@@ -37,21 +37,7 @@ private struct Incoming: Decodable {
     let options: [Choice]?
 }
 
-enum Settings {
-    static let hostKey = "host"
-    static let frameRateKey = "frameRate"
-    static let defaultHost = "Malins-Macbook-Pro-3.local"
-    static let reverseHeadTurnKey = "reverseHeadTurn"
-    static let reverseHeadTiltKey = "reverseHeadTilt"
-    static let soundHeightKey = "soundHeight"  // metres; positive raises sounds
-    static let defaultFrameRate = 20.0  // an M-series Mac processes about 23 frames per second
 
-    static var host: String { UserDefaults.standard.string(forKey: hostKey) ?? defaultHost }
-    static var frameRate: Double {
-        let value = UserDefaults.standard.double(forKey: frameRateKey)
-        return value > 0 ? value : defaultFrameRate
-    }
-}
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -69,17 +55,22 @@ final class AppModel: ObservableObject {
     private let sensor = Connection(path: "/ws/sensor")
     private let ar = ARSensor()
     private let audio = AudioGuide()
-    private let speaker = Speaker()
+    let voice = VoiceSession()
+    private var transcription: Task<Void, Never>?
+    private var transcriptionGeneration = 0
+    // A reset remains authoritative until a new search. Network latency must never
+    // let old guidance, choices or speech restart a cancelled session.
+    private var searchCleared = false
     private let talk = PushToTalk()
 
     private var guidance: Guidance?
     private var guidanceAt = Date.distantPast
     private var pose: PoseSample?
     private var interrupted = false
+    private var foreground = true
+    private var connectedHost: String?
     private var started = false
     private var ticker: Timer?
-    private var transcriptionTask: Task<Void, Never>?
-    private var connectedHost: String?
 
     private var smoothedDistance: Float?
     private var phoneInterval: Double?
@@ -110,6 +101,9 @@ final class AppModel: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
+        voice.onCommand = { [weak self] command in self?.handleVoice(command) }
+        voice.onUserCommand = { [weak self] in self?.cancelTranscription() }
+        voice.onSpeakingChanged = { [weak self] speaking in self?.audio.setGuidanceDucked(speaking) }
         audio.onDiagnostic = { [weak self] message in
             self?.control.sendJSON(["type": "audio_diagnostic", "message": message])
         }
@@ -150,7 +144,8 @@ final class AppModel: ObservableObject {
 
     func applySettings() {
         ar.setFrameRate(Settings.frameRate)
-        if Settings.host != connectedHost || !controlUp || !sensorUp { connect() }
+        if connectedHost != Settings.host || !controlUp || !sensorUp { connect() }
+        refreshGuidanceSound()
     }
 
     private func connect() {
@@ -159,18 +154,26 @@ final class AppModel: ObservableObject {
         sensor.connect(host: Settings.host)
     }
 
+    func refreshGuidanceSound() {
+        audio.silence()
+        resetProbe()
+        lastPulse = .distantPast
+        lastBeacon = .distantPast
+        tick()
+    }
+
     func calibrate() {
         guard let pose, pose.tracking == "normal" else {
             ar.reset()
-            speaker.say("Resetting tracking. Hold the phone ahead of you, then press Calibrate again.")
+            voice.say("Resetting tracking. Hold the phone ahead, then say calibrate again.")
             return
         }
         guard alignAudioForward() else {
-            speaker.say("Hold the phone upright, pointing ahead, and press Calibrate again.")
+            voice.say("Hold the phone upright, pointing ahead, then say calibrate again.")
             return
         }
         control.sendJSON(["type": "calibrate"])
-        speaker.say("Calibrated. Ahead is where the phone points.")
+        voice.say("Calibrated. Ahead is where the phone points.")
     }
 
     /// Audio "ahead" = the phone's current horizontal heading in the AR world.
@@ -183,94 +186,200 @@ final class AppModel: ObservableObject {
         return true
     }
 
-    func stop() { localStop("user") }
+    func stop() {
+        cancelTranscription()
+        localStop("user")
+    }
+
+    private func handleVoice(_ command: VoiceCommand) {
+        switch command {
+        case .find(let object): self.command("find \(object)")
+        case .calibrate: calibrate()
+        case .pause: stop()
+        case .resume: resume()
+        case .startOver: resetSearch(resetTracking: true)
+        case .finish: resetSearch(resetTracking: false)
+        case .choose(let index):
+            if let choice = choices.first(where: { $0.index == index }) { choose(choice) }
+            else { voice.say("That choice is not available. Say status to hear the current state.") }
+        case .chooseSide(let side):
+            let matches = choices.filter {
+                VoiceCommand.normalized($0.description).split(separator: " ").contains(Substring(side.rawValue))
+            }
+            if matches.count == 1, let choice = matches.first { choose(choice) }
+            else if choices.isEmpty { voice.say("I haven't found any matches to choose from yet.") }
+            else { voice.say("I can't pick out a single match on your \(side.rawValue). Tell me which option you mean.") }
+        case .repeatLast: voice.repeatResponse()
+        case .status: voice.say(statusSummary)
+        case .inspect: self.command("inspect")
+        case .help:
+            voice.say("Ask me to find an object, calibrate, pause, resume, or start over. Say status for progress, repeat to hear me again, or found it to finish.")
+        case .disableVoice: voice.disable()
+        }
+    }
+
+    private func resetSearch(resetTracking: Bool) {
+        voice.cancelPendingCommand()
+        cancelTranscription()
+        voice.hush()
+        audio.silence()
+        resetProbe()
+        guidance = nil
+        mode = "idle"
+        stopReason = nil
+        choices = []
+        searchCleared = true
+        control.sendJSON(["type": "command", "text": "cancel"])
+        if resetTracking { ar.reset() }
+        voice.say(resetTracking ? "Starting fresh. Say find, then the object." : "Finished. Ready for another object.", urgent: true)
+    }
 
     func resume() {
+        cancelTranscription()
+        guard !searchCleared else {
+            voice.say("There is no search to resume. Say find, then the object.")
+            return
+        }
         let blocker: String? =
             !(controlUp && sensorUp) ? "No connection to the Mac."
             : tracking != "normal" ? "Tracking is not ready. Move the phone slowly."
             : interrupted ? "Audio is interrupted."
             : nil
         if let blocker {
-            speaker.say("Cannot resume. \(blocker)")
+            voice.say("Cannot resume. \(blocker)")
             return
         }
         stopReason = nil
         resetProbe()
         audio.restart()
         control.sendJSON(["type": "resume"])
-        speaker.say("Resuming")
+        voice.say("Resuming")
     }
 
     func command(_ text: String, confirmation: String? = nil) {
-        guard controlUp else { return speaker.say("Not connected to the Mac.") }
-        let words = text.lowercased().split(whereSeparator: { !$0.isLetter })
-        if words.contains("stop") || words.contains("cancel") { stop(); return }
-        if words.contains("resume") { resume(); return }
-        if text.lowercased().contains("find") {
+        // Typed commands must use the same local interruption/reset behaviour.
+        let parsed = VoiceCommand.parse(text)
+        switch parsed {
+        case .pause: stop(); return
+        case .startOver: resetSearch(resetTracking: true); return
+        case .finish: resetSearch(resetTracking: false); return
+        case .resume: resume(); return
+        case .calibrate: calibrate(); return
+        case .repeatLast, .status, .help, .choose, .chooseSide, .disableVoice:
+            if let parsed { handleVoice(parsed) }
+            return
+        case .inspect where searchCleared || stopReason != nil:
+            voice.say(searchCleared ? "There is no target to inspect. Say find, then the object."
+                      : "Search paused. Say resume before inspecting the target.")
+            return
+        default: break
+        }
+        cancelTranscription()
+        guard controlUp else { return voice.say("Not connected to the Mac.") }
+        var outgoing = text
+        if case .find(let object) = parsed {
+            outgoing = "find \(object)"
             // Asking to find something is a deliberate action: it clears any earlier stop, and
             // "ahead" for the audio becomes where the phone points now (no separate Calibrate needed).
             stopReason = nil
+            searchCleared = false
+            guidance = nil
+            choices = []
+            mode = "searching"
+            audio.silence()
             resetProbe()
             audio.start()
             _ = alignAudioForward()
         }
-        control.sendJSON(["type": "command", "text": text])
-        if let confirmation { speaker.say(confirmation) }
+        control.sendJSON(["type": "command", "text": outgoing])
+        if let confirmation { voice.say(confirmation) }
     }
 
     func choose(_ choice: Choice) {
+        guard !searchCleared, stopReason == nil else {
+            voice.say("Resume your search before choosing a match.")
+            return
+        }
         control.sendJSON(["type": "choose", "index": choice.index])
-        speaker.say("Choice \(choice.index)")
+        voice.say("Okay.")
     }
 
     func startTalking() {
         guard !recording, !transcribing else { return }
-        guard controlUp && sensorUp else { return speaker.say("Not connected to the Mac.") }
-        speaker.hush()
+        guard controlUp && sensorUp else { return voice.say("Not connected to the Mac.") }
+        cancelTranscription(resumeVoice: false)
+        voice.listener.suspend()
+        voice.hush()
         audio.silence()
         resetProbe()
         recording = talk.start()
-        if !recording { speaker.say("Microphone not available.") }
+        if !recording {
+            voice.say("Microphone not available.")
+            resumeVoiceAfterRecording()
+        }
     }
 
     func stopTalking() {
         guard recording else { return }
         recording = false
-        guard let wav = talk.stop() else { return }
+        let wav = talk.stop()
+        transcriptionGeneration += 1
+        let generation = transcriptionGeneration
+        resumeVoiceAfterRecording()
+        guard let wav else {
+            voice.say("No recording was captured. Please try again.")
+            return
+        }
         transcribing = true
-        transcriptionTask = Task {
+        transcription = Task {
             do {
                 let text = try await PushToTalk.transcribe(wav, host: Settings.host)
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, transcriptionGeneration == generation else { return }
                 transcribing = false
-                transcriptionTask = nil
+                transcription = nil
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    speaker.say("I did not hear a request.")
+                    voice.say("I did not hear a request.")
                 } else {
-                    command(text)
+                    voice.submit(text)
                 }
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, transcriptionGeneration == generation else { return }
                 transcribing = false
-                transcriptionTask = nil
-                speaker.say("Speech recognition failed. Check the Mac connection.")
+                transcription = nil
+                voice.say("Speech recognition failed. Check the Mac connection.")
             }
+        }
+    }
+
+    private func cancelTranscription(resumeVoice: Bool = true) {
+        transcriptionGeneration += 1
+        transcription?.cancel()
+        transcription = nil
+        transcribing = false
+        if recording {
+            _ = talk.stop()
+            recording = false
+            if resumeVoice { resumeVoiceAfterRecording() }
+        }
+    }
+
+    private func resumeVoiceAfterRecording() {
+        Task { [weak self] in
+            guard let self, !self.recording,
+                  self.foreground, self.voice.isEnabled else { return }
+            await self.voice.listener.resume()
         }
     }
 
     func toggleTalking() { recording ? stopTalking() : startTalking() }
 
     private func localStop(_ reason: String) {
-        transcriptionTask?.cancel()
-        transcriptionTask = nil
-        if recording { _ = talk.stop() }
-        recording = false
-        transcribing = false
+        voice.cancelPendingCommand()
+        cancelTranscription()
         audio.silence()
         resetProbe()
         stopReason = reason
-        speaker.say(Self.reasonText[reason].map { "Stopped. \($0)" } ?? "Stopped")
+        voice.say(Self.reasonText[reason].map { "Stopped. \($0)" } ?? "Paused", urgent: true)
         control.sendJSON(["type": "stop", "reason": reason])
     }
 
@@ -286,11 +395,16 @@ final class AppModel: ObservableObject {
     }
 
     func enteredBackground() {
-        if recording || transcribing || stopReason == nil { localStop("interrupted") }
+        foreground = false
+        cancelTranscription(resumeVoice: false)
+        if stopReason == nil { localStop("interrupted") }
+        voice.enteredBackground()
     }
 
     func becameActive() {
+        foreground = true
         guard started else { return }
+        voice.becameActive()
         ar.resume()
         try? AVAudioSession.sharedInstance().setActive(true)
         audio.start()
@@ -341,7 +455,8 @@ final class AppModel: ObservableObject {
         guard let message = try? decoder.decode(Incoming.self, from: data) else { return }
         switch message.type {
         case "guidance":
-            guard let g = try? decoder.decode(Guidance.self, from: data) else { return }
+            guard !searchCleared, let g = try? decoder.decode(Guidance.self, from: data),
+                  stopReason == nil || g.mode == "stopped" else { return }
             if g.mode == "stopped" && mode != "stopped" { audio.silence() }
             guidance = g
             guidanceAt = Date()
@@ -349,11 +464,12 @@ final class AppModel: ObservableObject {
             if g.mode != "choosing" && !choices.isEmpty { choices = [] }
             if let l = g.listener, l.count == 3 { audio.setListener(SIMD3(l[0], l[1], l[2])) }
         case "say":
-            if let text = message.text { speaker.say(text) }
+            if !searchCleared, stopReason == nil, let text = message.text { voice.say(text) }
         case "choices":
+            guard !searchCleared, stopReason == nil else { return }
             choices = message.options ?? []
         case "cue":
-            guard let name = message.name, name == "stop" || stopReason == nil else { return }
+            guard !searchCleared, stopReason == nil, let name = message.name else { return }
             audio.cue(name)
         default:
             break
@@ -371,7 +487,21 @@ final class AppModel: ObservableObject {
         if audio.headTrackingLive != headTracking { headTracking = audio.headTrackingLive }
         let fresh = now.timeIntervalSince(guidanceAt) < 1
         if !fresh { autoStop("stale") }
-        guard !recording, !transcribing, stopReason == nil, fresh, tracking == "normal", let g = guidance else { return resetProbe() }
+        guard !recording, !transcribing, foreground, !searchCleared, stopReason == nil, fresh, tracking == "normal", let g = guidance else {
+            audio.stopTargetLoop()
+            return resetProbe()
+        }
+
+        if Settings.guidanceSoundStyle == .chest {
+            resetProbe()
+            if ["walking", "probe", "hotcold"].contains(g.mode),
+               let target = g.target, target.valid, let p = target.position,
+               p.count == 3, p.allSatisfy({ $0.isFinite }), pose?.epoch == g.epoch {
+                audio.startOrUpdateTargetLoop(at: SIMD3(p[0], p[1], p[2]))
+            } else { audio.stopTargetLoop() }
+            return
+        }
+        audio.stopTargetLoop()
 
         switch g.mode {
         case "walking":
