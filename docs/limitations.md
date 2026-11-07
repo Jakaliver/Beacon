@@ -14,14 +14,24 @@ implementation comes from the main iPhone app and uses PHASE.
   frames without enough visible floor reuse a running estimate.
 - Only observed surfaces appear. Missing walls, floors or furniture are not filled in.
   An incomplete point cloud is not a complete room model.
-- The backend integrates map points within 4 m. The viewer retains up to 20,000 points in
-  4.5 cm voxels for up to 90 seconds, which improves continuity while turning but can retain
-  traces of moved objects or depth drift. A new camera world clears the display history.
+- Navigation integrates map points within 4 m. The display samples depth up to 6 m, with
+  up to 60,000 points in 2.5 cm cells. Confirmed points have no time expiry; the oldest
+  observations are evicted only when the budget fills. A new world clears history.
+- Display points need two sightings. Revisits average small depth and colour changes;
+  removing points in observed free space needs three consistent depth observations.
+  Modest depth overestimates can be repaired from closer views. Larger behind-surface
+  differences are treated as possible occlusion, so hidden or ambiguous geometry can
+  remain stale until it is seen clearly again. This is conservative fusion, not a global
+  reconstruction optimiser, and does not eliminate monocular depth or ARKit drift.
+- The phone prefers ARKit-classified floors. Its unclassified fallback requires a stable
+  plane larger than 2 m² and at least 65 cm below the phone. Scan from normal holding height
+  first. Without a trusted floor, the scan still displays, but floor-scale correction waits.
 - The occupancy grid is 8×8 m with 10 cm cells and recentres as the phone moves. It can show
   a different footprint from the retained point cloud. It does not model overhangs beyond
   obstacle heights from 0.15 m to 2.0 m above the floor.
 - Red points lie inside the selected target's estimated box; they are not a separate
-  per-point segmentation result. The floor ring includes position uncertainty.
+  per-point segmentation result. Camera-coloured dots use image pixels and soft splats,
+  not a trained 3D Gaussian scene; lighting changes and occlusions can leave colour seams.
 - Paused geometry stays visible and is labelled. It is not evidence of current detection.
 - WebGL 2 is required. The browser is read-only and does not control capture or guidance.
 
@@ -31,6 +41,9 @@ implementation comes from the main iPhone app and uses PHASE.
   distant and partly hidden objects may be missed or mislabelled.
 - Depth may fall on an occluder instead of the requested object, shifting the target's
   estimated position. Proximity confirmation is an estimate, not grasp detection.
+- Selected identity is retained offscreen, while new sightings refine its geometry. Closer
+  views get more weight and large corrections require agreement. Similar objects along the
+  same viewing direction remain ambiguous.
 - Walking guidance needs observed floor. Unknown or narrow spaces may have no usable route;
   depth error and obstacle inflation can make open gaps appear blocked.
 - The body position is estimated behind the phone. Head orientation is measured separately;

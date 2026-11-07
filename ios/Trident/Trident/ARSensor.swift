@@ -30,6 +30,10 @@ final class ARSensor: NSObject, ARSessionDelegate {
     private var poseSeq = 0
     private var lastFrameT = -Double.infinity
     private var lastPoseT = -Double.infinity
+    private var lastPlanesT = -Double.infinity
+    private var floorEstimate: Float?
+    private var floorCandidate: Float?
+    private var floorCandidateSince = 0.0
     private var encoding = false
     private var pending: (pixels: CVPixelBuffer, header: [String: Any])?
 
@@ -37,7 +41,7 @@ final class ARSensor: NSObject, ARSessionDelegate {
 
     private var configuration: ARWorldTrackingConfiguration {
         let config = ARWorldTrackingConfiguration()
-        config.planeDetection = [.horizontal]
+        config.planeDetection = [.horizontal, .vertical]
         return config
     }
 
@@ -57,6 +61,9 @@ final class ARSensor: NSObject, ARSessionDelegate {
     func reset() {
         queue.async {
             self.epoch += 1
+            self.floorEstimate = nil
+            self.floorCandidate = nil
+            self.lastPlanesT = -Double.infinity
             self.session.run(self.configuration, options: [.resetTracking, .removeExistingAnchors])
         }
     }
@@ -66,6 +73,7 @@ final class ARSensor: NSObject, ARSessionDelegate {
             self.sessionID = Self.newSessionID()
             self.frameSeq = 0
             self.poseSeq = 0
+            self.lastPlanesT = -Double.infinity
         }
     }
 
@@ -74,15 +82,20 @@ final class ARSensor: NSObject, ARSessionDelegate {
         let (tracking, reason) = Self.describe(camera.trackingState)
         let pose = Self.columnMajor(camera.transform)
         let t = frame.timestamp
+        if tracking == "normal" { updateFloor(frame) }
 
         if t - lastPoseT >= 1.0 / 30 - 0.002 {
             lastPoseT = t
             poseSeq += 1
-            let message: [String: Any] = [
+            var message: [String: Any] = [
                 "v": 1, "type": "pose", "session": sessionID, "epoch": epoch, "seq": poseSeq, "t": t,
                 "pose": pose, "tracking": tracking, "tracking_reason": reason ?? NSNull(),
-                "head": NSNull(), "floor_y": Self.floorY(frame) ?? NSNull(),
+                "head": NSNull(), "floor_y": floorEstimate ?? NSNull(), "floor_source": "arkit",
             ]
+            if tracking == "normal", t - lastPlanesT >= 1 {
+                lastPlanesT = t
+                message["planes"] = Self.planes(frame)
+            }
             link?.sendJSON(message)
             let sample = PoseSample(transform: camera.transform, tracking: tracking, epoch: epoch)
             DispatchQueue.main.async { self.onPose?(sample) }
@@ -167,12 +180,63 @@ final class ARSensor: NSObject, ARSessionDelegate {
         }
     }
 
-    /// World y of the lowest horizontal plane larger than 1 m².
-    private static func floorY(_ frame: ARFrame) -> Float? {
-        frame.anchors
-            .compactMap { $0 as? ARPlaneAnchor }
-            .filter { $0.alignment == .horizontal && $0.planeExtent.width * $0.planeExtent.height > 1 }
-            .map { $0.transform.columns.3.y }
-            .min()
+    /// Send ARKit's observed plane geometry, in the same world frame as depth and targets.
+    private static func planes(_ frame: ARFrame) -> [[String: Any]] {
+        let anchors: [ARPlaneAnchor] = frame.anchors.compactMap { $0 as? ARPlaneAnchor }
+        let nearby = anchors.filter { anchor in
+            simd_distance(anchor.transform.columns.3, frame.camera.transform.columns.3) < 8
+        }
+        let largest = nearby.sorted { a, b in
+            a.planeExtent.width * a.planeExtent.height > b.planeExtent.width * b.planeExtent.height
+        }
+        return largest.prefix(32).compactMap { anchor -> [String: Any]? in
+                let geometry = anchor.geometry
+                guard geometry.vertices.count >= 3, geometry.vertices.count <= 1024 else { return nil }
+                let vertices = geometry.vertices.map { point -> [Float] in
+                    let world = anchor.transform * SIMD4<Float>(point, 1)
+                    return [world.x, world.y, world.z]
+                }
+                let kind: String
+                switch anchor.classification {
+                case .floor: kind = "floor"
+                case .wall: kind = "wall"
+                case .ceiling: kind = "ceiling"
+                case .table: kind = "table"
+                case .seat: kind = "seat"
+                default: kind = anchor.alignment == .vertical ? "vertical" : "horizontal"
+                }
+                return ["id": anchor.identifier.uuidString, "kind": kind,
+                        "vertices": vertices, "indices": geometry.triangleIndices.map { Int($0) }]
+            }
+    }
+
+    /// Prefer a classified floor. An unclassified patch must be large, below the
+    /// phone, and consistent over time so the first visible tabletop cannot win.
+    private func updateFloor(_ frame: ARFrame) {
+        let horizontal = frame.anchors.compactMap { $0 as? ARPlaneAnchor }.filter { $0.alignment == .horizontal }
+        let classified = horizontal.filter { $0.classification == .floor && $0.planeExtent.width * $0.planeExtent.height > 0.5 }
+        let candidates = classified.isEmpty ? horizontal.filter { plane in
+            let kind = plane.classification
+            return kind != .table && kind != .seat && kind != .ceiling
+                && plane.planeExtent.width * plane.planeExtent.height > 2
+                && frame.camera.transform.columns.3.y - plane.transform.columns.3.y > 0.65
+        } : classified
+        guard let height = candidates.map({ $0.transform.columns.3.y }).min() else {
+            floorCandidate = nil
+            return
+        }
+        if let estimate = floorEstimate, abs(height - estimate) < 0.1 {
+            floorEstimate = estimate * 0.95 + height * 0.05
+            return
+        }
+        if let candidate = floorCandidate, abs(height - candidate) < 0.08 {
+            floorCandidate = candidate * 0.9 + height * 0.1
+            if frame.timestamp - floorCandidateSince >= (classified.isEmpty ? 1.5 : 0.5) {
+                floorEstimate = floorCandidate
+            }
+        } else {
+            floorCandidate = height
+            floorCandidateSince = frame.timestamp
+        }
     }
 }

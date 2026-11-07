@@ -112,15 +112,23 @@ Allow incoming connections for the backend if macOS prompts. Use the Mac's Wi-Fi
 4. For the first object test, type **find the bottle** and tap **Send**. This isolates
    camera/detection setup from microphone setup. Once working, hold **Find object**, say
    the same request and release to send.
-5. The selected target appears red in the Mac view. Current `main` locks its position after
-   consistent sightings; send a new **find** command to reacquire an object that moved.
+5. The selected target appears red in the Mac view. Keep it visible while moving closer:
+   consistent new sightings refine its position and surface. Larger corrections require
+   three agreeing observations so a single bad depth frame does not move the target.
 6. **Stop** silences guidance locally; **Resume** restarts when the connection and tracking
    are ready. Audio changes and app interruptions can also stop guidance.
 
 ### Reading the room view
 
-The view accumulates up to 20,000 measured points, retaining surfaces for up to 90 seconds
-as you turn the camera. Low surfaces are dark grey; higher surfaces are brighter. The
+The view builds up to 60,000 depth points. Move slowly and revisit areas from closer views:
+a second sighting confirms new dots, repeated observations refine them, and three consistent
+depth readings repair incorrect geometry. Confirmed dots stay when you turn away; they
+only leave when overwritten, the scan resets, or the point budget fills. **Colour** uses
+the matching camera pixels for soft coloured dots; switch it off for the grey LiDAR view.
+The colour preference survives a page refresh.
+Floor height is automatic: scan a wide floor patch. ARKit-classified floors are preferred;
+an unclassified plane must be stable, over 2 m² and at least 65 cm below the phone.
+Low surfaces are dark grey in monochrome mode; higher surfaces are brighter. The
 white **iPhone** arrow shows camera position and direction. Your selected object
 has a red outline and label; its distance appears in the bottom status bar.
 

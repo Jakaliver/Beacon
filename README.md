@@ -5,7 +5,7 @@ audio guidance. The iPhone runs the app, captures ARKit poses and camera frames,
 commands and plays guidance through headphones. The Mac runs depth estimation, object
 recognition, speech recognition, mapping and target tracking locally.
 
-The browser is a **read-only room visualization**: grey measured surfaces, a white iPhone
+The browser is a **read-only room visualization**: grey LiDAR-style dots, a white iPhone
 marker, and the selected target in red. It connects only to `/ws/viewer`. It has no microphone,
 audio playback, commands, guidance controls or simulated camera.
 
@@ -20,12 +20,18 @@ Open <http://localhost:5173>. Keep Trident open on an iPhone connected to the sa
 See [iPhone setup](docs/real-device.md) for signing, installation and connection settings.
 
 Use the iPhone app to find an object. Its selected target appears automatically in the room
-view. **3D** shows height, **Overhead** shows the floor plan, **Fit room** restores automatic
+view. **3D** shows height, **Overhead** shows the floor plan, **Fit** restores automatic
 framing, and **Locate** centres the selected target. Drag to orbit, right-drag to pan and
 scroll/pinch to zoom. In Overhead mode, drag to pan.
 
-The scan retains up to 20,000 measured points for up to 90 seconds as the camera turns.
-Paused or disconnected scans are labelled. A fresh camera session clears the old room.
+**Colour** switches the grey LiDAR view to soft dots coloured from their source camera
+pixels. Selected targets remain red. The scan builds up to 60,000 points in 2.5 cm cells.
+Repeated sightings refine depth and colour; confirmed points remain when you turn away.
+New points need two sightings, and removing incorrect geometry requires three consistent
+depth observations. Occluded walls are preserved. There is no time expiry for confirmed
+points; the oldest observations leave only when the point budget is full. Closer, consistent
+sightings also refine the target position. Paused or disconnected scans are labelled.
+A fresh camera session clears the old room.
 This is estimated monocular depth, not hardware LiDAR or a complete model of unseen surfaces.
 
 ## Layout
@@ -46,6 +52,10 @@ from `/ws/viewer` without controlling either stream.
 The renderer reuses a fixed GPU point buffer, one floor texture and simple target outlines.
 It draws at most 30 frames per second, skips unchanged frames and hidden tabs, and needs no
 external model assets, shadows or postprocessing.
+
+Floor height is automatic. The iPhone prefers an ARKit-classified floor, otherwise waits
+for a stable, large plane below the phone. Scan a wide floor patch from normal holding
+height; camera geometry can still display while floor detection settles.
 
 ## Configuration and checks
 

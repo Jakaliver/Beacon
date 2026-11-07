@@ -94,6 +94,11 @@ The backend labels all results from such frames as injected.
   It is **not** in world coordinates. The backend aligns it during `calibrate`.
   Head position is never sent.
 - `floor_y`: optional floor height from ARKit horizontal plane detection.
+- `floor_source: "arkit"`: wait for the phone's automatic floor estimate instead of
+  treating an early monocular horizontal band as floor. Older sources keep the fallback.
+- `planes`: optional complete ARKit plane snapshot, sent once per second, with `id`,
+  `kind`, world-space `vertices` and triangle `indices`. Absent means unchanged; `[]`
+  clears it. The LiDAR view does not render filled planes.
 
 ## Control messages (client → Mac, JSON on `/ws/control`)
 
@@ -173,6 +178,8 @@ saw it.
   "type": "recon", "epoch": 0, "perception": "real",
   "grid": {"origin": [x0, z0], "res": 0.1, "w": 80, "h": 80, "cells": "<base64 uint8>"},
   "points": "<base64 float32 xyz...>",
+  "point_colors": "<base64 uint8 RGB, one triple per point in the same order>",
+  "points_fused": true, "points_version": 1,
   "phone": {"position": [..], "forward": [..], "tracking": "normal"},
   "listener": [..], "mode": "probe",
   "targets": [{"id", "label", "position", "extent", "sigma", "age", "selected"}],
@@ -195,9 +202,18 @@ uses the elapsed ages plus time since receipt to distinguish live and cached dat
 `scan_id` is an opaque string that changes whenever the backend resets its world,
 including reconnects with a new sensor session and tracking resets within the same
 AR epoch. `stats.map_version` increments when depth observations are integrated.
-The viewer uses these to retain a bounded, 4.5 cm voxel display history (up to
-20,000 measured points, expiring after 90 seconds without observation), skipping
-duplicate snapshots and clearing history on a world reset. This display history
-does not affect the occupancy map, target positions, or navigation. Target entries
-also expose `locked`, so the viewer can distinguish a locked position from a fresh
-detection.
+When `points_fused` is true, `points` is the complete current display scan: up to 60,000
+samples fused within 2.5 cm voxels from valid neighbouring depth pixels. New points need
+two sightings before display. Revisits refine depth and RGB; removing contradicted points
+requires three consistent observations. Occluded and out-of-view confirmed points persist
+without time expiry, subject to the point budget and world resets. Only unconfirmed samples
+expire after eight seconds. `points_version` increments per processed frame. The browser
+replaces its buffer on version changes; it must not accumulate these snapshots again.
+Optional `point_colors` contains sRGB bytes in the same order as `points`, fused from camera
+pixels paired with each depth image and capture pose. The legacy point-history path remains
+for older snapshots. Display geometry never feeds navigation.
+
+`locked` retains the selected identity offscreen; it does not freeze its position.
+Fresh sightings refine position, extent and target surface, with greater weight for
+closer views. Larger corrections require three agreeing sightings. `age` and
+`observed_now` describe how recently the target was actually seen.

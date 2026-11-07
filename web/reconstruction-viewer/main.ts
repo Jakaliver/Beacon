@@ -36,6 +36,19 @@ $("view3d").onclick = () => setView("3d");
 $("viewPlan").onclick = () => setView("plan");
 $("fitRoom").onclick = () => room?.setAutoFit(true);
 $("focusTarget").onclick = () => room?.focusTarget();
+let colourEnabled = $("viewColour").getAttribute("aria-pressed") === "true";
+try {
+  const saved = localStorage.getItem("trident.viewer.colour");
+  if (saved !== null) colourEnabled = saved === "true";
+} catch { /* Private browsing may disable storage. */ }
+$("viewColour").setAttribute("aria-pressed", String(colourEnabled));
+room?.setColourMode(colourEnabled);
+$("viewColour").onclick = () => {
+  const enabled = $("viewColour").getAttribute("aria-pressed") !== "true";
+  $("viewColour").setAttribute("aria-pressed", String(enabled));
+  room?.setColourMode(enabled);
+  try { localStorage.setItem("trident.viewer.colour", String(enabled)); } catch { /* Optional preference. */ }
+};
 
 function displaySnapshot(snapshot: Recon) {
   recon = snapshot;
@@ -81,7 +94,7 @@ function updateFreshness() {
   const target = recon?.targets.find(t => t.selected);
   if (target) {
     const stale = !live || target.age + elapsed / 1000 > 1.5;
-    $("targetState").textContent = !target.valid ? "Unverified" : !live ? "" : target.locked ? "Locked" : stale ? "Last seen" : "Tracked";
+    $("targetState").textContent = !target.valid ? "Unverified" : !live ? "" : stale ? "Last seen" : "Tracked";
   }
 }
 

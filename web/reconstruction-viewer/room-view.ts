@@ -3,9 +3,14 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { ScanCloud } from "./scan-cloud";
 import type { Recon } from "./types";
 
-const MAX_POINTS = 20_000;
+const MAX_POINTS = 60_000;
 const RED = 0xee5252;
-const decode = (base64: string) => Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+const decode = (base64: string) => {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+};
 const PALETTE = [[0, 0, 0, 0], [48, 48, 48, 85], [108, 108, 108, 95], [52, 52, 52, 65], [38, 38, 38, 50]];
 
 /** Displays measured reconstruction snapshots without inventing unseen surfaces. */
@@ -17,6 +22,10 @@ export class RoomView {
   private cloudGeometry = new THREE.BufferGeometry();
   private positions = new Float32Array(MAX_POINTS * 3);
   private colors = new Float32Array(MAX_POINTS * 3);
+  private imageColors: Uint8Array | null = null;
+  private decodedCount = 0;
+  private colourMode = false;
+  private rgb = new THREE.Color();
   private cloud: THREE.Points;
   private scan = new ScanCloud(MAX_POINTS);
   private scanId: string | undefined;
@@ -79,12 +88,14 @@ export class RoomView {
     // Soft circular splats in one draw call; no textures, lights, shadows or postprocessing.
     const material = new THREE.ShaderMaterial({
       vertexColors: true, transparent: true, depthWrite: true,
-      uniforms: { pointSize: { value: 3 * this.renderer.getPixelRatio() } },
+      uniforms: { pointSize: { value: 3 * this.renderer.getPixelRatio() }, colourMode: { value: 0 } },
       vertexShader: `uniform float pointSize; varying vec3 vColor;
         void main() { vColor = color; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = pointSize; }`,
-      fragmentShader: `varying vec3 vColor;
+      fragmentShader: `varying vec3 vColor; uniform float colourMode;
         void main() { float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard;
-          gl_FragColor = vec4(vColor, (1.0 - smoothstep(0.3, 0.5, r)) * 0.9);
+          float edge = 1.0 - smoothstep(0.3, 0.5, r);
+          float alpha = mix(edge * 0.9, exp(-r * r * 4.0) * edge, colourMode);
+          gl_FragColor = vec4(vColor, alpha);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
         }`,
@@ -142,7 +153,12 @@ export class RoomView {
   }
 
   setAutoFit(value: boolean) { this.autoFit = value; if (value) this.fit(); }
-  resetScan() { this.scan.clear(); this.scanId = undefined; this.mapVersion = undefined; this.needsFit = true; }
+  setColourMode(enabled: boolean) {
+    this.colourMode = enabled;
+    (this.cloud.material as THREE.ShaderMaterial).uniforms.colourMode.value = Number(enabled);
+    if (this.recon) this.update(this.recon);
+  }
+  resetScan() { this.scan.clear(); this.decodedCount = 0; this.imageColors = null; this.scanId = undefined; this.mapVersion = undefined; this.needsFit = true; }
   focusTarget() {
     const target = this.recon?.targets.find(t => t.selected);
     if (!target) return;
@@ -191,15 +207,22 @@ export class RoomView {
     this.recon = recon;
     const floorY = recon.floor_y ?? 0;
     this.grid.position.set(Math.round(recon.grid.origin[0] + recon.grid.w * recon.grid.res / 2), floorY - 0.04, Math.round(recon.grid.origin[1] + recon.grid.h * recon.grid.res / 2));
-    const version = recon.stats.map_version;
+    const version = recon.points_version ?? recon.stats.map_version;
     if (version === undefined || version !== this.mapVersion) {
       const bytes = decode(recon.points);
       const points = new Float32Array(bytes.buffer, 0, Math.floor(bytes.byteLength / 12) * 3);
-      this.scan.add(points, performance.now());
+      if (recon.points_fused) {
+        this.decodedCount = Math.min(MAX_POINTS, points.length / 3);
+        this.positions.set(points.subarray(0, this.decodedCount * 3));
+        this.imageColors = recon.point_colors ? decode(recon.point_colors) : null;
+      } else {
+        this.scan.add(points, performance.now());
+        this.imageColors = null;
+      }
       this.mapVersion = version;
     }
     const selected = recon.targets.find(t => t.selected && t.valid);
-    const count = this.scan.writeTo(this.positions);
+    const count = recon.points_fused ? this.decodedCount : this.scan.writeTo(this.positions);
     for (let j = 0; j < count * 3; j += 3) {
       const x = this.positions[j], y = this.positions[j + 1], z = this.positions[j + 2];
       const inTarget = selected
@@ -208,9 +231,17 @@ export class RoomView {
         && Math.abs(z - selected.position[2]) < selected.extent[2] / 2 + 0.025;
       // Quiet floor returns; bright furniture and walls make height legible.
       const shade = THREE.MathUtils.clamp(0.20 + (y - floorY) * 0.40, 0.16, 0.9);
-      this.colors[j] = inTarget ? 1 : shade;
-      this.colors[j + 1] = inTarget ? 0.065 : shade;
-      this.colors[j + 2] = inTarget ? 0.08 : shade;
+      if (this.colourMode && this.imageColors && this.imageColors.length >= count * 3) {
+        this.rgb.setRGB(this.imageColors[j] / 255, this.imageColors[j + 1] / 255,
+          this.imageColors[j + 2] / 255, THREE.SRGBColorSpace);
+        this.colors[j] = inTarget ? 1 : this.rgb.r;
+        this.colors[j + 1] = inTarget ? 0.065 : this.rgb.g;
+        this.colors[j + 2] = inTarget ? 0.08 : this.rgb.b;
+      } else {
+        this.colors[j] = inTarget ? 1 : shade;
+        this.colors[j + 1] = inTarget ? 0.065 : shade;
+        this.colors[j + 2] = inTarget ? 0.08 : shade;
+      }
     }
     this.cloudGeometry.setDrawRange(0, count);
     this.cloudGeometry.attributes.position.needsUpdate = this.cloudGeometry.attributes.color.needsUpdate = true;
@@ -295,7 +326,7 @@ export class RoomView {
     if (!this.dirty) return;
     this.dirty = false;
     const pixelsPerMeter = this.height / (this.camera.top - this.camera.bottom) * this.camera.zoom;
-    (this.cloud.material as THREE.ShaderMaterial).uniforms.pointSize.value = THREE.MathUtils.clamp(pixelsPerMeter * 0.03, 1.8, 3.8) * this.renderer.getPixelRatio();
+    (this.cloud.material as THREE.ShaderMaterial).uniforms.pointSize.value = THREE.MathUtils.clamp(pixelsPerMeter * 0.03, 1.8, 3.8) * this.renderer.getPixelRatio() * (this.colourMode ? 1.45 : 1);
     this.renderer.render(this.scene, this.camera);
     const t = this.recon?.targets.find(target => target.selected);
     this.label.hidden = !t;

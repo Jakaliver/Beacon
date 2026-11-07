@@ -39,7 +39,7 @@ class Track:
     n_obs: int = 1
     misses: int = 0
     last_miss: float = 0.0
-    # Locked: the 3D position is fixed; guidance relies on phone tracking only, not on seeing it again.
+    # Retain the selected identity offscreen; fresh camera observations still refine its geometry.
     locked: bool = False
     best_depth: float = 99.0  # closest camera distance of any sighting used so far
     relocate: list = field(default_factory=list)  # recent sightings away from a locked target
@@ -47,6 +47,7 @@ class Track:
     observed_now: bool = True
     injected: bool = False
     history: list = field(default_factory=list)
+    refinements: list = field(default_factory=list)
 
     def sigma_at(self, now: float) -> float:
         if self.locked:
@@ -115,13 +116,25 @@ class Tracker:
                     best, best_d = t, d
             if best is not None and best.locked:
                 matched.add(best.id)
-                # Re-sightings near the lock refine it, weighted by their (distance-dependent) accuracy.
-                self._fuse(best, obs, now)
+                # Large innovations need repeat evidence, even if they pass association.
+                if best_d > max(0.16, 2.5 * best.sigma):
+                    self._consider_refinement(best, obs, now)
+                else:
+                    self._fuse(best, obs, now)
+                    best.refinements = []
                 best.relocate = []
                 continue
-            locked = [t for t in self.tracks.values() if t.locked and t.label == obs.label]
+            locked = [t for t in self.tracks.values() if t.locked and t.label == obs.label and t.id not in matched]
             if best is None and locked:
-                self._consider_relocation(locked[0], obs, now)
+                # A closer view can correct a depth bias outside the old 3D gate. Require
+                # the same viewing direction and repeated agreement; don't switch to a
+                # different bottle merely because it has the same label.
+                candidates = [t for t in locked if self._closer_on_same_ray(t, obs, T)]
+                if len(candidates) == 1:
+                    matched.add(candidates[0].id)
+                    self._consider_refinement(candidates[0], obs, now)
+                elif len(locked) == 1:
+                    self._consider_relocation(locked[0], obs, now)
                 continue
             if best is None:
                 self._new(obs, now, injected)
@@ -158,6 +171,28 @@ class Tracker:
                                  now, injected=injected, best_depth=obs.depth)
 
     @staticmethod
+    def _closer_on_same_ray(t: Track, obs: Observation, transform: np.ndarray) -> bool:
+        a, b = t.position - transform[:3, 3], obs.position - transform[:3, 3]
+        lengths = np.linalg.norm(a) * np.linalg.norm(b)
+        return bool(lengths > 0.01 and obs.depth < t.best_depth * 0.85
+                    and np.linalg.norm(t.position - obs.position) < 1.2
+                    and np.dot(a, b) / lengths > 0.985)
+
+    @staticmethod
+    def _consider_refinement(t: Track, obs: Observation, now: float) -> None:
+        t.refinements = [(at, o) for at, o in t.refinements
+                         if now - at < 1.5 and np.linalg.norm(o.position - obs.position) < max(0.12, obs.sigma)]
+        t.refinements.append((now, obs))
+        t.refinements = t.refinements[-3:]
+        if len(t.refinements) == 3 and now - t.refinements[0][0] >= 0.12:
+            # Average the agreeing observations so a single last-frame spike cannot win.
+            centre = np.mean([o.position for _, o in t.refinements], axis=0)
+            agreed = Observation(obs.label, centre, obs.extent,
+                                 obs.surface + centre - obs.position, obs.sigma, obs.depth)
+            Tracker._fuse(t, agreed, now, prefer_new=True)
+            t.refinements = []
+
+    @staticmethod
     def _consider_relocation(t: Track, obs: Observation, now: float) -> None:
         """Move a locked target only after its old place looked empty and several sightings agree elsewhere."""
         t.relocate = [o for o in t.relocate if now - o[0] < 3.0 and np.linalg.norm(o[1] - obs.position) < 0.2]
@@ -165,25 +200,33 @@ class Tracker:
         if len(t.relocate) >= 3 and t.misses >= 2:
             t.position = np.mean([p for _, p in t.relocate], axis=0)
             t.surface = obs.surface + (t.position - obs.position)
+            t.extent = obs.extent.copy()
             t.sigma = obs.sigma
             t.best_depth = obs.depth
             t.last_seen = now
             t.misses = 0
             t.relocate = []
             t.relocated = True
+            t.observed_now = True
+            t.refinements = []
 
     @staticmethod
     def _fuse(t: Track, obs: Observation, now: float, prefer_new: bool = False) -> None:
-        s_t = t.sigma_at(now)
+        # Monocular observations share bias: old repeated frames must never become
+        # so confident that better close-up evidence has almost no effect.
+        s_t = np.hypot(t.sigma_at(now), 0.04)
         wt, wo = 1 / s_t**2, 1 / obs.sigma**2
+        gain = float(np.clip(wo / (wt + wo), 0.15, 0.6))
+        if obs.depth < t.best_depth * 0.85:
+            gain = max(gain, 0.65)
         if prefer_new:
-            wt *= 0.25
-        pos = (t.position * wt + obs.position * wo) / (wt + wo)
+            gain = max(gain, 0.8)
+        pos = t.position + gain * (obs.position - t.position)
         t.surface = obs.surface + (pos - obs.position)
         t.position = pos
-        t.extent = 0.7 * t.extent + 0.3 * obs.extent
+        t.extent = (1 - gain) * t.extent + gain * obs.extent
         # Repeated views of a biased monocular estimate are not independent: keep a floor.
-        t.sigma = max(0.08, 1 / np.sqrt(wt + wo))
+        t.sigma = max(0.06, 0.6 * obs.sigma, 1 / np.sqrt(wt + wo))
         t.last_seen = now
         t.n_obs += 1
         t.misses = 0

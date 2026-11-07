@@ -19,6 +19,7 @@ from .mapping import UNCERTAIN, GridMap
 from .planner import line_clear, plan, ring_cells, walkable_grid
 from .speech import parse_command
 from .targets import IGNORED, Tracker, canonical, observe
+from .surfaces import SurfaceMap, plane_snapshot
 
 # OpenCV's own thread pool, used from several threads next to PyTorch, deadlocked the vision thread.
 cv2.setNumThreads(0)
@@ -111,6 +112,9 @@ class Engine:
         self.epoch = epoch
         self.scan_id = str(time.monotonic_ns())
         self.map = GridMap()
+        self.surfaces = SurfaceMap()
+        self.planes: list[dict] = []
+        self.plane_version = 0
         self.tracker = Tracker()
         self.path: list[np.ndarray] = []
         self.waypoint: np.ndarray | None = None
@@ -178,6 +182,10 @@ class Engine:
                     # Geometry integrated before the metric floor was known used an unchecked depth scale.
                     self.reset_world(self.epoch)
                 self.map.arkit_floor = float(msg["floor_y"])
+            self.map.expect_arkit_floor = msg.get("floor_source") == "arkit"
+            if "planes" in msg and msg["tracking"] == "normal":
+                self.planes = plane_snapshot(msg["planes"])
+                self.plane_version += 1
 
     def process_frame(self, header: dict, jpeg: bytes, injected_depth: np.ndarray | None) -> None:
         """Runs in a worker thread. Heavy model calls happen outside the lock."""
@@ -230,8 +238,12 @@ class Engine:
                          floor=np.nan if self.map.floor_y is None else self.map.floor_y)
             world, scale = self.map.check_scale(world, cam)
             self.map.integrate(world, cam, time.monotonic())
+            surface_start = time.monotonic()
+            depth_scaled = depth * scale
+            # The display must not crop geometry to navigation's estimated floor/obstacle bands.
+            self.surfaces.integrate(depth_scaled, K, T, surface_start, bgr)
+            self.stats["surface_ms"] = round(1000 * (time.monotonic() - surface_start), 1)
             if run_detect:
-                depth_scaled = depth * scale
                 obs = [o for label, m in dets if (o := observe(label, m, depth_scaled, K, T, self.map.floor_y))]
                 if DEBUG_DIR:
                     with open(f"{DEBUG_DIR}/observations.log", "a") as f:
@@ -419,7 +431,7 @@ class Engine:
             az, dist = self.relative(t.position)
             age = now - t.last_seen
             parts.append(f"{self.spoken(t.label).capitalize()} about {dist:.1f} metres {describe_direction(az)}, "
-                         + ("position fixed, not re-checked by the camera, " if t.locked else f"last seen {age:.0f} seconds ago, ")
+                         + f"last seen {age:.0f} seconds ago, "
                          + f"uncertainty about {100 * t.sigma_at(now):.0f} centimetres.")
             if self.perception_mode == "injected":
                 parts.append("Warning: injected debug perception, not camera inference.")
@@ -618,7 +630,6 @@ class Engine:
         with self.lock:
             now = time.monotonic()
             states = self.map.states()
-            pts = self.map.recent_points().astype(np.float32)
             phone = forward_vec = None
             if self.pose is not None:
                 phone = self.pose.T[:3, 3].round(3).tolist()
@@ -631,7 +642,10 @@ class Engine:
                          "w": self.map.n, "h": self.map.n,
                          "cells": base64.b64encode(states.tobytes()).decode()},
                 "floor_y": self.map.floor_y,
-                "points": base64.b64encode(pts.tobytes()).decode(),
+                "points": self.surfaces.payload["points"],
+                "point_colors": self.surfaces.payload["colors"],
+                "points_version": self.surfaces.version,
+                "points_fused": True,
                 "phone": {"position": phone, "forward": forward_vec,
                           "tracking": self.pose.tracking if self.pose else None},
                 "listener": self.body_position().round(3).tolist() if self.pose is not None else None,

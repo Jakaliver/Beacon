@@ -23,6 +23,7 @@ class GridMap:
         self.last_seen = np.zeros(shape, np.float64)
         self.floor_samples: deque[float] = deque(maxlen=60)
         self.arkit_floor: float | None = None
+        self.expect_arkit_floor = False
         self.scale = 1.0  # running depth-scale correction
         self.n_scale = 0
         self.points = np.zeros((CONFIG.max_points, 3), np.float32)
@@ -34,6 +35,8 @@ class GridMap:
     def floor_y(self) -> float | None:
         if self.arkit_floor is not None:
             return self.arkit_floor
+        if self.expect_arkit_floor:
+            return None
         return float(np.median(self.floor_samples)) if len(self.floor_samples) >= 3 else None
 
     def cell(self, xz: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
