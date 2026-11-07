@@ -14,7 +14,12 @@
 <body>
   <!-- Two separate pages and data flows: the simulator only sends sensor data to the backend;
        the reconstruction only receives backend output. -->
-  <iframe src="/simulator/" title="Simulator" allow="autoplay"></iframe>
-  <iframe src="/reconstruction-viewer/" title="Reconstruction" allow="autoplay; microphone"></iframe>
+  <iframe id="sim" title="Simulator" allow="autoplay"></iframe>
+  <iframe id="recon" title="Reconstruction" allow="autoplay; microphone"></iframe>
+  <script>
+    // Pass ?backend=<port> through, to run a second Trident backend side by side.
+    document.getElementById("sim").src = "/simulator/" + location.search;
+    document.getElementById("recon").src = "/reconstruction-viewer/" + location.search;
+  </script>
 </body>
 </html>

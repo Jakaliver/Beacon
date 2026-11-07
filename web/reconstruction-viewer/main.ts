@@ -4,7 +4,8 @@ import { HotCold } from "./audio";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const host = location.hostname;
-const API = `http://${host}:8787`;
+const port = new URLSearchParams(location.search).get("backend") ?? "8787";
+const API = `http://${host}:${port}`;
 
 type Recon = {
   epoch: number; perception: string; mode: string; stop_reason: string | null; navigation: boolean;
@@ -111,7 +112,7 @@ function draw() {
 requestAnimationFrame(draw);
 
 function connectViewer() {
-  const ws = new WebSocket(`ws://${host}:8787/ws/viewer`);
+  const ws = new WebSocket(`ws://${host}:${port}/ws/viewer`);
   ws.onmessage = (e) => {
     recon = JSON.parse(e.data);
     const s = recon!.stats;
@@ -144,7 +145,7 @@ function speak(text: string) {
 }
 
 function connectControl() {
-  const ws = new WebSocket(`ws://${host}:8787/ws/control`);
+  const ws = new WebSocket(`ws://${host}:${port}/ws/control`);
   ws.onopen = () => { send({ type: "hello", role: "sim-app" }); reportAudio(); };
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
@@ -210,6 +211,7 @@ for (const [id, msg] of [["stop", { type: "stop", reason: "user" }], ["resume", 
 $("stop").addEventListener("click", () => audio.silence());
 $("findBottle").onclick = () => send({ type: "command", text: "find the bottle" });
 $<HTMLInputElement>("nav").onchange = (e) => send({ type: "config", navigation: (e.target as HTMLInputElement).checked });
+$("testEars").onclick = () => audio.testEars((side) => { $("earsVal").textContent = side ? `playing ${side}` : ""; });
 $<HTMLInputElement>("spatial").onchange = (e) => { audio.settings.spatial = (e.target as HTMLInputElement).checked; };
 for (const key of ["volume", "near", "far"] as const) {
   const input = $<HTMLInputElement>(key);

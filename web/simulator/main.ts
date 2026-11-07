@@ -4,7 +4,8 @@ import { IMG_H, IMG_W, SensorLink, type Tracking, intrinsicsFor, renderInjected 
 import { SCENES, World } from "./world";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const backend = `ws://${location.hostname}:8787/ws/sensor`;
+const port = new URLSearchParams(location.search).get("backend") ?? "8787";
+const backend = `ws://${location.hostname}:${port}/ws/sensor`;
 
 // Renderers: one for the third-person view, one that is the phone camera sensor.
 const view = new THREE.WebGLRenderer({ canvas: $("view"), antialias: true });

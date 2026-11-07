@@ -148,6 +148,8 @@ class Engine:
         if epoch != self.epoch:
             was_active = self.mode not in {"idle", "stopped"}
             self.reset_world(epoch)
+            # The headphone-to-world alignment is relative to the old world's heading.
+            self.audio_yaw_offset = None
             self.selected = None
             if was_active:
                 self.stop("world_reset", "Tracking was reset. The map is cleared. Scan again, then say resume.")
@@ -325,6 +327,8 @@ class Engine:
                  + (" Follow the beacon." if self.navigation else " Faster pulses mean closer."))
 
     def resume(self) -> None:
+        if self.audio_yaw_offset is None:
+            self.calibrate(quiet=True)
         if self.mode != "stopped":
             self.say("Nothing to resume.")
             return

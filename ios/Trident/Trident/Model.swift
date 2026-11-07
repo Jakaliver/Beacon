@@ -40,7 +40,7 @@ private struct Incoming: Decodable {
 enum Settings {
     static let hostKey = "host"
     static let frameRateKey = "frameRate"
-    static let defaultHost = "trident-mac.local"
+    static let defaultHost = "Malins-Macbook-Pro-3.local"
     static let defaultFrameRate = 10.0
 
     static var host: String { UserDefaults.standard.string(forKey: hostKey) ?? defaultHost }

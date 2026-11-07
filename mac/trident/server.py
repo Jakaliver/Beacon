@@ -24,6 +24,14 @@ engine = Engine()
 control_clients: set[WebSocket] = set()
 viewer_clients: set[WebSocket] = set()
 pending: dict = {"frame": None}
+# The newest sensor connection wins, so a forgotten simulator tab cannot fight a real phone.
+active_sensor: dict = {"ws": None}
+audio_status: dict[WebSocket, tuple[bool, bool]] = {}
+
+
+def apply_audio_status() -> None:
+    engine.audio_ok = not audio_status or any(ok for ok, _ in audio_status.values())
+    engine.interrupted = any(intr for _, intr in audio_status.values())
 frame_ready = asyncio.Event()
 speech = {"model": None}
 process = psutil.Process(os.getpid())
@@ -148,12 +156,15 @@ def parse_frame(data: bytes) -> tuple[dict, bytes, np.ndarray | None]:
 @app.websocket("/ws/sensor")
 async def sensor(ws: WebSocket) -> None:
     await ws.accept()
+    active_sensor["ws"] = ws
     engine.sensor_connected = True
     try:
         while True:
             msg = await ws.receive()
             if msg["type"] == "websocket.disconnect":
                 break
+            if active_sensor["ws"] is not ws:
+                continue
             if msg.get("bytes") is not None:
                 header, jpeg, depth = parse_frame(msg["bytes"])
                 if pending["frame"] is not None:
@@ -168,8 +179,10 @@ async def sensor(ws: WebSocket) -> None:
     except WebSocketDisconnect:
         pass
     finally:
-        engine.sensor_connected = False
-        await publish_guidance()
+        if active_sensor["ws"] is ws:
+            active_sensor["ws"] = None
+            engine.sensor_connected = False
+            await publish_guidance()
 
 
 @app.websocket("/ws/control")
@@ -198,13 +211,16 @@ async def control(ws: WebSocket) -> None:
                     if "probe_offset" in m:
                         engine.probe_offset = np.asarray(m["probe_offset"], float)
                 elif kind == "client_status":
-                    engine.audio_ok = bool(m.get("audio_ok", True))
-                    engine.interrupted = bool(m.get("interrupted", False))
+                    audio_status[ws] = (bool(m.get("audio_ok", True)), bool(m.get("interrupted", False)))
+                    apply_audio_status()
             await publish_guidance()
     except WebSocketDisconnect:
         pass
     finally:
         control_clients.discard(ws)
+        audio_status.pop(ws, None)
+        with engine.lock:
+            apply_audio_status()
 
 
 @app.websocket("/ws/viewer")

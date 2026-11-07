@@ -104,6 +104,21 @@ export class HotCold {
     o.start(t); o.stop(t + dur + 0.02);
   }
 
+  /** Plays a click from the left, then from the right, to check headphone channels. */
+  testEars(onSide: (side: string) => void) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const sides: [string, number][] = [["LEFT", -1.5], ["RIGHT", 1.5]];
+    sides.forEach(([name, x], i) => {
+      const p = new PannerNode(ctx, { panningModel: "HRTF", positionX: x, positionY: 0, positionZ: -0.2 });
+      p.connect(this.master);
+      const t = ctx.currentTime + 0.1 + i * 1.2;
+      for (let k = 0; k < 4; k++) this.tick(t + k * 0.18, 900, 0.08, p);
+      window.setTimeout(() => onSide(name), (0.1 + i * 1.2) * 1000);
+    });
+    window.setTimeout(() => onSide(""), 2600);
+  }
+
   cue(name: string) {
     const ctx = this.ctx;
     if (!ctx) return;
