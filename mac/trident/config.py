@@ -39,8 +39,8 @@ class Config:
 
     approach_min: float = 0.35
     approach_max: float = 0.75
-    probe_enter: float = 1.1  # horizontal phone-to-target distance
-    probe_leave: float = 1.1  # listener drift that ends Probe mode
+    probe_enter: float = 0.7  # horizontal phone-to-target distance
+    probe_leave: float = 1.0  # listener drift that ends Probe mode
 
     near_m: float = 0.15
     far_m: float = 3.0

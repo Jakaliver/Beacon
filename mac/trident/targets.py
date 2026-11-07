@@ -41,6 +41,7 @@ class Track:
     last_miss: float = 0.0
     # Locked: the 3D position is fixed; guidance relies on phone tracking only, not on seeing it again.
     locked: bool = False
+    best_depth: float = 99.0  # closest camera distance of any sighting used so far
     observed_now: bool = True
     injected: bool = False
     history: list = field(default_factory=list)
@@ -111,7 +112,12 @@ class Tracker:
                 if d < gate and d < best_d:
                     best, best_d = t, d
             if best is not None and best.locked:
-                matched.add(best.id)  # a sighting of the locked target: absorb it, never move it
+                matched.add(best.id)
+                # Locked targets only learn from clearly closer, nearby views: monocular depth is far
+                # more accurate up close, and far or unrelated sightings must never move the target.
+                near_lock = float(np.linalg.norm(best.position - obs.position)) < 0.35
+                if near_lock and obs.depth < 0.8 * best.best_depth:
+                    self._fuse(best, obs, now, prefer_new=True)
                 continue
             if best is None:
                 self._new(obs, now, injected)
@@ -145,12 +151,14 @@ class Tracker:
         self.counter[obs.label] = n
         tid = f"{obs.label.replace(' ', '-')}-{n}"
         self.tracks[tid] = Track(tid, obs.label, obs.position, obs.extent, obs.surface, obs.sigma,
-                                 now, injected=injected)
+                                 now, injected=injected, best_depth=obs.depth)
 
     @staticmethod
-    def _fuse(t: Track, obs: Observation, now: float) -> None:
+    def _fuse(t: Track, obs: Observation, now: float, prefer_new: bool = False) -> None:
         s_t = t.sigma_at(now)
         wt, wo = 1 / s_t**2, 1 / obs.sigma**2
+        if prefer_new:
+            wt *= 0.25
         pos = (t.position * wt + obs.position * wo) / (wt + wo)
         t.surface = obs.surface + (pos - obs.position)
         t.position = pos
@@ -161,6 +169,7 @@ class Tracker:
         t.n_obs += 1
         t.misses = 0
         t.observed_now = True
+        t.best_depth = min(t.best_depth, obs.depth)
 
     def _merge_duplicates(self) -> None:
         ids = sorted(self.tracks, key=lambda i: (not self.tracks[i].locked, -self.tracks[i].n_obs))
@@ -206,4 +215,9 @@ if __name__ == "__main__":
     for i in range(20):
         locked.update([moved] if i % 2 else [], empty, K, T, 1.0 + i, False)
     assert track.valid_at(500.0) and np.allclose(track.position, before) and len(locked.tracks) == 1
+    # A clearly closer, consistent view refines the locked position.
+    closer = observe("bottle", mask, depth * 0.6, K, T)
+    closer.position = before + np.array([0.0, 0.0, 0.1])
+    locked.update([closer], depth * 0.6, K, T, 600.0, False)
+    assert 0.05 < float(np.linalg.norm(track.position - before)) < 0.1, track.position
     print("targets ok")

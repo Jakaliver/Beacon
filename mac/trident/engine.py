@@ -257,9 +257,12 @@ class Engine:
     def _handle(self, c: dict) -> None:
         cmd = c["cmd"]
         if cmd == "find":
+            # Always place anew: an earlier sighting may be stale or of another object.
+            label = canonical(c["label"])
+            self.tracker.tracks = {k: t for k, t in self.tracker.tracks.items() if t.label != label}
             for t in self.tracker.tracks.values():
                 t.locked = False
-            self.want_label = canonical(c["label"])
+            self.want_label = label
             self.want_word = (c["spoken"] or c["label"]).replace("waterbottle", "water bottle")
             self.selected = None
             self.choice_ids = []
