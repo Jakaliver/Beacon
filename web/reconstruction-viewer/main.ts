@@ -54,7 +54,7 @@ function displaySnapshot(snapshot: Recon) {
     const phone = snapshot.phone.position;
     const distance = phone ? Math.hypot(...target.position.map((v, i) => v - phone[i])).toFixed(1) : null;
     $("targetDistance").textContent = distance ? `${distance} m` : "—";
-    $("targetLabelText").textContent = `${target.label.toUpperCase()}${distance ? ` · ${distance} m` : ""}`;
+    $("targetLabelText").textContent = target.label;
   }
   updateFreshness();
 }
@@ -70,19 +70,18 @@ function updateFreshness() {
   const injected = recon?.perception === "injected";
   $("connection").dataset.state = live ? "live" : recon ? "paused" : "waiting";
   $("connectionText").textContent = live ? injected ? "Debug feed" : "Live" : !connected ? "Connecting" : pointCount ? "Scan paused" : "Waiting for iPhone";
-  $("scanCaption").textContent = injected ? "Debug observations" : live ? "Live camera scan" : pointCount ? "Last camera scan" : "Camera reconstruction";
-  $("frameAge").textContent = Number.isFinite(frameAge)
+  $("frameAge").textContent = !live && Number.isFinite(frameAge)
     ? frameAge < 60_000 ? `${(frameAge / 1000).toFixed(1)}s ago` : `${Math.floor(frameAge / 60_000)}m ago`
     : "";
   $("emptyHint").textContent = !connected
     ? "Start the Mac backend, then open Trident on your iPhone."
     : recon?.phone.tracking && recon.phone.tracking !== "normal"
     ? "Move the iPhone slowly while camera tracking settles."
-    : "Open Trident on your iPhone and scan the floor and nearby furniture.";
+    : "Open Trident on your iPhone and scan the room.";
   const target = recon?.targets.find(t => t.selected);
   if (target) {
     const stale = !live || target.age + elapsed / 1000 > 1.5;
-    $("targetState").textContent = !target.valid ? "Unverified" : !live ? "Paused" : target.locked ? "Position locked" : stale ? "Last seen" : "Tracked";
+    $("targetState").textContent = !target.valid ? "Unverified" : !live ? "" : target.locked ? "Locked" : stale ? "Last seen" : "Tracked";
   }
 }
 

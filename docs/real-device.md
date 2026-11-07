@@ -105,7 +105,7 @@ Allow incoming connections for the backend if macOS prompts. Use the Mac's Wi-Fi
 1. Keep Trident open in the foreground. Start at **5 frames/sec** in its Settings on a
    MacBook Air; raise the rate only while the displayed camera age remains low.
 2. Sweep slowly across a well-lit floor and nearby furniture. A floor patch of about 1 m²
-   helps ARKit establish the floor height. The Mac view should show **Live reconstruction**
+   helps ARKit establish the floor height. The Mac view should show **Live**
    and an increasing point count.
 3. Hold the phone ahead of your torso, facing forward, and tap **Calibrate**. If testing
    head tracking, wear compatible AirPods paired with the phone during calibration.
@@ -121,10 +121,10 @@ Allow incoming connections for the backend if macOS prompts. Use the Mac's Wi-Fi
 
 The view accumulates up to 20,000 measured points, retaining surfaces for up to 90 seconds
 as you turn the camera. Low surfaces are dark grey; higher surfaces are brighter. The
-white **YOU / iPhone** marker shows camera position and direction. Your selected object
-has a red box, floor ring and distance label; unrelated detections are hidden by default.
+white **iPhone** arrow shows camera position and direction. Your selected object
+has a red outline and label; its distance appears in the bottom status bar.
 
-Use **3D** to see height, **Overhead** for a floor plan, and **Fit room** to restore automatic
+Use **3D** to see height, **Overhead** for a floor plan, and **Fit** to restore automatic
 framing after dragging or zooming. **Locate** centres the selected target.
 Use **Find object** in the iPhone app to select a target; the browser is read-only.
 The geometry comes from monocular depth estimates, not a hardware LiDAR scan.

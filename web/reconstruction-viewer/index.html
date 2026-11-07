@@ -3,39 +3,38 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#0c1117" />
+  <meta name="theme-color" content="#1b1b1b" />
   <meta name="description" content="Your live room scan from Trident on iPhone." />
   <title>Trident · Room view</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23101820'/%3E%3Cpath d='M16 27V5M7 8v7q0 6 9 6t9-6V8M12 9l4-4 4 4' fill='none' stroke='%23e8edf1' stroke-width='2'/%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%231b1b1b'/%3E%3Cpath d='M16 26V6M8 8v7q0 5 8 5t8-5V8' fill='none' stroke='%23dedede' stroke-width='2'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <header>
-    <div class="brand"><svg width="20" height="25" viewBox="0 0 24 28" fill="none" aria-hidden="true"><path d="M12 26V2M3 5v7c0 4 4 5 9 5s9-1 9-5V5M8 6l4-4 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><strong>TRIDENT</strong><span>Room view</span></div>
+  <header class="toolbar">
+    <div class="brand"><strong>Trident</strong><span aria-hidden="true">/</span><h1>Room</h1></div>
     <nav aria-label="View controls">
       <div class="view-switch"><button id="view3d" aria-pressed="true">3D</button><button id="viewPlan" aria-pressed="false">Overhead</button></div>
-      <button id="fitRoom" title="Keep the whole scan in view"><span aria-hidden="true">⛶</span> Fit room</button>
+      <button id="fitRoom" title="Keep the whole scan in view"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2H2v4m8-4h4v4M2 10v4h4m8-4v4h-4" /></svg>Fit</button>
     </nav>
-    <div class="connection" id="connection" data-state="waiting"><i></i><span id="connectionText" role="status">Connecting</span></div>
   </header>
   <main aria-label="Room reconstruction">
     <canvas id="roomCanvas" tabindex="0" aria-label="Interactive room scan. Drag to orbit, right-drag to pan, scroll to zoom. Use Overhead for a floor plan."></canvas>
     <div id="injected" class="notice" hidden>Debug observations · not live camera inference</div>
-    <div class="scan-info"><h1 id="scanCaption">Camera reconstruction</h1><p><span id="pointCount">0</span> points <span class="separator">/</span> <span id="mappedArea">—</span> m² <span id="frameAge"></span></p></div>
-    <div id="emptyState" class="empty-state"><span aria-hidden="true">⌖</span><h2>Your room appears here</h2><p id="emptyHint">Open Trident on your iPhone and scan the floor and nearby furniture.</p></div>
+    <div id="emptyState" class="empty-state"><h2>No scan yet</h2><p id="emptyHint">Open Trident on your iPhone and scan the room.</p></div>
     <div id="renderError" class="empty-state" hidden><h2>3D view unavailable</h2><p>Enable hardware acceleration or use a browser with WebGL 2 support.</p></div>
-    <div id="phoneLabel" class="phone-label" hidden>YOU <span>iPhone</span></div>
-    <div id="targetLabel" class="target-label" hidden><span aria-hidden="true">＋</span><span id="targetLabelText"></span></div>
-    <div class="bottom-bar">
-      <div class="scene-details">
-        <div id="targetCard" class="target-card" hidden><i></i><div><strong id="targetName"></strong><span id="targetState"></span></div><span id="targetDistance"></span><button id="focusTarget" title="Centre the selected target">Locate</button></div>
-        <p id="noTarget" class="no-target">Find an object in Trident to highlight it here.</p>
-        <div class="legend"><span><i class="scan-key"></i>Room</span><span><i class="target-key"></i>Target</span><span><i class="phone-key"></i>You</span></div>
-        <p id="interactionHint">Drag to orbit · Scroll to zoom · Right-drag to pan</p>
-      </div>
-      <div class="scale"><span id="scaleBar"></span><span>1 m</span><small>Estimated depth</small></div>
+    <div id="phoneLabel" class="phone-label" hidden>iPhone</div>
+    <div id="targetLabel" class="target-label" hidden><span id="targetLabelText"></span></div>
+    <div class="canvas-footer">
+      <p id="interactionHint">Drag to orbit · Scroll to zoom · Right-drag to pan</p>
+      <div class="scale" aria-label="Scale: one metre, estimated depth"><span id="scaleBar"></span><span>1 m</span><span class="depth-note">Estimated depth</span></div>
     </div>
   </main>
+  <footer class="statusbar">
+    <div class="connection" id="connection" data-state="waiting"><i aria-hidden="true"></i><span id="connectionText" role="status">Connecting</span><span id="frameAge"></span></div>
+    <div id="targetCard" class="selection" hidden><i aria-hidden="true"></i><strong id="targetName"></strong><span id="targetDistance"></span><span id="targetState"></span><button id="focusTarget" title="Centre the selected target">Locate</button></div>
+    <p id="noTarget" class="no-target">Select an object on iPhone</p>
+    <div class="metrics"><span><span id="pointCount">0</span> points</span><span><span id="mappedArea">—</span> m²</span></div>
+  </footer>
   <script type="module" src="./main.ts"></script>
 </body>
 </html>

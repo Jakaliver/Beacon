@@ -4,9 +4,9 @@ import { ScanCloud } from "./scan-cloud";
 import type { Recon } from "./types";
 
 const MAX_POINTS = 20_000;
-const RED = 0xff4b50;
+const RED = 0xee5252;
 const decode = (base64: string) => Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-const PALETTE = [[0, 0, 0, 0], [40, 48, 54, 110], [108, 119, 127, 125], [47, 55, 62, 75], [32, 39, 45, 60]];
+const PALETTE = [[0, 0, 0, 0], [48, 48, 48, 85], [108, 108, 108, 95], [52, 52, 52, 65], [38, 38, 38, 50]];
 
 /** Displays measured reconstruction snapshots without inventing unseen surfaces. */
 export class RoomView {
@@ -23,25 +23,21 @@ export class RoomView {
   private mapVersion: number | boolean | null | undefined;
   private autoFit = true;
   private lastFit = 0;
-  private floor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+  private floor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide }));
   private texture: THREE.DataTexture | null = null;
-  private grid = new THREE.GridHelper(40, 40, 0x303b45, 0x1c252d);
+  private grid = new THREE.GridHelper(40, 40, 0x333333, 0x272727);
   private targets = new THREE.Group();
   private targetGeometry = new THREE.BoxGeometry(1, 1, 1);
   private targetEdges = new THREE.EdgesGeometry(this.targetGeometry);
-  private ringGeometry = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 65 }, (_, i) => new THREE.Vector3(Math.cos(i / 64 * Math.PI * 2), 0, Math.sin(i / 64 * Math.PI * 2))));
   private targetVisuals = new Map<string, {
     group: THREE.Group;
     box: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>;
     edges: THREE.LineSegments<THREE.EdgesGeometry, THREE.LineBasicMaterial>;
-    ring: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
-    stem: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   }>();
-  private route = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xa5cbd1, transparent: true, opacity: 0.85 }));
-  private waypoint = new THREE.Mesh(new THREE.OctahedronGeometry(0.085), new THREE.MeshBasicMaterial({ color: 0xc1e2e6 }));
+  private route = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xb0b0b0, transparent: true, opacity: 0.65 }));
+  private waypoint = new THREE.Mesh(new THREE.OctahedronGeometry(0.085), new THREE.MeshBasicMaterial({ color: 0xd4d4d4 }));
   private phone = new THREE.Group();
-  private phoneMaterial = new THREE.MeshBasicMaterial({ color: 0xe8eff2, depthTest: false });
-  private body = new THREE.Line(this.ringGeometry, new THREE.LineBasicMaterial({ color: 0x8b9ba5, transparent: true, opacity: 0.6 }));
+  private phoneMaterial = new THREE.MeshBasicMaterial({ color: 0xe5e5e5, depthTest: false, side: THREE.DoubleSide });
   private recon: Recon | null = null;
   private epoch: number | null = null;
   private needsFit = true;
@@ -64,7 +60,7 @@ export class RoomView {
     this.phoneLabel = phoneLabel;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "low-power" });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
-    this.renderer.setClearColor(0x0c1117, 0);
+    this.renderer.setClearColor(0x181818, 0);
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = !matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.controls.dampingFactor = 0.12;
@@ -97,21 +93,15 @@ export class RoomView {
     this.cloud.frustumCulled = false;
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.visible = false;
-    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 8), this.phoneMaterial);
-    const heading = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.32, 3), this.phoneMaterial);
-    heading.rotation.x = -Math.PI / 2;
-    heading.position.z = -0.23;
-    const fov = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(-0.65, 0, -1.05), new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.65, 0, -1.05),
-    ]);
-    const halo = new THREE.Line(this.ringGeometry, new THREE.LineBasicMaterial({ color: 0xd4e3ec, transparent: true, opacity: 0.8, depthTest: false }));
-    halo.scale.setScalar(0.22);
-    this.phone.add(dot, heading, halo, new THREE.Line(fov, new THREE.LineBasicMaterial({ color: 0x91a8b6, transparent: true, opacity: 0.55, depthTest: false })));
+    const arrow = new THREE.BufferGeometry();
+    arrow.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, -0.15, -0.075, 0, 0.08, 0, 0, 0.04, 0.075, 0, 0.08], 3));
+    arrow.setIndex([0, 1, 2, 0, 2, 3]);
+    const heading = new THREE.Mesh(arrow, this.phoneMaterial);
+    this.phone.add(heading);
     this.phone.renderOrder = 4;
     this.phone.children.forEach(child => { child.renderOrder = 4; });
-    this.body.scale.setScalar(0.22);
-    this.phone.visible = this.body.visible = this.waypoint.visible = false;
-    this.scene.add(this.grid, this.floor, this.cloud, this.targets, this.route, this.waypoint, this.phone, this.body);
+    this.phone.visible = this.waypoint.visible = false;
+    this.scene.add(this.grid, this.floor, this.cloud, this.targets, this.route, this.waypoint, this.phone);
     this.resizeObserver = new ResizeObserver(() => this.resize(canvas));
     this.resizeObserver.observe(canvas);
     canvas.addEventListener("webglcontextlost", this.contextLost);
@@ -188,7 +178,7 @@ export class RoomView {
       extentX = Math.max(extentX, Math.abs(this.project.x));
       extentY = Math.max(extentY, Math.abs(this.project.y));
     }
-    this.camera.zoom = THREE.MathUtils.clamp(0.76 / Math.max(extentX, extentY), 0.35, 2.5);
+    this.camera.zoom = THREE.MathUtils.clamp(0.82 / Math.max(extentX, extentY), 0.35, 4);
     this.camera.updateProjectionMatrix();
     this.controls.update();
     this.invalidate();
@@ -219,8 +209,8 @@ export class RoomView {
       // Quiet floor returns; bright furniture and walls make height legible.
       const shade = THREE.MathUtils.clamp(0.20 + (y - floorY) * 0.40, 0.16, 0.9);
       this.colors[j] = inTarget ? 1 : shade;
-      this.colors[j + 1] = inTarget ? 0.065 : shade * 1.03;
-      this.colors[j + 2] = inTarget ? 0.08 : shade * 1.07;
+      this.colors[j + 1] = inTarget ? 0.065 : shade;
+      this.colors[j + 2] = inTarget ? 0.08 : shade;
     }
     this.cloudGeometry.setDrawRange(0, count);
     this.cloudGeometry.attributes.position.needsUpdate = this.cloudGeometry.attributes.color.needsUpdate = true;
@@ -247,7 +237,7 @@ export class RoomView {
     this.floor.visible = observed > 0;
     this.floor.scale.set(w * res, h * res, 1);
     this.floor.position.set(origin[0] + w * res / 2, floorY - 0.025, origin[1] + h * res / 2);
-    this.updateTargets(recon, floorY);
+    this.updateTargets(recon);
 
     this.route.geometry.dispose();
     this.route.geometry = new THREE.BufferGeometry().setFromPoints(recon.path.map(([x, z]) => new THREE.Vector3(x, floorY + 0.06, z)));
@@ -258,10 +248,8 @@ export class RoomView {
       this.phone.position.set(recon.phone.position[0], floorY + 0.1, recon.phone.position[2]);
       const f = recon.phone.forward;
       if (f) this.phone.rotation.y = Math.atan2(-f[0], -f[2]);
-      this.phoneMaterial.color.setHex(recon.phone.tracking === "normal" ? 0xe8eff2 : 0xdba866);
+      this.phoneMaterial.color.setHex(recon.phone.tracking === "normal" ? 0xe5e5e5 : 0x999999);
     }
-    this.body.visible = !!recon.listener;
-    if (recon.listener) this.body.position.set(recon.listener[0], floorY + 0.05, recon.listener[2]);
     const now = performance.now();
     if (count && (this.needsFit || this.autoFit && now - this.lastFit > 2000)) {
       this.fit(); this.needsFit = false; this.lastFit = now;
@@ -270,13 +258,12 @@ export class RoomView {
     return { points: count, area: observed * res * res };
   }
 
-  private updateTargets(recon: Recon, floorY: number) {
+  private updateTargets(recon: Recon) {
     const selected = recon.targets.filter(t => t.selected);
     const ids = new Set(selected.map(t => t.id));
     for (const [id, visual] of this.targetVisuals) if (!ids.has(id)) {
       this.targets.remove(visual.group);
-      visual.box.material.dispose(); visual.edges.material.dispose(); visual.ring.material.dispose();
-      visual.stem.geometry.dispose(); visual.stem.material.dispose();
+      visual.box.material.dispose(); visual.edges.material.dispose();
       this.targetVisuals.delete(id);
     }
     for (const t of selected) {
@@ -285,26 +272,19 @@ export class RoomView {
         const group = new THREE.Group();
         const box = new THREE.Mesh(this.targetGeometry, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.07, depthWrite: false }));
         const edges = new THREE.LineSegments(this.targetEdges, new THREE.LineBasicMaterial({ transparent: true, depthTest: false }));
-        const ring = new THREE.Line(this.ringGeometry, new THREE.LineBasicMaterial({ transparent: true, depthTest: false }));
-        const stem = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 1, 0)]), new THREE.LineBasicMaterial({ color: RED, transparent: true, opacity: 0.65, depthTest: false }));
-        group.add(box, edges, ring, stem);
-        edges.renderOrder = ring.renderOrder = stem.renderOrder = 3;
+        group.add(box, edges);
+        edges.renderOrder = 3;
         this.targets.add(group);
-        visual = { group, box, edges, ring, stem };
+        visual = { group, box, edges };
         this.targetVisuals.set(t.id, visual);
       }
       const color = RED;
       visual.group.position.fromArray(t.position);
       const size = t.extent.map(v => Math.max(0.06, v));
       visual.box.scale.fromArray(size); visual.edges.scale.fromArray(size);
-      visual.box.material.color.setHex(color); visual.edges.material.color.setHex(color); visual.ring.material.color.setHex(color);
-      visual.box.material.opacity = t.valid ? 0.24 : 0.08;
+      visual.box.material.color.setHex(color); visual.edges.material.color.setHex(color);
+      visual.box.material.opacity = t.valid ? 0.16 : 0.05;
       visual.edges.material.opacity = t.valid ? 1 : 0.25;
-      visual.ring.material.opacity = t.valid ? 0.95 : 0.35;
-      visual.ring.position.y = floorY + 0.065 - t.position[1];
-      visual.ring.scale.setScalar(Math.max(t.sigma, size[0] / 2, size[2] / 2, 0.18));
-      visual.stem.position.y = visual.ring.position.y;
-      visual.stem.scale.y = Math.max(0, -visual.ring.position.y);
     }
   }
 
@@ -315,7 +295,7 @@ export class RoomView {
     if (!this.dirty) return;
     this.dirty = false;
     const pixelsPerMeter = this.height / (this.camera.top - this.camera.bottom) * this.camera.zoom;
-    (this.cloud.material as THREE.ShaderMaterial).uniforms.pointSize.value = THREE.MathUtils.clamp(pixelsPerMeter * 0.04, 2.4, 5) * this.renderer.getPixelRatio();
+    (this.cloud.material as THREE.ShaderMaterial).uniforms.pointSize.value = THREE.MathUtils.clamp(pixelsPerMeter * 0.03, 1.8, 3.8) * this.renderer.getPixelRatio();
     this.renderer.render(this.scene, this.camera);
     const t = this.recon?.targets.find(target => target.selected);
     this.label.hidden = !t;
