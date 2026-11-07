@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trident Simulator</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #f4f5f7; --fg: #1d2330; --muted: #5b6475; --panel: #fff; --line: #d6dae2; --warn: #b3261e; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #14161b; --fg: #e7e9ee; --muted: #9aa3b5; --panel: #1d2027; --line: #323743; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 13px/1.4 system-ui, sans-serif; background: var(--bg); color: var(--fg); display: grid; grid-template-rows: auto 1fr; height: 100vh; }
+    header { padding: 6px 10px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+    header b { font-size: 15px; }
+    #status, #notes { color: var(--muted); }
+    main { display: grid; grid-template-columns: 1fr 300px; min-height: 0; }
+    #view { width: 100%; height: 100%; display: block; min-height: 0; }
+    aside { overflow: auto; border-left: 1px solid var(--line); background: var(--panel); padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+    #phonecam { width: 100%; aspect-ratio: 4 / 3; background: #000; display: block; }
+    fieldset { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+    legend { color: var(--muted); font-size: 12px; }
+    button, select { font: inherit; padding: 3px 7px; }
+    kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; }
+    .keys { color: var(--muted); font-size: 12px; line-height: 1.6; }
+    #injectedBanner { background: var(--warn); color: #fff; padding: 4px 8px; font-weight: 600; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <b>Simulator</b><span>authored fake world — ground truth stays here</span>
+    <span id="status"></span><span id="notes"></span>
+  </header>
+  <main>
+    <canvas id="view" tabindex="0" aria-label="Third-person simulator view"></canvas>
+    <aside>
+      <div><small>Simulated phone camera (what Trident receives)</small><canvas id="phonecam"></canvas></div>
+      <div id="injectedBanner" hidden>INJECTED PERCEPTION (debug): sends rendered depth and boxes, not camera inference</div>
+      <fieldset><legend>Scene</legend>
+        <select id="scene"></select><button id="resetScene">Reset scene</button>
+      </fieldset>
+      <fieldset><legend>Phone</legend>
+        <button id="resetPhone">Hold ahead</button><button id="pointDown">Point down</button><button id="reach">Reach to target</button>
+      </fieldset>
+      <fieldset><legend>Faults and world events</legend>
+        <label><input type="checkbox" id="tracking" /> Tracking lost</label>
+        <label><input type="checkbox" id="disconnect" /> Disconnect</label>
+        <label>Delay <input type="range" id="delay" min="0" max="1500" step="50" value="0" /> <span id="delayVal">0 ms</span></label>
+        <button id="arReset">AR world reset</button>
+        <button id="moveTarget">Move target (unseen)</button>
+        <button id="dropAhead">Drop obstacle ahead</button>
+        <button id="dropGap">Drop obstacle in gap</button>
+      </fieldset>
+      <fieldset><legend>Perception source</legend>
+        <select id="perception"><option value="real">Real: RGB through Depth Anything + YOLO</option><option value="injected">Injected perception (debug)</option></select>
+      </fieldset>
+      <div class="keys">
+        Click the 3D view first, then:<br />
+        Body: <kbd>W</kbd><kbd>S</kbd> walk, <kbd>A</kbd><kbd>D</kbd> turn, <kbd>Q</kbd><kbd>E</kbd> sidestep<br />
+        Head only: <kbd>←</kbd><kbd>→</kbd> turn, <kbd>↑</kbd><kbd>↓</kbd> tilt<br />
+        Phone position: <kbd>I</kbd><kbd>K</kbd> fwd/back, <kbd>J</kbd><kbd>L</kbd> left/right, <kbd>U</kbd><kbd>O</kbd> up/down<br />
+        Phone rotation: <kbd>T</kbd><kbd>G</kbd> pitch, <kbd>F</kbd><kbd>H</kbd> yaw, <kbd>R</kbd><kbd>Y</kbd> roll<br />
+        Drag to orbit the view camera.
+      </div>
+    </aside>
+  </main>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

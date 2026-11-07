@@ -1,0 +1,39 @@
+name: Trident
+options:
+  bundleIdPrefix: ai.trident
+  deploymentTarget:
+    iOS: "18.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+targets:
+  Trident:
+    type: application
+    platform: iOS
+    sources: [Trident]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.trident.app
+        TARGETED_DEVICE_FAMILY: "1"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+    info:
+      path: Trident/Info.plist
+      properties:
+        CFBundleDisplayName: Trident
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIRequiredDeviceCapabilities: [arkit]
+        NSCameraUsageDescription: Trident uses the camera to map the room and find objects for you.
+        NSMicrophoneUsageDescription: Trident records your spoken request while you hold the Find object button.
+        NSMotionUsageDescription: Trident uses headphone motion to keep guidance sounds fixed in the room.
+        NSLocalNetworkUsageDescription: Trident sends camera frames to your Mac on the local network and receives guidance.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    entitlements:
+      path: Trident/Trident.entitlements
+      properties:
+        com.apple.developer.coremotion.head-pose: true

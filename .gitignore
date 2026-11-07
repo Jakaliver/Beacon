@@ -1,0 +1,15 @@
+.DS_Store
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+mac/models/
+mac/third_party/
+web/public/assets/
+ios/Trident/build/
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+.playwright-mcp/

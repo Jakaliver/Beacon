@@ -1,0 +1,322 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		103EEC9C2E5B1B70D4813886 /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B59A25BACFD98E15CDA2E09 /* Model.swift */; };
+		24FAD47C8E67BDED849F4BB9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8618FC10F163DFF865E31228 /* ContentView.swift */; };
+		8A999AB239C34C17EE0C15A4 /* AudioGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308C7C8FAF760F96A7D562BD /* AudioGuide.swift */; };
+		AF642317531D6E0CFEE9ADFD /* TridentApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D3606D4B91643D76C2EE34 /* TridentApp.swift */; };
+		D462A44B3408A13B8F314499 /* Speech.swift in Sources */ = {isa = PBXBuildFile; fileRef = 604702D284EFE94A88B04A53 /* Speech.swift */; };
+		E3B56C6C1E2E4B43F6F622D6 /* Connection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE6DDF5BCF93CDF29CCED18F /* Connection.swift */; };
+		FFFFB19290A045889C0A79C7 /* ARSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88593297C40A9B03AD0701FB /* ARSensor.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		00888A4EF1F1884442A5E887 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2B59A25BACFD98E15CDA2E09 /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
+		308C7C8FAF760F96A7D562BD /* AudioGuide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioGuide.swift; sourceTree = "<group>"; };
+		604702D284EFE94A88B04A53 /* Speech.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Speech.swift; sourceTree = "<group>"; };
+		8618FC10F163DFF865E31228 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		88593297C40A9B03AD0701FB /* ARSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARSensor.swift; sourceTree = "<group>"; };
+		95D86479D65557427FCBC62F /* Trident.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Trident.entitlements; sourceTree = "<group>"; };
+		C2D42317C13FA6629FCC997F /* Trident.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Trident.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E9D3606D4B91643D76C2EE34 /* TridentApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TridentApp.swift; sourceTree = "<group>"; };
+		EE6DDF5BCF93CDF29CCED18F /* Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connection.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		26E6D92631E3CE3CA201B562 = {
+			isa = PBXGroup;
+			children = (
+				8243A99044365329FE77F005 /* Trident */,
+				300FDC2BC26B512FBA6393E4 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		300FDC2BC26B512FBA6393E4 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C2D42317C13FA6629FCC997F /* Trident.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		8243A99044365329FE77F005 /* Trident */ = {
+			isa = PBXGroup;
+			children = (
+				88593297C40A9B03AD0701FB /* ARSensor.swift */,
+				308C7C8FAF760F96A7D562BD /* AudioGuide.swift */,
+				EE6DDF5BCF93CDF29CCED18F /* Connection.swift */,
+				8618FC10F163DFF865E31228 /* ContentView.swift */,
+				00888A4EF1F1884442A5E887 /* Info.plist */,
+				2B59A25BACFD98E15CDA2E09 /* Model.swift */,
+				604702D284EFE94A88B04A53 /* Speech.swift */,
+				95D86479D65557427FCBC62F /* Trident.entitlements */,
+				E9D3606D4B91643D76C2EE34 /* TridentApp.swift */,
+			);
+			path = Trident;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		6599E2CA25A5C26AFEE6193D /* Trident */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3671F856DAB8C776E01CFA20 /* Build configuration list for PBXNativeTarget "Trident" */;
+			buildPhases = (
+				2A8800A0F03001AEEECAEDC1 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Trident;
+			packageProductDependencies = (
+			);
+			productName = Trident;
+			productReference = C2D42317C13FA6629FCC997F /* Trident.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F612FF228587B7DD929DB1BF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					6599E2CA25A5C26AFEE6193D = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = C1CD4170B33314F4AF7EC3B3 /* Build configuration list for PBXProject "Trident" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 26E6D92631E3CE3CA201B562;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 300FDC2BC26B512FBA6393E4 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				6599E2CA25A5C26AFEE6193D /* Trident */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		2A8800A0F03001AEEECAEDC1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FFFFB19290A045889C0A79C7 /* ARSensor.swift in Sources */,
+				8A999AB239C34C17EE0C15A4 /* AudioGuide.swift in Sources */,
+				E3B56C6C1E2E4B43F6F622D6 /* Connection.swift in Sources */,
+				24FAD47C8E67BDED849F4BB9 /* ContentView.swift in Sources */,
+				103EEC9C2E5B1B70D4813886 /* Model.swift in Sources */,
+				D462A44B3408A13B8F314499 /* Speech.swift in Sources */,
+				AF642317531D6E0CFEE9ADFD /* TridentApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		49EE931B831070F11E926805 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		80E03785FD44362E2C95F37D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E49FD15BF9B717D22FC8C802 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Trident/Trident.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Trident/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.trident.app;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		FBF3642A5C9259AD9B77917B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Trident/Trident.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Trident/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.trident.app;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3671F856DAB8C776E01CFA20 /* Build configuration list for PBXNativeTarget "Trident" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FBF3642A5C9259AD9B77917B /* Debug */,
+				E49FD15BF9B717D22FC8C802 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C1CD4170B33314F4AF7EC3B3 /* Build configuration list for PBXProject "Trident" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				80E03785FD44362E2C95F37D /* Debug */,
+				49EE931B831070F11E926805 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = F612FF228587B7DD929DB1BF /* Project object */;
+}
