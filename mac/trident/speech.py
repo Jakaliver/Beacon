@@ -24,6 +24,10 @@ class Speech:
             return self.transcribe_pcm(pcm, w.getframerate())
 
     def transcribe_pcm(self, pcm: np.ndarray, rate: int) -> str:
+        # A quick press/release can send an empty or sub-word clip. Parakeet's
+        # spectral window cannot process these; let the phone ask for a request.
+        if len(pcm) < rate * 0.1:
+            return ""
         if rate != self.rate:
             n = int(len(pcm) * self.rate / rate)
             pcm = np.interp(np.linspace(0, len(pcm) - 1, n), np.arange(len(pcm)), pcm)
