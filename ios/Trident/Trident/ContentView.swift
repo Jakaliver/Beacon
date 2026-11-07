@@ -21,6 +21,8 @@ struct ContentView: View {
                             model.command("inspect", confirmation: "Inspecting")
                         }
                     }
+                    BigButton(title: "Test 3D sound", hint: "Plays a beep that travels ahead, right, behind and left of you.",
+                              color: .purple, height: 64) { model.testSound() }
                     BigButton(title: "Stop", hint: "Silences all guidance immediately.", color: .red, height: 160) {
                         model.stop()
                     }
@@ -115,6 +117,7 @@ private struct SettingsView: View {
     @AppStorage(Settings.hostKey) private var host = Settings.defaultHost
     @AppStorage(Settings.frameRateKey) private var frameRate = Settings.defaultFrameRate
     @AppStorage(Settings.reverseHeadTurnKey) private var reverseHeadTurn = false
+    @AppStorage(Settings.reverseHeadTiltKey) private var reverseHeadTilt = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -127,6 +130,8 @@ private struct SettingsView: View {
                 Stepper("Frame rate: \(Int(frameRate)) per second", value: $frameRate, in: 2...15)
                 Toggle("Reverse head turn", isOn: $reverseHeadTurn)
                     .accessibilityHint("Turn on if sounds move the wrong way when you turn your head")
+                Toggle("Reverse head tilt", isOn: $reverseHeadTilt)
+                    .accessibilityHint("Turn on if sounds move the wrong way when you look up or down")
             }
             .navigationTitle("Settings")
             .toolbar { Button("Done") { dismiss() } }

@@ -42,6 +42,7 @@ enum Settings {
     static let frameRateKey = "frameRate"
     static let defaultHost = "Malins-Macbook-Pro-3.local"
     static let reverseHeadTurnKey = "reverseHeadTurn"
+    static let reverseHeadTiltKey = "reverseHeadTilt"
     static let defaultFrameRate = 10.0
 
     static var host: String { UserDefaults.standard.string(forKey: hostKey) ?? defaultHost }
@@ -167,6 +168,11 @@ final class AppModel: ObservableObject {
     }
 
     func stop() { localStop("user") }
+
+    func testSound() {
+        speaker.say("Test. The beep goes ahead, right, behind, left, then ahead again.")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.5) { [weak self] in self?.audio.testAround() }
+    }
 
     func resume() {
         let blocker: String? =

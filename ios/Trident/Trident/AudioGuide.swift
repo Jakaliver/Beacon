@@ -39,10 +39,9 @@ final class AudioGuide {
         }
         engine.connect(environment, to: engine.mainMixerNode, format: nil)
 
-        let hq = AVAudio3DMixingRenderingAlgorithm.HRTFHQ
-        let algorithm = environment.applicableRenderingAlgorithms.contains(NSNumber(value: hq.rawValue)) ? hq : .auto
+        // .auto: Apple's highest-quality renderer for the current hardware (newer than HRTFHQ on AirPods).
         for player in [beacon, probe] {
-            player.renderingAlgorithm = algorithm
+            player.renderingAlgorithm = .auto
             player.sourceMode = .pointSource
             player.pointSourceInHeadMode = .bypass
             player.reverbBlend = 0.2
@@ -79,16 +78,41 @@ final class AudioGuide {
 
     /// Listener forward = calibrated world forward, turned by the head's yaw since calibration.
     private func applyHead() {
-        var yaw: Float = 0
+        var yaw: Float = 0, pitch: Float = 0
         if let head = latestHead?.copy() as? CMAttitude, let reference = headReference {
             head.multiply(byInverseOf: reference)
-            yaw = Float(head.yaw) * (UserDefaults.standard.bool(forKey: Settings.reverseHeadTurnKey) ? -1 : 1)
+            let defaults = UserDefaults.standard
+            yaw = Float(head.yaw) * (defaults.bool(forKey: Settings.reverseHeadTurnKey) ? -1 : 1)
+            pitch = Float(head.pitch) * (defaults.bool(forKey: Settings.reverseHeadTiltKey) ? -1 : 1)
         }
-        // Rotation about +Y: a positive yaw (turn left) swings forward towards −X.
+        // Turn: rotation about +Y; a positive yaw (turn left) swings forward towards −X.
         let c = cos(yaw), s = sin(yaw)
-        let f = SIMD3<Float>(baseForward.x * c + baseForward.z * s, 0, -baseForward.x * s + baseForward.z * c)
+        let flat = SIMD3<Float>(baseForward.x * c + baseForward.z * s, 0, -baseForward.x * s + baseForward.z * c)
+        // Tilt: a positive pitch (look up) lifts forward towards +Y and tips "up" backwards.
+        let worldUp = SIMD3<Float>(0, 1, 0)
+        let f = flat * cos(pitch) + worldUp * sin(pitch)
+        let u = worldUp * cos(pitch) - flat * sin(pitch)
         environment.listenerVectorOrientation = AVAudio3DVectorOrientation(
-            forward: AVAudio3DVector(x: f.x, y: 0, z: f.z), up: AVAudio3DVector(x: 0, y: 1, z: 0))
+            forward: AVAudio3DVector(x: f.x, y: f.y, z: f.z), up: AVAudio3DVector(x: u.x, y: u.y, z: u.z))
+    }
+
+    /// Beeps that travel around the listener, 1.5 m away: ahead, right, behind, left, ahead.
+    /// Relative to the calibrated "ahead", so it checks rendering and head tracking without the Mac.
+    func testAround() {
+        let l = environment.listenerPosition
+        let centre = SIMD3<Float>(l.x, l.y, l.z)
+        let right = SIMD3<Float>(-baseForward.z, 0, baseForward.x)
+        let stops: [SIMD3<Float>] = [baseForward, right, -baseForward, -right, baseForward]
+        for (i, direction) in stops.enumerated() {
+            for k in 0..<3 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 1.6 + Double(k) * 0.35) { [weak self] in
+                    guard let self else { return }
+                    let p = centre + direction * 1.5
+                    self.beacon.position = AVAudio3DPoint(x: p.x, y: p.y, z: p.z)
+                    self.play(self.pulseBuffer, on: self.beacon)
+                }
+            }
+        }
     }
 
     func restart() {
