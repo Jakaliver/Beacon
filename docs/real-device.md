@@ -145,7 +145,22 @@ microphone session and cannot change the phone's guidance state.
 | `vision_ready: false` / `speech_ready: false` | Wait for model loading and check the backend terminal. Re-run setup online if downloads did not finish. |
 | Connected, but no room points | Allow Camera/Local Network access, wait for normal tracking, scan the floor, and check `vision_ready`. |
 | Room stops changing | Check the camera age in the viewer and keep the iPhone app foregrounded. |
+| Speech works, but guidance is silent | Connect AirPods to the **iPhone**, check its audio output, then send a new **find** command or tap **Resume**. Check the displayed stop reason if guidance pauses. |
 | Sounds turn the wrong way with your head | Recalibrate while facing ahead; try the app's **Reverse head turn** setting. |
+
+For a playback check independent of camera detection, launch an installed **Debug** build
+with the following command, substituting your device identifier and bundle identifier:
+
+```sh
+xcrun devicectl device process launch --device YOUR_DEVICE_ID --terminate-existing \
+  --console YOUR_BUNDLE_ID -- --audio-self-test
+```
+
+After five seconds, it plays ten evenly spaced pulses. **Stop** cancels the sequence.
+The console reports the active audio route, playback failures and completed sounds;
+confirm that the pulses are actually audible through the selected output. Launch the app
+again without `--audio-self-test` for normal use. Without headphones, audio defaults to
+the phone's speaker.
 
 The browser build and backend self-checks can run without Xcode. A successful local
 Xcode build, signing, device permissions, ARKit capture and audio still need verification

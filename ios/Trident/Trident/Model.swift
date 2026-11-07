@@ -107,6 +107,9 @@ final class AppModel: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
+        audio.onDiagnostic = { [weak self] message in
+            self?.control.sendJSON(["type": "audio_diagnostic", "message": message])
+        }
         configureAudioSession()
         audio.start()
         observeAudioSession()
@@ -115,6 +118,7 @@ final class AppModel: ObservableObject {
         control.onOpen = { [weak self] in
             self?.controlUp = true
             self?.control.sendJSON(["type": "hello", "role": "iphone"])
+            self?.audio.reportStatus()
         }
         control.onClose = { [weak self] in self?.connectionLost(control: true) }
         control.onText = { [weak self] in self?.handle($0) }
@@ -129,9 +133,16 @@ final class AppModel: ObservableObject {
         ar.start(frameRate: Settings.frameRate)
         connect()
 
-        ticker = Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 0.02, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        ticker = timer
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--audio-self-test") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in self?.audio.runPlaybackCheck() }
+        }
+        #endif
     }
 
     func applySettings() {
@@ -182,6 +193,7 @@ final class AppModel: ObservableObject {
         }
         stopReason = nil
         resetProbe()
+        audio.restart()
         control.sendJSON(["type": "resume"])
         speaker.say("Resuming")
     }
@@ -193,6 +205,7 @@ final class AppModel: ObservableObject {
             // "ahead" for the audio becomes where the phone points now (no separate Calibrate needed).
             stopReason = nil
             resetProbe()
+            audio.start()
             _ = alignAudioForward()
         }
         control.sendJSON(["type": "command", "text": text])
@@ -262,7 +275,7 @@ final class AppModel: ObservableObject {
 
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetoothA2DP])
+        try? session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetoothA2DP, .defaultToSpeaker])
         try? session.setActive(true)
     }
 
@@ -270,8 +283,12 @@ final class AppModel: ObservableObject {
         let center = NotificationCenter.default
         center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] note in
             let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
-            guard raw.flatMap(AVAudioSession.RouteChangeReason.init) == .oldDeviceUnavailable else { return }
-            MainActor.assumeIsolated { self?.autoStop("audio") }
+            guard let reason = raw.flatMap(AVAudioSession.RouteChangeReason.init) else { return }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if reason == .oldDeviceUnavailable { self.autoStop("audio") }
+                if !self.interrupted { self.audio.restart() }
+            }
         }
         center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
             let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
@@ -286,9 +303,6 @@ final class AppModel: ObservableObject {
                     self.audio.restart()
                 }
             }
-        }
-        center.addObserver(forName: .AVAudioEngineConfigurationChange, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.audio.restart() }
         }
     }
 
