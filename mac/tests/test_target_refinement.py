@@ -53,6 +53,19 @@ class RefinementTests(unittest.TestCase):
             self.tracker.update([obs], self.depth, self.K, self.T, 10 + i * 0.2, False)
         self.assertLess(np.linalg.norm(self.track.position - obs.position), 0.02)
 
+    def test_a_moved_target_follows_when_the_old_place_is_out_of_view(self):
+        self.T[0, 3] = 3.0  # the camera now faces away from the old place
+        moved = observation([3.5, 0, -2], 1.3)
+        for i in range(8):
+            self.tracker.update([moved], self.depth, self.K, self.T, 10 + i * 0.25, False)
+        self.assertLess(np.linalg.norm(self.track.position - moved.position), 1e-6)
+        self.assertTrue(self.track.relocated)
+
+    def test_an_empty_old_place_at_arms_length_counts_as_a_miss(self):
+        self.T[2, 3] = -2.0  # 0.5 m from the target, which is no longer there
+        self.tracker.update([], self.depth, self.K, self.T, 10, False)
+        self.assertEqual(self.track.misses, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

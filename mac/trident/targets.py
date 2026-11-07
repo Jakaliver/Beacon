@@ -153,7 +153,8 @@ class Tracker:
             apparent_px = K[1] * float(max(t.extent)) / d
             # Only count a miss where the detector would reliably see an object of this size.
             # Very close objects are often cropped or blurred and missed by the detector.
-            detectable = 25 < apparent_px < 0.6 * min(w, h) and 0.7 < d < 5.0
+            # The size limit already rejects cropped close-ups, so arm's-length views count too.
+            detectable = 25 < apparent_px < 0.6 * min(w, h) and 0.35 < d < 5.0
             if detectable and 0.1 * w < u < 0.9 * w and 0.1 * h < v < 0.9 * h:
                 seen = depth[int(v), int(u)]
                 if seen > d - 0.3:  # the line of sight reaches the cached position
@@ -193,10 +194,12 @@ class Tracker:
 
     @staticmethod
     def _consider_relocation(t: Track, obs: Observation, now: float) -> None:
-        """Move a locked target only after its old place looked empty and several sightings agree elsewhere."""
+        """Move a locked target when sightings agree elsewhere and its old place looked empty,
+        or, with the old place out of view, when they keep agreeing for 1.5 s."""
         t.relocate = [o for o in t.relocate if now - o[0] < 3.0 and np.linalg.norm(o[1] - obs.position) < 0.2]
         t.relocate.append((now, obs.position))
-        if len(t.relocate) >= 3 and t.misses >= 2:
+        steady = len(t.relocate) >= 6 and now - t.relocate[0][0] >= 1.5
+        if len(t.relocate) >= 3 and (t.misses >= 2 or steady):
             t.position = np.mean([p for _, p in t.relocate], axis=0)
             t.surface = obs.surface + (t.position - obs.position)
             t.extent = obs.extent.copy()
