@@ -257,6 +257,8 @@ class Engine:
     def _handle(self, c: dict) -> None:
         cmd = c["cmd"]
         if cmd == "find":
+            for t in self.tracker.tracks.values():
+                t.locked = False
             self.want_label = canonical(c["label"])
             self.want_word = c["spoken"] or c["label"]
             self.selected = None
@@ -272,6 +274,8 @@ class Engine:
         elif cmd == "stop":
             self.stop("user", "Stopped.")
         elif cmd == "cancel":
+            for t in self.tracker.tracks.values():
+                t.locked = False
             self.mode, self.selected, self.want_label, self.stop_reason = "idle", None, None, None
             self.say("Cancelled.")
         elif cmd == "repeat":
@@ -321,13 +325,15 @@ class Engine:
 
     def start_guidance(self) -> None:
         t = self.tracker.tracks[self.selected]
+        t.locked = True
         self.mode = "walking" if self.navigation else "hotcold"
         self.stop_reason = None
         self.listener_anchor = None
         self.path, self.waypoint = [], None
         az, dist = self.relative(t.position)
         self.say(f"Found {self.spoken(t.label)}, about {dist:.1f} metres {describe_direction(az)}."
-                 + (" Follow the beacon." if self.navigation else " Faster pulses mean closer."))
+                 + " Its position is now fixed. Say find again to place it anew."
+                + (" Follow the beacon." if self.navigation else " Faster pulses mean closer."))
 
     def resume(self) -> None:
         if self.audio_yaw_offset is None:
@@ -411,7 +417,8 @@ class Engine:
             az, dist = self.relative(t.position)
             age = now - t.last_seen
             parts.append(f"{self.spoken(t.label).capitalize()} about {dist:.1f} metres {describe_direction(az)}, "
-                         f"last seen {age:.0f} seconds ago, uncertainty about {100 * t.sigma_at(now):.0f} centimetres.")
+                         + ("position fixed, not re-checked by the camera, " if t.locked else f"last seen {age:.0f} seconds ago, ")
+                         + f"uncertainty about {100 * t.sigma_at(now):.0f} centimetres.")
             if self.perception_mode == "injected":
                 parts.append("Warning: injected debug perception, not camera inference.")
         elif self.want_label:
@@ -490,7 +497,7 @@ class Engine:
             return
         if self.mode in ACTIVE and self.selected:
             t = self.tracker.tracks.get(self.selected)
-            if t is None or t.misses >= CONFIG.misses_to_lose:
+            if t is None or (not t.locked and t.misses >= CONFIG.misses_to_lose):
                 self.mode = "searching"
                 self.selected = None
                 self.cue("rescan")
@@ -603,7 +610,7 @@ class Engine:
         return {"id": t.id, "label": t.label, "position": t.position.round(3).tolist(),
                 "extent": t.extent.round(3).tolist(), "surface": t.surface.round(3).tolist(),
                 "sigma": round(t.sigma_at(now), 3), "age": round(now - t.last_seen, 2),
-                "valid": t.valid_at(now), "observed_now": t.observed_now, "injected": t.injected}
+                "valid": t.valid_at(now), "observed_now": t.observed_now, "locked": t.locked, "injected": t.injected}
 
     # Viewer snapshot -------------------------------------------------------
     def snapshot(self) -> dict:
