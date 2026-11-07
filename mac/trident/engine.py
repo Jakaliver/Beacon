@@ -14,7 +14,7 @@ import cv2
 import numpy as np
 
 from .config import CONFIG
-from .geometry import forward, pose_matrix, to_world, unproject, wrap, yaw_of
+from .geometry import forward, head_local, pose_matrix, to_world, unproject, wrap, yaw_of
 from .mapping import UNCERTAIN, GridMap
 from .planner import line_clear, plan, ring_cells, walkable_grid
 from .speech import parse_command
@@ -386,6 +386,16 @@ class Engine:
         head_world = quat_yaw(self.pose.head_q) + self.audio_yaw_offset
         return wrap(yaw_of(p - self.body_position()) - head_world)
 
+    def source_in_head(self, p: np.ndarray) -> list[float]:
+        """Where a sound at world point p sits relative to the listener's head, for HRTF preview."""
+        head = self.body_position() + np.array([0.0, CONFIG.head_above_phone, 0.0])
+        v = p - head
+        if self.pose.head_q is not None and self.audio_yaw_offset is not None:
+            local = head_local(v, self.pose.head_q, self.audio_yaw_offset)
+        else:  # no headphone orientation: assume the head faces where the phone points
+            local = head_local(v, [0.0, 0.0, 0.0, 1.0], yaw_of(forward(self.pose.T)))
+        return local.round(3).tolist()
+
     def inspect(self) -> str:
         parts = [f"Mode {self.mode}" + (f", stopped because {self.stop_reason.replace('_', ' ')}" if self.stop_reason else "") + "."]
         t = self.tracker.tracks.get(self.selected) if self.selected else None
@@ -520,6 +530,7 @@ class Engine:
         elif self.confirm and d > 1.3 * threshold:
             self.confirm = False
         return {"distance": round(d, 3), "pulse_interval": round(self.smoothed_interval, 3),
+                "source_head": self.source_in_head(target.position),
                 "confirm": self.confirm, "threshold": round(threshold, 3),
                 "azimuth_head": self.head_azimuth(target.position)}
 
@@ -577,7 +588,7 @@ class Engine:
             self.outbox.append({"type": "say", "text": instr})
         return {"position": wp3.round(3).tolist(), "distance": round(dist, 2),
                 "azimuth_phone": round(az, 3), "azimuth_head": self.head_azimuth(wp3),
-                "instruction": instr,
+                "instruction": instr, "source_head": self.source_in_head(wp3),
                 "pulse_interval": round(0.25 + 0.95 * abs(az) / math.pi, 3)}
 
     @staticmethod

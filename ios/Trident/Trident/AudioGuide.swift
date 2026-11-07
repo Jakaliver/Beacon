@@ -78,13 +78,20 @@ final class AudioGuide {
         play(beaconBuffer, on: beacon)
     }
 
-    func pulse() { playCentred(pulseBuffer) }
-    func confirm() { playCentred(confirmBuffer) }
+    /// Hot/cold pulses come from the estimated target position, so the user hears where it is.
+    /// Without a position they fall back to the listener (centred).
+    func pulse(at position: SIMD3<Float>?) { playAt(position, pulseBuffer) }
+    func confirm(at position: SIMD3<Float>?) { playAt(position, confirmBuffer) }
+
+    private func playAt(_ position: SIMD3<Float>?, _ buffer: AVAudioPCMBuffer) {
+        guard let p = position else { return playCentred(buffer) }
+        probe.position = AVAudio3DPoint(x: p.x, y: p.y, z: p.z)
+        play(buffer, on: probe)
+    }
 
     func cue(_ name: String) {
         switch name {
         case "stop": silence(); playCentred(stopBuffer)
-        case "confirm": playCentred(confirmBuffer)
         case "rescan": playCentred(rescanBuffer)
         default: break
         }

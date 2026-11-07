@@ -52,7 +52,33 @@ def wrap(a: float) -> float:
     return float((a + np.pi) % (2 * np.pi) - np.pi)
 
 
+def quat_matrix(q: list[float]) -> np.ndarray:
+    x, y, z, w = q
+    return np.array([
+        [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+        [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+        [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+    ])
+
+
+def head_local(v_world: np.ndarray, head_q: list[float], yaw_offset: float) -> np.ndarray:
+    """World vector → head frame (+x right, +y up, -z forward).
+
+    head_q is in the headphones' own reference; yaw_offset (heading sense, from calibration)
+    aligns that reference with the world.
+    """
+    c, s = np.cos(-yaw_offset), np.sin(-yaw_offset)
+    align = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+    return (align @ quat_matrix(head_q)).T @ v_world
+
+
 if __name__ == "__main__":
+    # Head turned 90° right (yaw about -Y by -90°): a source straight ahead in the world is on the left.
+    q = [0.0, np.sin(-np.pi / 4), 0.0, np.cos(-np.pi / 4)]
+    assert np.allclose(head_local(np.array([0, 0, -1.0]), q, 0.0), [-1, 0, 0], atol=1e-9)
+    # With a +90° offset the headphone reference faces world +X, so a source at +X is straight ahead.
+    assert np.allclose(head_local(np.array([1.0, 0, 0]), [0, 0, 0, 1.0], np.pi / 2), [0, 0, -1], atol=1e-9)
+
     # A camera 1.5 m up, looking straight down -Z: pixel at the centre with depth 2 maps to (0, 1.5, -2).
     T = np.eye(4)
     T[1, 3] = 1.5

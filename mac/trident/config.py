@@ -32,6 +32,7 @@ class Config:
     body_radius: float = 0.22
     clearance_margin: float = 0.08
     hand_body_uncertainty: float = 0.08
+    head_above_phone: float = 0.35  # approximate; real AirPods give no head position
     hand_forward_offset: float = 0.3  # phone held this far ahead of the torso while walking
     depth_uncertainty: float = 0.05
     latency_margin: float = 0.03

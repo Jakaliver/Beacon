@@ -5,6 +5,7 @@ import simd
 struct Guidance: Decodable {
     struct Target: Decodable {
         let valid: Bool
+        let position: [Float]?
         let surface: [[Float]]?
     }
     struct Proximity: Decodable {
@@ -346,13 +347,14 @@ final class AppModel: ObservableObject {
             confirming = g.proximity?.confirm ?? false
         }
 
+        let source = g.target?.position.flatMap { $0.count == 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
         if confirming {
             if !wasConfirming || now.timeIntervalSince(lastPulse) >= 0.8 {
-                audio.confirm()
+                audio.confirm(at: source)
                 lastPulse = now
             }
         } else if let interval, now.timeIntervalSince(lastPulse) >= interval {
-            audio.pulse()
+            audio.pulse(at: source)
             lastPulse = now
         }
         wasConfirming = confirming

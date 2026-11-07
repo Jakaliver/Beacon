@@ -19,8 +19,8 @@ type Recon = {
 type Guidance = {
   mode: string; stop_reason: string | null; perception: string;
   target: { id: string; sigma: number; age: number; valid: boolean; observed_now: boolean } | null;
-  proximity: { distance: number; pulse_interval: number; confirm: boolean; threshold: number } | null;
-  waypoint: { distance: number; azimuth_head: number | null; azimuth_phone: number; instruction: string; pulse_interval: number } | null;
+  proximity: { distance: number; pulse_interval: number; confirm: boolean; threshold: number; source_head: [number, number, number] } | null;
+  waypoint: { distance: number; instruction: string; pulse_interval: number; source_head: [number, number, number] } | null;
   navigation: boolean;
 };
 
@@ -166,8 +166,8 @@ function onGuidance(m: Guidance) {
   $("prox").textContent = p ? `phone → target surface ${p.distance.toFixed(2)} m (confirm < ${p.threshold.toFixed(2)} m)${p.confirm ? " ✔ CLOSE" : ""}`
     : w ? `waypoint ${w.distance.toFixed(1)} m · ${w.instruction}` : "–";
   $("target").textContent = m.target ? `${m.target.id} ±${Math.round(m.target.sigma * 100)} cm · seen ${m.target.age.toFixed(1)} s ago${m.target.observed_now ? "" : " (cached, not verified now)"}` : "–";
-  if ((m.mode === "probe" || m.mode === "hotcold") && p) audio.setProbe(p.distance);
-  else if (m.mode === "walking" && w) audio.setWaypoint(w.pulse_interval, w.azimuth_head ?? w.azimuth_phone);
+  if ((m.mode === "probe" || m.mode === "hotcold") && p) audio.setProbe(p.distance, p.source_head);
+  else if (m.mode === "walking" && w) audio.setWaypoint(w.pulse_interval, w.source_head);
   else audio.silence();
 }
 
@@ -210,6 +210,7 @@ for (const [id, msg] of [["stop", { type: "stop", reason: "user" }], ["resume", 
 $("stop").addEventListener("click", () => audio.silence());
 $("findBottle").onclick = () => send({ type: "command", text: "find the bottle" });
 $<HTMLInputElement>("nav").onchange = (e) => send({ type: "config", navigation: (e.target as HTMLInputElement).checked });
+$<HTMLInputElement>("spatial").onchange = (e) => { audio.settings.spatial = (e.target as HTMLInputElement).checked; };
 for (const key of ["volume", "near", "far"] as const) {
   const input = $<HTMLInputElement>(key);
   input.oninput = () => { audio.settings[key] = +input.value; $(`${key}Val`).textContent = input.value; };
