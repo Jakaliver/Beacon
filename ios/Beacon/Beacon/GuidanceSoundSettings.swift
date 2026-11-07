@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct GuidanceSoundSettings: View {
-    @AppStorage(Settings.guidanceSoundStyleKey) private var soundStyle = GuidanceSoundStyle.chest.rawValue
+    @AppStorage(Settings.guidanceSoundStyleKey) private var soundStyle = GuidanceSoundStyle.beeps.rawValue
 
     var body: some View {
         Section {

@@ -52,6 +52,7 @@ targets:
       - Beacon/Settings.swift
       - Beacon/GuidanceSoundSettings.swift
       - Beacon/AudioGuide.swift
+      - Beacon/Torch.swift
       - Beacon/chest_loop.wav
     settings:
       base:

@@ -1,4 +1,4 @@
-"""Local vision models: Depth Anything V2 metric (Hypersim, ViT-S) and YOLO11n-seg."""
+"""Local vision models: Depth Anything V2 metric (Hypersim, ViT-S) and open-vocabulary YOLOE-11s-seg."""
 import sys
 from dataclasses import dataclass
 
@@ -6,10 +6,25 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from .config import CONFIG, DA2_DIR, DEPTH_CHECKPOINT, YOLO_CHECKPOINT
+from .config import CONFIG, DA2_DIR, DEPTH_CHECKPOINT, DETECTOR_CHECKPOINT
 
 sys.path.insert(0, str(DA2_DIR / "metric_depth"))
 from depth_anything_v2.dpt import DepthAnythingV2  # noqa: E402
+
+# Household targets COCO lacks, as detector prompt -> target label. Several wordings can name
+# one target: on test photos "wall switch" and "switch plate" found switches that "light switch" missed.
+EXTRA_PROMPTS = {
+    "door": "door", "door handle": "door handle",
+    "light switch": "light switch", "wall switch": "light switch", "switch plate": "light switch",
+    "power outlet": "power outlet", "window": "window", "stairs": "stairs",
+    "keys": "keys", "wallet": "wallet", "glasses": "glasses", "headphones": "headphones",
+    "shoe": "shoe", "trash can": "trash can",
+}
+
+
+def prompts() -> list[str]:
+    from ultralytics.utils import ROOT, YAML
+    return [*YAML.load(ROOT / "cfg/datasets/coco.yaml")["names"].values(), *EXTRA_PROMPTS]
 
 
 @dataclass
@@ -30,9 +45,11 @@ class Perception:
         self.dtype = torch.float16 if self.device == "mps" else torch.float32
         self.depth_model = model.to(self.device, self.dtype).eval()
 
-        from ultralytics import YOLO
-        self.yolo = YOLO(str(YOLO_CHECKPOINT))
-        self.labels: dict[int, str] = self.yolo.names
+        from ultralytics import YOLOE
+        self.yolo = YOLOE(str(DETECTOR_CHECKPOINT)) if DETECTOR_CHECKPOINT.exists() else None
+        if self.yolo is None or list(self.yolo.names.values()) != prompts():
+            raise RuntimeError("Detector vocabulary is missing or changed: run `uv run python -m beacon.setup_models`.")
+        self.labels: dict[int, str] = {i: EXTRA_PROMPTS.get(p, p) for i, p in self.yolo.names.items()}
 
     @torch.inference_mode()
     def depth(self, bgr: np.ndarray) -> np.ndarray:
@@ -43,8 +60,8 @@ class Perception:
 
     def detect(self, bgr: np.ndarray) -> list[Detection]:
         # 960 px and a low threshold: real flasks scored 0.2-0.5 at best (about 2 ms extra on MPS).
-        result = self.yolo.predict(bgr, imgsz=960, device=self.device, retina_masks=True,
-                                   conf=0.15, verbose=False)[0]
+        result = self.yolo.predict(bgr, imgsz=960, device=self.device, retina_masks=True, conf=0.15,
+                                   verbose=False, quantize="fp16" if self.device == "mps" else None)[0]
         if result.masks is None:
             return []
         masks = result.masks.data.cpu().numpy() > 0.5

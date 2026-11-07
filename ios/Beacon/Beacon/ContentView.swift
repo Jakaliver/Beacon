@@ -9,7 +9,7 @@ struct ContentView: View {
         self.voice = model.voice
     }
     @State private var showSettings = false
-    @AppStorage(Settings.guidanceSoundStyleKey) private var soundStyle = GuidanceSoundStyle.chest.rawValue
+    @AppStorage(Settings.guidanceSoundStyleKey) private var soundStyle = GuidanceSoundStyle.beeps.rawValue
 
     private var connected: Bool { model.controlUp && model.sensorUp }
     private var guiding: Bool { ["walking", "probe", "hotcold"].contains(model.mode) && model.stopReason == nil }
