@@ -139,8 +139,12 @@ final class VoiceLabModel: ObservableObject {
             state = .guiding
             refreshGuidanceSound()
             voice.say("Okay, the \(selectedSide) one. It's about one and a half metres away. Say found it when you're done.")
+        case .lootMode(let enabled):
+            Settings.guidanceSoundStyle = enabled ? .chest : .beeps
+            refreshGuidanceSound()
+            voice.say(enabled ? "Loot mode on." : "Loot mode off. Back to beeps.")
         case .help:
-            voice.say(helpReply)
+            voice.say(helpReply + " Say loot mode on for chest sounds, or loot mode off for beeps.")
         case .status, .inspect:
             voice.say(summary)
         case .repeatLast:
