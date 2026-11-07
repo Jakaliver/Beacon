@@ -631,5 +631,9 @@ class Engine:
                             for t in self.tracker.tracks.values() if t.valid_at(now) or t.id == self.selected],
                 "path": [p.round(3).tolist() for p in self.path] if self.mode == "walking" else [],
                 "waypoint": self.waypoint.round(3).tolist() if self.waypoint is not None and self.mode == "walking" else None,
-                "stats": dict(self.stats),
+                "stats": {**self.stats,
+                          "sensor_connected": self.sensor_connected,
+                          "observation_age_ms": round(1000 * (now - self.last_frame_processed))
+                          if self.last_frame_processed else None,
+                          "pose_age_ms": round(1000 * (now - self.pose.received)) if self.pose else None},
             }

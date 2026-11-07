@@ -3,67 +3,47 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Trident Reconstruction</title>
-  <style>
-    :root { color-scheme: light dark; --bg: #f4f5f7; --fg: #1d2330; --muted: #5b6475; --panel: #fff; --line: #d6dae2; --warn: #b3261e; }
-    @media (prefers-color-scheme: dark) { :root { --bg: #14161b; --fg: #e7e9ee; --muted: #9aa3b5; --panel: #1d2027; --line: #323743; } }
-    * { box-sizing: border-box; }
-    body { margin: 0; font: 13px/1.4 system-ui, sans-serif; background: var(--bg); color: var(--fg); display: grid; grid-template-rows: auto auto 1fr; height: 100vh; }
-    header { padding: 6px 10px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
-    header b { font-size: 15px; }
-    #stats { color: var(--muted); font: 11px ui-monospace, monospace; padding: 2px 10px; }
-    main { display: grid; grid-template-columns: 1fr 300px; min-height: 0; }
-    #bev { width: 100%; height: 100%; display: block; }
-    aside { overflow: auto; border-left: 1px solid var(--line); background: var(--panel); padding: 8px; display: flex; flex-direction: column; gap: 8px; }
-    fieldset { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
-    legend { color: var(--muted); font-size: 12px; }
-    button, input { font: inherit; padding: 3px 7px; }
-    #stop { background: #c62828; color: #fff; border: 0; font-weight: 700; padding: 8px 14px; border-radius: 6px; }
-    #ptt { padding: 8px 12px; }
-    #mode { font-weight: 700; }
-    #mode[data-mode="stopped"] { color: var(--warn); }
-    #injected { background: var(--warn); color: #fff; padding: 4px 8px; font-weight: 600; }
-    #log { margin: 0; padding-left: 16px; color: var(--muted); max-height: 220px; overflow: auto; }
-    .legend span { display: inline-block; width: 10px; height: 10px; margin: 0 3px 0 8px; vertical-align: middle; }
-    small { color: var(--muted); }
-  </style>
+  <meta name="theme-color" content="#0c1117" />
+  <meta name="description" content="A live spatial view of your room, reconstructed from Trident camera observations." />
+  <title>Trident · Live room</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23101820'/%3E%3Cpath d='M16 27V5M7 8v7q0 6 9 6t9-6V8M12 9l4-4 4 4' fill='none' stroke='%23e8edf1' stroke-width='2'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <header>
-    <b>Reconstruction</b><span>only what Trident estimated from sensor inputs</span>
-    <span>Mode: <span id="mode">–</span></span>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Trident live room"><svg width="24" height="28" viewBox="0 0 24 28" fill="none" aria-hidden="true"><path d="M12 26V2M3 5v7c0 4 4 5 9 5s9-1 9-5V5M8 6l4-4 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>TRIDENT<span class="brand-divider"></span><span class="brand-sub">SPATIAL VIEW</span></a>
+    <div class="connection" id="connection" data-state="waiting"><span class="status-dot"></span><span id="connectionText" role="status">Connecting</span></div>
+    <a id="labLink" class="lab-link" href="/?lab=1" target="_top">Simulator lab <span aria-hidden="true">↗</span></a>
   </header>
-  <div><div id="injected" hidden>INJECTED PERCEPTION (debug) — these results are not camera inference</div><div id="stats">waiting for backend…</div></div>
+  <div id="injected" class="notice" hidden>INJECTED PERCEPTION · Debug depth and detections, not camera inference</div>
+  <div id="previewBanner" class="notice preview-notice" hidden><span>SAMPLE ROOM · Illustrative scan, not live camera data</span><a id="exitPreview" href="./">Connect live camera ↗</a></div>
   <main>
-    <canvas id="bev" aria-label="Reconstructed bird's-eye view"></canvas>
+    <section class="room" aria-label="Room reconstruction">
+      <div class="view-heading"><div class="eyebrow">RECONSTRUCTION / <span id="epoch">01</span></div><h1>Your room.<br /><span>In perspective.</span></h1><p id="sceneCaption">Camera observations, mapped in space.</p></div>
+      <div class="view-controls" role="group" aria-label="View controls">
+        <button id="view3d" aria-pressed="true" title="Oblique top-down 3D view">◇ <span>3D view</span></button>
+        <button id="viewPlan" aria-pressed="false" title="Directly overhead floor plan">⊞ <span>Top down</span></button>
+        <span class="control-divider"></span><button id="fitRoom" title="Fit all observed geometry in view">⛶ <span>Fit room</span></button>
+      </div>
+      <canvas id="roomCanvas" tabindex="0" aria-label="Interactive 3D room scan. Drag to orbit, right-drag to pan, scroll or pinch to zoom."></canvas>
+      <div id="targetLabel" class="target-label" hidden><span class="target-cross">＋</span><span id="targetLabelText">TARGET</span></div>
+      <div id="emptyState" class="empty-state"><div class="empty-icon" aria-hidden="true">⌖</div><h2>Ready to see your space</h2><p>Connect your iPhone or start the simulator.<br />Your room appears as the camera looks around.</p><button id="previewRoom">Explore a sample room <span aria-hidden="true">↗</span></button><small>Preview the view without a camera</small></div>
+      <div id="renderError" class="empty-state" hidden><h2>3D view unavailable</h2><p>Enable hardware acceleration or use a browser with WebGL 2 support.</p></div>
+      <div class="scene-bottom"><div class="legend"><span><i class="scan-key"></i>Room scan</span><span><i class="target-key"></i>Selected target</span><span><i class="phone-key"></i>Camera</span></div><div class="scale"><span id="scaleBar"></span><small>1 m</small></div></div>
+      <div class="interaction-hint">DRAG TO ORBIT <span>·</span> SCROLL TO ZOOM <span>·</span> RIGHT-DRAG TO PAN</div>
+    </section>
     <aside>
-      <fieldset><legend>Audio (Mac preview)</legend>
-        <button id="enableAudio">Enable audio</button>
-        <button id="testEars">Test left / right</button> <b id="earsVal" aria-live="polite"></b>
-        <label><input type="checkbox" id="spatial" checked /> Spatial (HRTF): sound comes from the estimated object</label>
-        <label>Volume <input id="volume" type="range" min="0" max="1" step="0.05" value="0.6" /> <span id="volumeVal">0.6</span></label>
-        <label>Near (m) <input id="near" type="range" min="0.05" max="0.6" step="0.05" value="0.15" /> <span id="nearVal">0.15</span></label>
-        <label>Far (m) <input id="far" type="range" min="1" max="6" step="0.5" value="3" /> <span id="farVal">3</span></label>
-        <small>Use headphones, and turn off macOS "Spatialize Stereo" / head tracking for them. Turn your simulated head with the arrow keys. This is a Web Audio preview; it does not verify Apple spatial audio or AirPods head tracking.</small>
-      </fieldset>
-      <fieldset><legend>Commands</legend>
-        <form id="cmdForm"><input id="cmd" placeholder="find the bottle" aria-label="Typed command" /></form>
-        <button id="findBottle">Find bottle</button>
-        <button id="ptt">Hold to talk</button>
-        <button id="stop">STOP</button><button id="resume">Resume</button>
-        <button id="calibrate">Calibrate</button><button id="repeat">Repeat</button><button id="inspect">Inspect</button><button id="cancel">Cancel</button>
-        <label><input type="checkbox" id="nav" /> Route guidance (milestone 2)</label>
-        <div id="choices"></div>
-      </fieldset>
-      <fieldset><legend>Guidance</legend>
-        <div>Target: <span id="target">–</span></div>
-        <div>Proximity: <span id="prox">–</span></div>
-      </fieldset>
-      <div class="legend"><span style="background:#cfe8cf"></span>free<span style="background:#c0392b"></span>occupied<span style="background:#f2b8b0"></span>inflated<span style="background:#ece3c8"></span>seen, no floor<span style="background:#3a3f4a"></span>unknown</div>
-      <small>Green: phone and camera direction. Purple ring: approximate body/listener. Yellow: selected target with uncertainty radius. Blue: planned path and waypoint. Scroll to zoom.</small>
-      <ul id="log"></ul>
+      <section class="panel scan-panel"><div class="section-heading"><h2>Room overview</h2><span class="tiny-label" id="sourceLabel">CAMERA FEED</span></div><div class="metrics"><div><strong id="pointCount">—</strong><span>scan points</span></div><div><strong id="mappedArea">—</strong><span>m² observed</span></div></div><div class="scan-status"><span id="scanStatus">Waiting for sensor</span><span id="frameAge">—</span></div></section>
+      <section class="panel target-panel"><div class="section-heading"><h2><i class="target-key"></i> Selected target</h2><span class="tiny-label" id="targetState">SEARCHING</span></div><div class="target-title"><h3 id="targetName">No target yet</h3><span class="target-symbol" aria-hidden="true">⌖</span></div><p id="targetMeta">Choose an object to locate in your room.</p><div class="target-measures"><div><strong id="targetDistance">—</strong><span>metres from camera</span></div><div><strong id="targetUncertainty">—</strong><span>position uncertainty</span></div></div><div class="target-actions"><button id="findBottle">Find bottle <span aria-hidden="true">↗</span></button><button id="focusTarget" title="Centre the selected target in view">Locate</button></div></section>
+      <section class="panel"><div class="section-heading"><h2>View layers</h2><span class="tiny-label">DISPLAY</span></div><label class="switch-row"><span>Scan points</span><input id="layerPoints" type="checkbox" role="switch" checked /></label><label class="switch-row"><span>Observed floor</span><input id="layerFloor" type="checkbox" role="switch" checked /></label><label class="switch-row"><span>Planned route</span><input id="layerRoute" type="checkbox" role="switch" checked /></label><label class="switch-row"><span>Follow camera</span><input id="followCamera" type="checkbox" role="switch" /></label></section>
+      <section class="panel guidance-panel"><div class="section-heading"><h2>Guidance</h2><span id="mode" class="mode">Standby</span></div><p id="prox">Waiting for guidance.</p><small id="target">No target selected</small><div class="safety-actions"><button id="stop">■ Stop</button><button id="resume">Resume</button></div></section>
+      <details class="panel"><summary>Camera commands <span>＋</span></summary><div class="detail-body"><form id="cmdForm"><label class="sr-only" for="cmd">Typed command</label><input id="cmd" placeholder="Find the bottle…" /><button type="submit" aria-label="Send command">↵</button></form><button id="ptt">Hold to talk</button><div class="button-row"><button id="calibrate">Calibrate</button><button id="repeat">Repeat</button><button id="inspect">Inspect</button><button id="cancel">Cancel</button></div><label class="check-label"><input type="checkbox" id="nav" /> Route guidance</label><div id="choices"></div></div></details>
+      <details class="panel"><summary>Audio preview <span>＋</span></summary><div class="detail-body"><div class="button-row"><button id="enableAudio">Enable audio</button><button id="testEars">Test left / right</button></div><b id="earsVal" aria-live="polite"></b><label class="check-label"><input type="checkbox" id="spatial" checked /> Spatial audio (HRTF)</label><label class="range-label">Volume <input id="volume" type="range" min="0" max="1" step="0.05" value="0.6" /><span id="volumeVal">0.6</span></label><label class="range-label">Near (m) <input id="near" type="range" min="0.05" max="0.6" step="0.05" value="0.15" /><span id="nearVal">0.15</span></label><label class="range-label">Far (m) <input id="far" type="range" min="1" max="6" step="0.5" value="3" /><span id="farVal">3</span></label><small>Use headphones with macOS Spatialize Stereo off. This previews guidance audio; it does not verify AirPods head tracking.</small></div></details>
+      <details class="panel diagnostics"><summary>Session details <span>＋</span></summary><div class="detail-body"><p id="stats">Waiting for backend…</p><ul id="log" aria-live="polite"></ul></div></details>
+      <div class="aside-foot"><span class="foot-mark">⌁</span><span>Built from what your camera sees.<br />Geometry and distances are estimates.</span></div>
     </aside>
   </main>
+  <footer><span><span class="footer-dot"></span> LOCAL SPATIAL ENGINE</span><span id="renderInfo">3D RECONSTRUCTION</span><span class="footer-note">TRIDENT / ROOM VIEW</span></footer>
   <script type="module" src="./main.ts"></script>
 </body>
 </html>

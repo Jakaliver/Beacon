@@ -46,6 +46,16 @@
 
 ## Not built
 
-- No orbitable 3D point-cloud view (optional in the brief).
 - No Bonjour discovery: the phone needs the Mac host name or IP address.
 - No automated test suite: each module has a small `python -m trident.<module>` self-check.
+
+## Room viewer
+
+- The grey LiDAR appearance visualises estimated monocular depth; it does not add a
+  LiDAR sensor or recover unseen surfaces. The live cloud contains the backend's most
+  recent 6,000 points; the rolling occupancy grid can retain a larger observed footprint.
+- Red points are observations inside the selected target's estimated bounding box,
+  not a separate per-point segmentation result. The floor ring shows position uncertainty.
+- The optional sample room is illustrative, clearly labelled, and never sent to the backend.
+- WebGL 2 is required. The display marks stale observations and unverified targets;
+  the guidance engine remains responsible for navigation and stop decisions.

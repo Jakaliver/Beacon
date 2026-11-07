@@ -24,9 +24,26 @@ scripts/setup.sh   # once, needs internet: Python deps, model weights, 3D assets
 scripts/dev.sh     # backend on :8787, simulator + reconstruction on :5173
 ```
 
-Open <http://localhost:5173>. The left pane is the **Simulator** (fake world). The right
-pane is the **Reconstruction** (only what Trident estimated). Click **Enable audio**, then
-follow [docs/demo-guide.md](docs/demo-guide.md).
+Open <http://localhost:5173> for the **Live room**: an overhead 3D reconstruction with
+grey scan points, a red selected target, camera position and optional route overlay.
+Drag to orbit, right-drag to pan, and scroll/pinch to zoom. **Top down** switches to an
+orthographic floor plan; **Fit room**, **Locate**, and **Follow camera** control framing.
+The layer switches control scan points, observed floor and route independently.
+
+**Simulator lab** opens <http://localhost:5173/?lab=1>, with the fake-world simulator
+on the left and reconstruction on the right. Open **Audio preview → Enable audio**, then
+follow [docs/demo-guide.md](docs/demo-guide.md). The simulator is also available directly
+at <http://localhost:5173/simulator/>.
+
+To preview the graphics without the backend or model downloads:
+
+```sh
+cd web && npm ci && npm run dev
+```
+
+Open <http://localhost:5173/reconstruction-viewer/?preview=1>. This is explicitly labelled
+sample data and disables guidance commands. Live mode never substitutes sample geometry
+for missing camera data; disconnected or stale scans are marked as cached.
 
 Requirements: Apple-silicon Mac, Python 3.11 and [uv](https://docs.astral.sh/uv/), Node 20+,
 Xcode 16+ with XcodeGen for the iPhone app.
@@ -36,7 +53,7 @@ Xcode 16+ with XcodeGen for the iPhone app.
 ```
 mac/trident/            FastAPI backend: perception, mapping, targets, planner, guidance engine, speech
 web/simulator/          Three.js fake world, simulated phone/head/body, sensor adapter
-web/reconstruction-viewer/  bird's-eye view + virtual phone client (commands, push-to-talk, Web Audio)
+web/reconstruction-viewer/  live 3D room view + virtual phone client (commands, push-to-talk, Web Audio)
 ios/Trident/            SwiftUI/ARKit/AVAudioEngine app (XcodeGen project.yml + generated .xcodeproj)
 shared/PROTOCOL.md      sensor, control, guidance and viewer message contracts
 scripts/                setup.sh, dev.sh
@@ -58,6 +75,9 @@ Simulator (rendered RGB) ─┘                                       → Depth 
 
 The simulator and the reconstruction viewer are separate pages and separate data flows.
 The viewer imports nothing from the simulator and only receives backend output.
+Its point cloud uses a reusable GPU buffer (up to 20,000 points), a single textured floor
+plane and simple target outlines. Rendering is capped at 30 fps, skips unchanged frames
+and hidden tabs, and uses no shadows, postprocessing, external fonts or model assets.
 
 ## Configuration
 

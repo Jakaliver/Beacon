@@ -17,9 +17,15 @@
   <iframe id="sim" title="Simulator" allow="autoplay"></iframe>
   <iframe id="recon" title="Reconstruction" allow="autoplay; microphone"></iframe>
   <script>
+    // The room view is the primary experience. Keep the two-pane sensor lab opt-in.
+    if (new URLSearchParams(location.search).get("lab") !== "1") {
+      location.replace("/reconstruction-viewer/" + location.search);
+    }
     // Pass ?backend=<port> through, to run a second Trident backend side by side.
-    document.getElementById("sim").src = "/simulator/" + location.search;
-    document.getElementById("recon").src = "/reconstruction-viewer/" + location.search;
+    else {
+      document.getElementById("sim").src = "/simulator/" + location.search;
+      document.getElementById("recon").src = "/reconstruction-viewer/" + location.search;
+    }
   </script>
 </body>
 </html>

@@ -178,3 +178,10 @@ saw it.
 
 Grid cell values: `0` unknown, `1` observed free, `2` occupied, `3` inflated
 (blocked for walking), `4` floor seen but uncertain.
+
+Viewer `stats` also includes `sensor_connected` (boolean), `observation_age_ms`
+(elapsed time since the last processed frame, or null) and `pose_age_ms`
+(elapsed time since the last received pose, or null). These ages are recomputed
+for every snapshot, even when the sensor stops sending. `frame_age_ms` remains
+the capture-to-processing latency measured for the last frame. The room viewer
+uses the elapsed ages plus time since receipt to distinguish live and cached data.

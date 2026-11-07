@@ -1,8 +1,9 @@
 # Demo guide (virtual)
 
-Start with `scripts/dev.sh` and open <http://localhost:5173>. Wait until the reconstruction
-header shows `vision … fps` (the models load in a few seconds). Click **Enable audio** in the
-Reconstruction pane: guidance stops with reason `audio` while audio is off.
+Start with `scripts/dev.sh` and open <http://localhost:5173/?lab=1> (or choose **Simulator
+lab** from the room view). Wait until **Session details** shows `vision … fps` (the models
+load in a few seconds). Open **Audio preview → Enable audio** in the Reconstruction pane:
+guidance stops with reason `audio` while audio is off.
 
 Simulator keys work after you click the 3D view:
 
@@ -48,7 +49,7 @@ Things to check:
 
 Check **Route guidance**. In walking mode Trident says "turn left / turn right / continue".
 A low triangle beacon (stereo-panned towards the waypoint, relative to the head) differs from
-the high probe blips. The bird's-eye view shows the computed path (blue) and the waypoint.
+the high probe blips. The room view shows the computed path (pale blue) and the waypoint.
 
 - **M2: target behind a table**: the route bends around the table. At the approach point
   Trident switches to Probe mode.

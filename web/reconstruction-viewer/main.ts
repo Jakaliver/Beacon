@@ -1,22 +1,144 @@
-// Reconstruction viewer + virtual Trident client. It receives ONLY backend output messages
-// (/ws/viewer, /ws/control) and imports nothing from the simulator.
+// Receives backend reconstruction only; never imports simulator state.
 import { HotCold } from "./audio";
+import { RoomView } from "./room-view";
+import type { Recon } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const host = location.hostname;
-const port = new URLSearchParams(location.search).get("backend") ?? "8787";
-const API = `http://${host}:${port}`;
+const params = new URLSearchParams(location.search);
+const port = params.get("backend") ?? "8787";
+const endpoint = new URL(location.href);
+endpoint.port = port;
+const API = endpoint.origin;
+const socketURL = (path: string) => `${location.protocol === "https:" ? "wss:" : "ws:"}//${endpoint.host}${path}`;
+let preview = params.get("preview") === "1";
+let recon: Recon | null = null;
+let room: RoomView | null = null;
+let lastSnapshot = 0;
+let viewerConnected = false;
+let viewer: WebSocket | null = null;
+let viewerRetry = 0;
+let controlRetry = 0;
+let previewTimer = 0;
+let destroyed = false;
+let pointCount = 0;
+const liveParams = new URLSearchParams(params);
+liveParams.delete("preview"); liveParams.delete("lab");
+$("exitPreview").setAttribute("href", `./?${liveParams}`);
+document.querySelector<HTMLAnchorElement>(".brand")!.href = `./?${liveParams}`;
+const labParams = new URLSearchParams(liveParams);
+labParams.set("lab", "1");
+$("labLink").setAttribute("href", `/?${labParams}`);
 
-type Recon = {
-  epoch: number; perception: string; mode: string; stop_reason: string | null; navigation: boolean;
-  grid: { origin: [number, number]; res: number; w: number; h: number; cells: string };
-  floor_y: number | null; points: string;
-  phone: { position: number[] | null; forward: number[] | null; tracking: string | null };
-  listener: number[] | null;
-  targets: { id: string; label: string; position: number[]; extent: number[]; sigma: number; age: number; valid: boolean; selected: boolean; injected: boolean }[];
-  path: number[][]; waypoint: number[] | null;
-  stats: Record<string, number | boolean | null>;
-};
+try {
+  room = new RoomView($("roomCanvas"), $("targetLabel"), $("scaleBar"));
+  room.onInteract = () => { $<HTMLInputElement>("followCamera").checked = false; };
+} catch (error) {
+  $("renderError").hidden = false;
+  $("emptyState").hidden = true;
+  $("renderInfo").textContent = "WEBGL UNAVAILABLE";
+  console.error("Room renderer unavailable", error);
+}
+
+function setView(view: "3d" | "plan") {
+  room?.setView(view);
+  $("view3d").setAttribute("aria-pressed", String(view === "3d"));
+  $("viewPlan").setAttribute("aria-pressed", String(view === "plan"));
+}
+$("view3d").onclick = () => setView("3d");
+$("viewPlan").onclick = () => setView("plan");
+$("fitRoom").onclick = () => { room?.setFollow(false); $<HTMLInputElement>("followCamera").checked = false; room?.fit(); };
+$("focusTarget").onclick = () => room?.focusTarget();
+for (const [id, layer] of [["layerPoints", "points"], ["layerFloor", "floor"], ["layerRoute", "route"]] as const) {
+  $<HTMLInputElement>(id).onchange = e => room?.setLayer(layer, (e.target as HTMLInputElement).checked);
+}
+$<HTMLInputElement>("followCamera").onchange = e => room?.setFollow((e.target as HTMLInputElement).checked);
+
+function displaySnapshot(snapshot: Recon) {
+  recon = snapshot;
+  lastSnapshot = performance.now();
+  const metric = room?.update(snapshot);
+  pointCount = metric?.points ?? 0;
+  $("pointCount").textContent = pointCount.toLocaleString();
+  $("mappedArea").textContent = metric ? metric.area.toFixed(1) : "—";
+  $("epoch").textContent = String(snapshot.epoch).padStart(2, "0");
+  $("emptyState").hidden = !room || pointCount > 0;
+  $("injected").hidden = snapshot.perception !== "injected";
+  $("sourceLabel").textContent = preview ? "SAMPLE DATA" : snapshot.perception === "injected" ? "INJECTED DATA" : "CAMERA FEED";
+  $("sceneCaption").textContent = preview ? "An illustrative room, ready to explore." : "Camera observations, mapped in space.";
+  $("renderInfo").textContent = room ? `${pointCount.toLocaleString()} OBSERVATIONS / WORLD SPACE` : "WEBGL UNAVAILABLE";
+  const s = snapshot.stats;
+  $("stats").textContent = preview ? "Illustrative reconstruction. No sensor connected; guidance controls are disabled." :
+    `vision ${Number(s.vision_fps).toFixed(1)} fps · depth ${Number(s.depth_ms).toFixed(0)} ms · detect ${Number(s.detect_ms).toFixed(0)} ms`
+    + ` · pose ${Number(s.pose_hz).toFixed(0)} Hz · dropped ${s.dropped_frames}`
+    + ` · RSS ${s.rss_mb ?? "—"} / ${s.budget_mb ?? "—"} MB · MPS ${s.mps_mb ?? "—"} MB${s.over_budget ? " · OVER BUDGET" : ""}`;
+  const t = snapshot.targets.find(t => t.selected);
+  $("targetName").textContent = t?.label ?? "No target yet";
+  $("targetMeta").textContent = t ? `${t.id} · ${t.injected ? "injected estimate" : preview ? "sample object" : "camera estimate"}` : "Choose an object to locate in your room.";
+  $("targetUncertainty").textContent = t ? `±${Math.round(t.sigma * 100)} cm` : "—";
+  const p = snapshot.phone.position;
+  $("targetDistance").textContent = t && p ? Math.hypot(...t.position.map((v, i) => v - p[i])).toFixed(2) : "—";
+  $<HTMLButtonElement>("focusTarget").disabled = !t;
+  updateFreshness();
+}
+
+function updateFreshness() {
+  const elapsed = lastSnapshot ? performance.now() - lastSnapshot : Infinity;
+  const age = recon?.stats.observation_age_ms;
+  const frameAge = typeof age === "number" ? age + Number(recon?.stats.frame_age_ms ?? 0) + elapsed : Infinity;
+  const poseAge = recon?.stats.pose_age_ms;
+  const live = viewerConnected && elapsed < 1500 && frameAge < 2500
+    && typeof poseAge === "number" && poseAge + elapsed < 1000
+    && recon?.stats.sensor_connected === true && recon.phone.tracking === "normal";
+  const state = preview ? "preview" : live ? "live" : recon ? "stale" : "waiting";
+  $("connection").dataset.state = state;
+  $("connectionText").textContent = preview ? "Sample preview" : live ? "Live reconstruction" : !viewerConnected ? "Reconnecting" : !recon?.phone.position ? "Awaiting camera" : "Scan paused";
+  $("scanStatus").textContent = preview ? "Illustrative room scan" : live ? "Receiving observations" : !viewerConnected ? "Backend disconnected" : recon?.phone.tracking && recon.phone.tracking !== "normal" ? "Camera tracking limited" : "Waiting for fresh frames";
+  $("frameAge").textContent = preview ? "PREVIEW" : Number.isFinite(frameAge) ? `${(frameAge / 1000).toFixed(1)}s ago` : "—";
+  const t = recon?.targets.find(t => t.selected);
+  const stale = !preview && (!live || !!t && t.age + elapsed / 1000 > 1.5);
+  $("targetState").textContent = !t ? "SEARCHING" : preview ? "SAMPLE" : !t.valid ? "UNVERIFIED" : stale ? "CACHED" : "TRACKED";
+  $("targetLabelText").textContent = t ? `${t.label.toUpperCase()} / ${!t.valid ? "UNVERIFIED" : stale ? "CACHED" : preview ? "SAMPLE" : "TARGET"}` : "";
+  if (t) $("targetMeta").textContent = `${t.id} · ${preview ? "sample object" : `${t.injected ? "injected · " : ""}seen ${(t.age + elapsed / 1000).toFixed(1)}s ago`}`;
+}
+
+function connectViewer() {
+  if (preview || destroyed) return;
+  const ws = new WebSocket(socketURL("/ws/viewer"));
+  viewer = ws;
+  ws.onopen = () => { viewerConnected = true; updateFreshness(); };
+  ws.onmessage = e => {
+    try {
+      const snapshot = JSON.parse(e.data) as Recon;
+      if (snapshot.grid && snapshot.phone && Array.isArray(snapshot.targets) && typeof snapshot.points === "string") displaySnapshot(snapshot);
+    } catch (error) { console.warn("Skipped invalid reconstruction snapshot", error); }
+  };
+  ws.onclose = () => {
+    viewerConnected = false; updateFreshness();
+    if (!preview && !destroyed) viewerRetry = window.setTimeout(connectViewer, 1000);
+  };
+}
+
+async function startPreview() {
+  if (previewTimer) return;
+  preview = true;
+  viewer?.close(); control?.close();
+  clearTimeout(viewerRetry); clearTimeout(controlRetry);
+  audio.silence();
+  $("previewBanner").hidden = false;
+  $("emptyState").hidden = true;
+  $("mode").textContent = "Preview";
+  $("prox").textContent = "Connect a camera to enable live guidance.";
+  document.querySelectorAll<HTMLInputElement | HTMLButtonElement>(".guidance-panel button, .detail-body button, .detail-body input, #findBottle").forEach(el => { el.disabled = true; });
+  const url = new URL(location.href); url.searchParams.set("preview", "1"); history.replaceState(null, "", url);
+  const { sampleRoom } = await import("./sample-room");
+  if (destroyed) return;
+  const started = performance.now();
+  displaySnapshot(sampleRoom(0));
+  previewTimer = window.setInterval(() => { if (!document.hidden) displaySnapshot(sampleRoom((performance.now() - started) / 1000)); }, 200);
+}
+$("previewRoom").onclick = () => { void startPreview(); };
+
+// Virtual phone client: commands, speech, guidance audio.
 type Guidance = {
   mode: string; stop_reason: string | null; perception: string;
   target: { id: string; sigma: number; age: number; valid: boolean; observed_now: boolean } | null;
@@ -24,114 +146,12 @@ type Guidance = {
   waypoint: { distance: number; instruction: string; pulse_interval: number; source_head: [number, number, number] } | null;
   navigation: boolean;
 };
-
-// Bird's-eye view ---------------------------------------------------------------
-const canvas = $<HTMLCanvasElement>("bev");
-const g = canvas.getContext("2d")!;
-let recon: Recon | null = null;
-let scale = 70; // pixels per metre
-canvas.addEventListener("wheel", (e) => { scale = Math.min(250, Math.max(20, scale * (e.deltaY < 0 ? 1.1 : 0.9))); e.preventDefault(); });
-
-const CELL_COLORS: Record<number, string> = { 1: "#cfe8cf", 2: "#c0392b", 3: "#f2b8b0", 4: "#ece3c8" };
-
-function decode(b64: string) { return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)); }
-
-function draw() {
-  const dpr = devicePixelRatio;
-  const W = canvas.clientWidth, H = canvas.clientHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  g.fillStyle = "#3a3f4a";
-  g.fillRect(0, 0, W, H);
-  if (!recon) { requestAnimationFrame(draw); return; }
-  const centre = recon.phone.position ?? [0, 0, 0];
-  // World X → right, world −Z → up (top-down orthographic).
-  const sx = (x: number) => W / 2 + (x - centre[0]) * scale;
-  const sy = (z: number) => H / 2 + (z - centre[2]) * scale;
-
-  const { origin, res, w, h } = recon.grid;
-  const cells = decode(recon.grid.cells);
-  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
-    const v = cells[r * w + c];
-    if (!v) continue;
-    g.fillStyle = CELL_COLORS[v];
-    g.fillRect(sx(origin[0] + c * res), sy(origin[1] + r * res), res * scale + 0.5, res * scale + 0.5);
-  }
-  g.strokeStyle = "#555b66"; g.lineWidth = 1;
-  g.strokeRect(sx(origin[0]), sy(origin[1]), w * res * scale, h * res * scale);
-
-  const pts = new Float32Array(decode(recon.points).buffer);
-  const floor = recon.floor_y ?? 0;
-  for (let i = 0; i < pts.length; i += 3) {
-    const rel = pts[i + 1] - floor;
-    g.fillStyle = rel < 0.06 ? "rgba(255,255,255,0.25)" : `hsl(${Math.max(0, 50 - rel * 40)},90%,60%)`;
-    g.fillRect(sx(pts[i]) - 1, sy(pts[i + 2]) - 1, 2, 2);
-  }
-
-  if (recon.path.length > 1) {
-    g.strokeStyle = "#4fc3f7"; g.lineWidth = 3; g.beginPath();
-    recon.path.forEach(([x, z], i) => (i ? g.lineTo(sx(x), sy(z)) : g.moveTo(sx(x), sy(z))));
-    g.stroke();
-  }
-  if (recon.waypoint) {
-    const [x, z] = recon.waypoint;
-    g.fillStyle = "#4fc3f7";
-    g.beginPath(); g.moveTo(sx(x), sy(z) - 8); g.lineTo(sx(x) + 8, sy(z)); g.lineTo(sx(x), sy(z) + 8); g.lineTo(sx(x) - 8, sy(z)); g.fill();
-  }
-
-  for (const t of recon.targets) {
-    const [x, , z] = t.position;
-    g.strokeStyle = t.selected ? "#ffeb3b" : t.valid ? "#ffffff" : "#888";
-    g.setLineDash(t.valid ? [] : [4, 4]);
-    g.lineWidth = t.selected ? 3 : 1.5;
-    g.beginPath(); g.arc(sx(x), sy(z), Math.max(4, t.sigma * scale), 0, Math.PI * 2); g.stroke();
-    g.setLineDash([]);
-    g.fillStyle = g.strokeStyle;
-    g.beginPath(); g.arc(sx(x), sy(z), 3, 0, Math.PI * 2); g.fill();
-    g.font = "12px system-ui";
-    g.fillText(`${t.id} ±${Math.round(t.sigma * 100)}cm ${t.age.toFixed(0)}s${t.injected ? " [INJECTED]" : ""}`, sx(x) + 8, sy(z) - 6);
-  }
-
-  if (recon.listener) {
-    const [x, , z] = recon.listener;
-    g.strokeStyle = "#ce93d8"; g.lineWidth = 2;
-    g.beginPath(); g.arc(sx(x), sy(z), 0.22 * scale, 0, Math.PI * 2); g.stroke();
-  }
-  if (recon.phone.position && recon.phone.forward) {
-    const [x, , z] = recon.phone.position;
-    const [fx, , fz] = recon.phone.forward;
-    const n = Math.hypot(fx, fz) || 1;
-    const ok = recon.phone.tracking === "normal";
-    g.strokeStyle = g.fillStyle = ok ? "#00e676" : "#ff5252";
-    g.lineWidth = 2;
-    g.beginPath(); g.moveTo(sx(x), sy(z)); g.lineTo(sx(x + fx / n * 0.8), sy(z + fz / n * 0.8)); g.stroke();
-    g.beginPath(); g.arc(sx(x), sy(z), 5, 0, Math.PI * 2); g.fill();
-  }
-  requestAnimationFrame(draw);
-}
-requestAnimationFrame(draw);
-
-function connectViewer() {
-  const ws = new WebSocket(`ws://${host}:${port}/ws/viewer`);
-  ws.onmessage = (e) => {
-    recon = JSON.parse(e.data);
-    const s = recon!.stats;
-    $("stats").textContent = `vision ${Number(s.vision_fps).toFixed(1)} fps · depth ${Number(s.depth_ms).toFixed(0)} ms · detect ${Number(s.detect_ms).toFixed(0)} ms`
-      + ` · frame age ${s.frame_age_ms ?? "–"} ms · pose ${Number(s.pose_hz).toFixed(0)} Hz · dropped ${s.dropped_frames}`
-      + ` · RSS ${s.rss_mb} MB / budget ${s.budget_mb} MB · MPS ${s.mps_mb} MB${s.over_budget ? " · OVER BUDGET" : ""}`;
-    $("injected").hidden = recon!.perception !== "injected";
-  };
-  ws.onclose = () => setTimeout(connectViewer, 1000);
-}
-connectViewer();
-
-// Virtual phone client: commands, speech, guidance audio ---------------------------
 const audio = new HotCold();
 let control: WebSocket | null = null;
 let lastGuidance = 0;
 let guidance: Guidance | null = null;
 
-function send(m: object) { if (control?.readyState === WebSocket.OPEN) control.send(JSON.stringify(m)); }
+function send(m: object) { if (!preview && control?.readyState === WebSocket.OPEN) control.send(JSON.stringify(m)); }
 function log(text: string) {
   const li = document.createElement("li");
   li.textContent = text;
@@ -145,7 +165,8 @@ function speak(text: string) {
 }
 
 function connectControl() {
-  const ws = new WebSocket(`ws://${host}:${port}/ws/control`);
+  if (preview || destroyed) return;
+  const ws = new WebSocket(socketURL("/ws/control"));
   ws.onopen = () => { send({ type: "hello", role: "sim-app" }); reportAudio(); };
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
@@ -154,10 +175,9 @@ function connectControl() {
     else if (m.type === "cue") audio.cue(m.name);
     else if (m.type === "choices") showChoices(m.options);
   };
-  ws.onclose = () => { control = null; setTimeout(connectControl, 1000); };
+  ws.onclose = () => { control = null; audio.silence(); if (!preview && !destroyed) controlRetry = window.setTimeout(connectControl, 1000); };
   control = ws;
 }
-connectControl();
 
 function onGuidance(m: Guidance) {
   $("mode").textContent = m.mode + (m.stop_reason ? ` (${m.stop_reason})` : "");
@@ -173,8 +193,9 @@ function onGuidance(m: Guidance) {
 }
 
 // Client-side freshness: stale guidance silences audio even if the backend is unreachable.
-setInterval(() => {
-  if (guidance && performance.now() - lastGuidance > 1000) {
+const freshnessTimer = window.setInterval(() => {
+  updateFreshness();
+  if (!preview && guidance && performance.now() - lastGuidance > 1000) {
     audio.silence();
     $("mode").textContent = "no fresh guidance — silent";
   }
@@ -256,3 +277,15 @@ function wav16(pcm: Float32Array): Blob {
   pcm.forEach((v, i) => b.setInt16(44 + i * 2, Math.max(-1, Math.min(1, v)) * 0x7fff, true));
   return new Blob([b.buffer], { type: "audio/wav" });
 }
+
+if (preview) void startPreview();
+else { connectViewer(); connectControl(); }
+
+function dispose() {
+  destroyed = true;
+  clearInterval(freshnessTimer); clearInterval(previewTimer);
+  clearTimeout(viewerRetry); clearTimeout(controlRetry);
+  viewer?.close(); control?.close(); audio.silence(); room?.dispose();
+}
+addEventListener("pagehide", event => { if (!event.persisted) dispose(); });
+import.meta.hot?.dispose(dispose);

@@ -13,3 +13,5 @@ xcuserdata/
 DerivedData/
 
 .playwright-mcp/
+.playwright-cli/
+output/playwright/
