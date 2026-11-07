@@ -86,11 +86,13 @@ final class AudioGuide {
         // while a warmer resonant body gives the source a small physical presence.
         let tap = Self.tap(hz: 620, seconds: 0.14)
         register("pulse", tap)
-        register("confirm", tap + Self.silence(0.05) + tap)
+        // Reached: a rising pair, low then an octave higher.
+        register("confirm", tap + Self.silence(0.05) + Self.tap(hz: 1240, seconds: 0.14))
         // Probe-mode torch: low when the phone points away, middle when close, high when on the object.
-        register("torch-off", Self.tap(hz: 392, seconds: 0.12))
-        register("torch-near", Self.tap(hz: 587, seconds: 0.12))
-        register("torch-on", Self.tap(hz: 880, seconds: 0.10))
+        // Its lowest note is the normal pulse's pitch, so every torch beep sounds at or above it.
+        register("torch-off", Self.tap(hz: 620, seconds: 0.12))
+        register("torch-near", Self.tap(hz: 930, seconds: 0.12))
+        register("torch-on", Self.tap(hz: 1395, seconds: 0.10))
         register("beacon", Self.tap(hz: 430, seconds: 0.20))
         register("stop", Self.tone([(660, 0.1), (440, 0.18)], harmonic: 0.2))
         register("rescan", Self.tone([(700, 0.06), (0, 0.05), (700, 0.06)], harmonic: 0.2))
