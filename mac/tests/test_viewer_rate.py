@@ -2,7 +2,7 @@
 import unittest
 from unittest.mock import patch
 
-from trident import server
+from beacon import server
 
 
 class PointCloudRateTests(unittest.TestCase):

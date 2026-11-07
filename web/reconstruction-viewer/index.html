@@ -4,14 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1b1b1b" />
-  <meta name="description" content="Your live room scan from Trident on iPhone." />
-  <title>Trident · Room view</title>
+  <meta name="description" content="Your live room scan from Beacon on iPhone." />
+  <title>Beacon · Room view</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%231b1b1b'/%3E%3Cpath d='M16 26V6M8 8v7q0 5 8 5t8-5V8' fill='none' stroke='%23dedede' stroke-width='2'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <header class="toolbar">
-    <div class="brand"><strong>Trident</strong><span aria-hidden="true">/</span><h1>Room</h1></div>
+    <div class="brand"><strong>Beacon</strong><span aria-hidden="true">/</span><h1>Room</h1></div>
     <nav aria-label="View controls">
       <div class="view-switch"><button id="view3d" aria-pressed="true" title="Slow orbit from 30° above horizontal">3D</button><button id="viewPlan" aria-pressed="false">Overhead</button><button id="viewFirst" aria-pressed="false" title="See the scan from the iPhone camera position" disabled>First person</button></div>
       <button id="viewColour" aria-pressed="false" title="Use the camera image colours">Colour</button>
@@ -21,7 +21,7 @@
   <main aria-label="Room reconstruction">
     <canvas id="roomCanvas" tabindex="0" aria-label="Interactive room scan. Drag to orbit, right-drag to pan, scroll to zoom. Use Overhead for a floor plan."></canvas>
     <div id="injected" class="notice" hidden>Debug observations · not live camera inference</div>
-    <div id="emptyState" class="empty-state"><h2>No scan yet</h2><p id="emptyHint">Open Trident on your iPhone and scan the room.</p></div>
+    <div id="emptyState" class="empty-state"><h2>No scan yet</h2><p id="emptyHint">Open Beacon on your iPhone and scan the room.</p></div>
     <div id="renderError" class="empty-state" hidden><h2>3D view unavailable</h2><p>Enable hardware acceleration or use a browser with WebGL 2 support.</p></div>
     <div id="phoneLabel" class="phone-label" hidden>iPhone</div>
     <div id="targetLabel" class="target-label" hidden><span id="targetLabelText"></span></div>

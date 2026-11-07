@@ -1,7 +1,7 @@
 [project]
-name = "trident"
+name = "beacon"
 version = "0.1.0"
-description = "Trident Mac backend: perception, reconstruction, target tracking, guidance"
+description = "Beacon Mac backend: perception, reconstruction, target tracking, guidance"
 requires-python = ">=3.11,<3.12"
 dependencies = [
   "fastapi==0.162.2",
@@ -23,4 +23,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["trident"]
+packages = ["beacon"]

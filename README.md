@@ -1,11 +1,13 @@
-# Trident
+# Beacon
 
-Trident uses an iPhone camera and local Mac models to locate objects and provide spatial
+Beacon uses an iPhone camera and local Mac models to locate objects and provide spatial
 audio guidance. The iPhone runs the app, captures ARKit poses and camera frames, accepts
 commands and plays guidance through headphones. The Mac runs depth estimation, object
-recognition, hold-to-talk speech recognition, mapping and target tracking locally.
-Hands-free voice mode recognizes commands on the iPhone. Say "find the bottle",
-"calibrate", "pause", "resume", "start over" or "found it" while the app is open.
+recognition, button-request speech recognition, mapping and target tracking locally.
+Hands-free recognition runs on the iPhone while the app is open. Say **"Beacon, find
+the bottle"**, **"Beacon, calibrate"**, **"Beacon, pause"** or **"Beacon, resume"**.
+Microphone and Speech Recognition permissions are requested on first use; hands-free
+listening can be turned off in Settings.
 Found objects play a continuous spatial chest sound by default; choose **Chest** or
 **Beeps** in Settings. See the [voice and audio test guide](docs/voice-audio-testing.md)
 for installation, expected behavior and checks on a real iPhone.
@@ -21,12 +23,13 @@ scripts/setup.sh   # once: Python dependencies, model weights, warm-up and web d
 scripts/dev.sh     # backend on :8787, room view on :5173
 ```
 
-Open <http://localhost:5173>. Keep Trident open on an iPhone connected to the same Wi-Fi.
+Open <http://localhost:5173>. Keep Beacon open on an iPhone connected to the same Wi-Fi.
 See [iPhone setup](docs/real-device.md) for signing, installation and connection settings.
 
-On the iPhone, tap **Calibrate**, then **Hold to navigate**: say what to find and release.
+On the iPhone, tap **Calibrate**, then **Talk to Beacon**: speak, then pause to send.
+Or just say **"Beacon"** followed by your request. No button hold is needed.
 **Stop** appears during active requests or guidance. Connection settings live behind the gear.
-You can also assign **Trident → Push to Talk** to the iPhone's Action button in Settings.
+You can also assign **Beacon → Talk to Beacon** to the iPhone's Action button in Settings.
 Press to start, speak, then pause to send; press again to send early.
 Use the iPhone app to find an object. Its selected target appears automatically in the room
 view. **3D** slowly circles the scan at 30° above horizontal, completing a turn in 90
@@ -50,9 +53,9 @@ This is estimated monocular depth, not hardware LiDAR or a complete model of uns
 ## Layout
 
 ```
-mac/trident/               local perception, mapping, targets, guidance, speech and server
+mac/beacon/               local perception, mapping, targets, guidance, speech and server
 web/reconstruction-viewer/ read-only Three.js room visualization
-ios/Trident/               SwiftUI, ARKit and PHASE spatial audio app
+ios/Beacon/               SwiftUI, ARKit and PHASE spatial audio app
 shared/PROTOCOL.md         sensor, control and reconstruction message contracts
 scripts/                   setup.sh and dev.sh
 docs/                      phone setup, demo guide, model licences and limitations
@@ -72,14 +75,14 @@ height; camera geometry can still display while floor detection settles.
 
 ## Configuration and checks
 
-- `TRIDENT_PARAKEET`: speech model, default `mlx-community/parakeet-tdt-0.6b-v3`.
-- `TRIDENT_MEMORY_BUDGET_MB`: memory budget reported by `/api/health`, default `16384`.
-- `TRIDENT_VIEWER_HZ`: room view updates per second, default `5`. The point cloud is only resent
+- `BEACON_PARAKEET`: speech model, default `mlx-community/parakeet-tdt-0.6b-v3`.
+- `BEACON_MEMORY_BUDGET_MB`: memory budget reported by `/api/health`, default `16384`.
+- `BEACON_VIEWER_HZ`: room view updates per second, default `5`. The point cloud is only resent
   when it changes, and at most 5 times a second, so a fast Mac can use `30`. Put per-machine values in `mac/local.env`
-  (not in Git), for example `TRIDENT_VIEWER_HZ=30`; `scripts/dev.sh` loads it.
+  (not in Git), for example `BEACON_VIEWER_HZ=30`; `scripts/dev.sh` loads it.
 - The iPhone's camera frame rate is in the app's Settings (2–30 per second, default 20).
-- `TRIDENT_DEBUG_DIR`: optional local image, point-cloud and observation logs.
-- Mapping and guidance settings: `mac/trident/config.py`.
+- `BEACON_DEBUG_DIR`: optional local image, point-cloud and observation logs.
+- Mapping and guidance settings: `mac/beacon/config.py`.
 - Requirements: Apple-silicon Mac, Python 3.11, uv, Node and Xcode supporting your iPhone.
 
 ```sh
@@ -88,5 +91,5 @@ npm test
 npm run build
 ```
 
-Backend checks: `cd mac && for m in geometry mapping targets planner; do uv run python -m trident.$m; done`.
+Backend checks: `cd mac && for m in geometry mapping targets planner; do uv run python -m beacon.$m; done`.
 See [limitations](docs/limitations.md) for the practical limits of estimated depth and guidance.

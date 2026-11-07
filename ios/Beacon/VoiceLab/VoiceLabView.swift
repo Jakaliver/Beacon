@@ -55,7 +55,7 @@ struct VoiceLabView: View {
                 }
                 .padding(20)
             }
-            .navigationTitle("Trident Voice Lab")
+            .navigationTitle("Beacon Voice Lab")
             .toolbar {
                 Button { showSettings = true } label: { Image(systemName: "gearshape") }
                     .accessibilityLabel("Settings")

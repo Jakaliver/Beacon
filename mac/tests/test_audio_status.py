@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from fastapi import WebSocketDisconnect
-from trident import server
+from beacon import server
 
 
 class AudioStatusTests(unittest.TestCase):

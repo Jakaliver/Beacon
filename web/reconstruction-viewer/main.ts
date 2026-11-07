@@ -49,7 +49,7 @@ $("fitRoom").onclick = () => room?.setAutoFit(true);
 $("focusTarget").onclick = () => room?.focusTarget();
 let colourEnabled = $("viewColour").getAttribute("aria-pressed") === "true";
 try {
-  const saved = localStorage.getItem("trident.viewer.colour");
+  const saved = localStorage.getItem("beacon.viewer.colour") ?? localStorage.getItem("trident.viewer.colour");
   if (saved !== null) colourEnabled = saved === "true";
 } catch { /* Private browsing may disable storage. */ }
 $("viewColour").setAttribute("aria-pressed", String(colourEnabled));
@@ -58,7 +58,7 @@ $("viewColour").onclick = () => {
   const enabled = $("viewColour").getAttribute("aria-pressed") !== "true";
   $("viewColour").setAttribute("aria-pressed", String(enabled));
   room?.setColourMode(enabled);
-  try { localStorage.setItem("trident.viewer.colour", String(enabled)); } catch { /* Optional preference. */ }
+  try { localStorage.setItem("beacon.viewer.colour", String(enabled)); } catch { /* Optional preference. */ }
 };
 
 function displaySnapshot(snapshot: Recon) {
@@ -102,10 +102,10 @@ function updateFreshness() {
     ? frameAge < 60_000 ? `${(frameAge / 1000).toFixed(1)}s ago` : `${Math.floor(frameAge / 60_000)}m ago`
     : "";
   $("emptyHint").textContent = !connected
-    ? "Start the Mac backend, then open Trident on your iPhone."
+    ? "Start the Mac backend, then open Beacon on your iPhone."
     : recon?.phone.tracking && recon.phone.tracking !== "normal"
     ? "Move the iPhone slowly while camera tracking settles."
-    : "Open Trident on your iPhone and scan the room.";
+    : "Open Beacon on your iPhone and scan the room.";
   const target = recon?.targets.find(t => t.selected);
   if (target) {
     const stale = !live || target.age + elapsed / 1000 > 1.5;

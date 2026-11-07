@@ -18,9 +18,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import CONFIG
 from .engine import DEBUG_DIR, Engine
 
-log = logging.getLogger("trident")
-# Event log: what the user sent and what Trident answered. Goes to the server's stderr.
-events = logging.getLogger("trident.events")
+log = logging.getLogger("beacon")
+# Event log: what the user sent and what Beacon answered. Goes to the server's stderr.
+events = logging.getLogger("beacon.events")
 _handler = logging.StreamHandler()
 _handler.setFormatter(logging.Formatter("%(asctime)s %(message)s", "%H:%M:%S"))
 events.addHandler(_handler)
@@ -161,7 +161,7 @@ async def lifespan(_: FastAPI):
         t.cancel()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(title="Beacon", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 

@@ -74,12 +74,12 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
 
     var automaticVoiceExplanation: String {
         guard let voice = installedVoices.first else {
-            return "No English voice is available to Trident on this iPhone."
+            return "No English voice is available to Beacon on this iPhone."
         }
         if Self.metadata(for: voice).identifiesSiri {
-            return "Automatic uses \(voice.name), a Siri voice available to Trident."
+            return "Automatic uses \(voice.name), a Siri voice available to Beacon."
         }
-        return "Siri’s voice isn’t available to Trident on this iPhone. Automatic uses \(voice.name), the best installed English voice available to the app."
+        return "Siri’s voice isn’t available to Beacon on this iPhone. Automatic uses \(voice.name), the best installed English voice available to the app."
     }
 
     private var resolvedVoice: AVSpeechSynthesisVoice? {
@@ -125,7 +125,7 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
         }
         if voiceDiagnostics {
             for voice in installedVoices {
-                print("[TridentVoice] available id=\(voice.identifier) name=\(voice.name) quality=\(Self.qualityLabel(voice.quality))")
+                print("[BeaconVoice] available id=\(voice.identifier) name=\(voice.name) quality=\(Self.qualityLabel(voice.quality))")
             }
             logSelectedVoice()
         }
@@ -173,11 +173,11 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
     private func logSelectedVoice() {
         guard voiceDiagnostics else { return }
         if let voice = resolvedVoice {
-            print("[TridentVoice] selected id=\(voice.identifier) name=\(voice.name) quality=\(Self.qualityLabel(voice.quality))")
+            print("[BeaconVoice] selected id=\(voice.identifier) name=\(voice.name) quality=\(Self.qualityLabel(voice.quality))")
         } else {
-            print("[TridentVoice] selected id=none name=none quality=none")
+            print("[BeaconVoice] selected id=none name=none quality=none")
         }
-        print("[TridentVoice] siriAvailable=\(siriVoiceAvailable)")
+        print("[BeaconVoice] siriAvailable=\(siriVoiceAvailable)")
         fflush(stdout)
     }
 

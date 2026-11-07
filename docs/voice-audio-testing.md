@@ -1,7 +1,9 @@
 # Voice and spatial audio testing
 
-Hands-free voice and spatial chest audio are integrated into **Trident** on `main`.
-The main screen has Calibrate and Hold to navigate; hands-free controls are in Settings.
+Hands-free voice and spatial chest audio are integrated into **Beacon** on `main`.
+The main screen has **Calibrate** and **Talk to Beacon**. Tap once, speak and pause to
+send, or say **"Beacon"** followed by your command. Hands-free listening starts when
+the app opens and can be disabled in Settings. It does not listen in the background.
 Use a physical iPhone for microphone, spatial audio and AR tracking checks.
 
 ## Get the app and install
@@ -12,13 +14,13 @@ In a checkout with no uncommitted work:
 git fetch origin
 git switch main
 git pull --ff-only origin main
-open ios/Trident/Trident.xcodeproj
+open ios/Beacon/Beacon.xcodeproj
 ```
 
 If the repository is not on the test Mac yet, clone
 `git@github.com:Jakaliver/Trident.git` first.
 
-Select scheme **Trident**, choose the tester's signing team and a unique bundle
+Select scheme **Beacon**, choose the tester's signing team and a unique bundle
 identifier, then build and run on their iPhone. The checked-in signing team belongs to
 the existing project; each tester should replace it locally. Follow
 [real iPhone setup](real-device.md) for device pairing and permissions.
@@ -34,10 +36,10 @@ Use a well-lit room, a bottle or another object supported by the current detecto
 and headphones paired with the iPhone. Start at a low camera frame rate if the test
 Mac is slow. Stay in a clear area while checking spatial audio.
 
-1. Open Settings → **Hands-free voice**, tap **Start voice mode**, allow Microphone and Speech Recognition access, and wait
-   for listening. The app should greet you once. Say **"calibrate"** with the phone
+1. Open Beacon, allow Microphone and Speech Recognition access, and wait for listening.
+   If previously disabled, enable Hands-free voice in Settings. Say **"Beacon, calibrate"** with the phone
    held ahead. With compatible AirPods, face the same direction as the phone.
-2. Say **"find the bottle"**. Check the **Heard:** text in Settings and that the Mac starts a search.
+2. Say **"Beacon, find the bottle"**. Check the **Heard:** text in Settings and that the Mac starts a search.
    Close Settings to return to the main controls; hands-free listening continues.
    Once a valid target is acquired, a single continuous chest sound should come from
    its position. There should be no repeating guidance beeps in Chest mode. Searching
@@ -45,31 +47,31 @@ Mac is slow. Stay in a clear area while checking spatial audio.
 3. Turn your head and move the phone slowly while keeping tracking normal. The sound
    should remain aligned with the target. Listen for at least **45 seconds** to cross
    two loop boundaries; report audible gaps, clicks, doubled sounds or drifting position.
-4. While it is playing, say **"status"** or **"help"**. The chest should become quieter
+4. While it is playing, say **"Beacon, status"** or **"Beacon, help"**. The chest should become quieter
    while the reply speaks, then return to its previous level. Try another command before
    a reply ends: old replies must not accumulate and play back later. If a command is
-   masked by speech, also try **"Trident, pause"** and record the difference.
+   masked by speech, also try **"Beacon, pause"** and record the difference.
 5. Open Settings → **Object sound**. Switch **Chest → Beeps → Chest** while guiding.
    Each switch should take effect immediately, with only one style playing. Dismissing
    Settings without changing Mac host should preserve the connection and target.
    Relaunch and confirm the selected sound style is remembered.
-6. Say **"pause"**, then **"resume"**. Audio should stop promptly and resume only when
-   connection and tracking are ready. Repeat using **Stop**, then hold **Hold to navigate**, say **"resume"** and release. A partially heard command must not restart guidance after Stop.
-7. Say **"start over"**. The target and old guidance should clear and tracking should
-   reset. Say **"resume"**: it should ask for a new search, without restoring the old
-   sound. Start another find, then say **"found it"**; this ends the search without
+6. Say **"Beacon, pause"**, then **"Beacon, resume"**. Audio should stop promptly and resume only when
+   connection and tracking are ready. Repeat using **Stop**, then tap **Talk to Beacon**, say **"Beacon, resume"** and pause. A partially heard command must not restart guidance after Stop.
+7. Say **"Beacon, start over"**. The target and old guidance should clear and tracking should
+   reset. Say **"Beacon, resume"**: it should ask for a new search, without restoring the old
+   sound. Start another find, then say **"Beacon, found it"**; this ends the search without
    resetting tracking. Old queued replies and target sounds must stay cleared.
 8. During guidance, leave or lock the app, disconnect the backend, lose tracking, or
    disconnect headphones. Check each separately. Guidance should stop and the app
    should report the reason where applicable. Restore the condition and explicitly
    resume. Confirm there is no leftover chest loop or delayed command after stopping.
-9. Check **"repeat"**, **"inspect"**, **"help"**, and **"turn off voice mode"**.
-   The **Hold to navigate** button should still work with voice mode off or on. Disabling voice mode
-   stops listening; use **"pause"** or **Stop** to stop object guidance.
+9. Check **"Beacon, repeat"**, **"Beacon, inspect"**, **"Beacon, help"**, and **"Beacon, turn off voice mode"**.
+   The **Talk to Beacon** button should still work with voice mode off or on. Disabling voice mode
+   stops listening; use **"Beacon, pause"** or **Stop** to stop object guidance.
 
 The current backend automatically selects targets; it does not currently emit a
-multiple-object choice prompt. The phone supports **"left"**, **"right"**, and
-**"the one on the left/right"** if choices are provided. Exercise that dialogue in
+multiple-object choice prompt. The phone supports **"Beacon, left"**, **"Beacon, right"**, and
+**"Beacon, the one on the left/right"** if choices are provided. Exercise that dialogue in
 Voice Lab below; voice mode does not add backend object disambiguation.
 
 ## Speaking voice
@@ -89,9 +91,9 @@ return to the app to refresh the list and compare **Try voice**.
 
 ## Optional Voice Lab check
 
-Scheme **TridentVoiceLab** installs a separate app and needs no Mac backend or camera.
+Scheme **BeaconVoiceLab** installs a separate app and needs no Mac backend or camera.
 Set its signing team and unique bundle identifier as well. It uses the same speech
-recognizer, command coordinator, voice selection and PHASE chest playback as Trident,
+recognizer, command coordinator, voice selection and PHASE chest playback as Beacon,
 with sample targets instead of live detections.
 
 Start voice mode and say **"find a bottle"**. When offered two matches, say **"left"**
@@ -102,11 +104,11 @@ network behavior or world alignment in the full app.
 
 ## Validation and feedback
 
-The voice branch originally passed unsigned Debug builds for both **Trident** and
-**TridentVoiceLab** with Xcode 26.3 / iOS 26.2 SDK. Run these focused checks after changes:
+Build both **Beacon** and **BeaconVoiceLab** with Xcode, then run these focused checks
+after changes:
 
 - `scripts/test-voice-directions.sh`: 74 utterances and 4 semantic checks.
-- `scripts/test-voice-session.sh`: 50 speech coordination checks.
+- `scripts/test-voice-session.sh`: 64 speech coordination checks.
 - `scripts/test-voice-lab-directional.sh`: 35 dialogue checks.
 - `scripts/test-voice-lab-sound.sh`: 32 audio lifecycle checks using a fake audio output.
 

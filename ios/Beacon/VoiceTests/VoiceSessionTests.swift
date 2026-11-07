@@ -91,7 +91,7 @@ final class VoiceSessionSuite {
         }
         expect(commands == [.help, .status, .calibrate], "negation and conversation cannot become object targets")
         expect(session.awaitingObject, "rejected replies leave the object prompt available")
-        session.submit("Hey Trident, please find")
+        session.submit("Hey Beacon, please find")
         expect(commands.count == 3, "a bare find asks for an object instead of starting a search")
         session.listener.emit("the red reset button", final: true)
         expect(commands.last == .find("the red reset button"), "bare object replies preserve their description")
@@ -224,6 +224,53 @@ final class VoiceSessionSuite {
         expect(!session.speaker.spoken.contains("After disable"), "disable cancels pending feedback")
     }
 
+    func beaconWakeWord() async {
+        let session = VoiceSession(requiresWakeWord: true)
+        var commands: [VoiceCommand] = []
+        var enabled: [Bool] = []
+        session.onCommand = { commands.append($0) }
+        session.onEnabledChanged = { enabled.append($0) }
+        await session.enable(greet: false)
+        expect(session.isListening && !session.awaitingObject, "Beacon starts ready for an addressed command")
+        session.listener.emit("find the bottle", final: true)
+        session.listener.emit("I told Beacon to stop", final: true)
+        await wait(.milliseconds(180))
+        expect(commands.isEmpty && session.speaker.spoken.isEmpty, "unaddressed conversation stays silent")
+        session.listener.emit("Beacon, find the bottle", final: true)
+        expect(commands == [.find("the bottle")], "Beacon prefix starts a search")
+        session.listener.emit("resume", final: true)
+        expect(commands.count == 1, "later commands still require the wake word")
+        session.listener.emit("Hey Beacon, pause", final: false)
+        expect(commands.last == .pause, "an addressed pause interrupts immediately")
+        session.listener.emit("Beacon", final: true)
+        expect(session.awaitingObject, "the wake word alone opens a brief object prompt")
+        session.listener.emit("my red keys", final: true)
+        expect(commands.last == .find("my red keys"), "a prompted object reply needs no second wake word")
+        expect(!session.awaitingObject, "one reply closes the follow-up window")
+        session.listener.emit("Beacon, found it", final: true)
+        expect(!session.awaitingObject, "finishing does not expose ambient conversation as another request")
+        session.submit("find my wallet")
+        expect(commands.last == .find("my wallet"), "the screen button can submit without a wake word")
+        let count = commands.count
+        session.listener.emit("Beacon, find a phone", final: false)
+        session.listener.emit("I said find a phone", final: true)
+        await wait(.milliseconds(750))
+        expect(commands.count == count, "a revision removing the wake word cancels the earlier request")
+        session.say("Beacon, find a cup", urgent: true)
+        session.listener.emit("Beacon, find a cup", final: true)
+        expect(commands.count == count, "spoken examples cannot trigger their own wake command")
+        session.disable()
+        expect(enabled == [true, false], "explicit listening changes can be remembered by the app")
+
+        let cancelled = VoiceSession(requiresWakeWord: true)
+        cancelled.listener.nextStartDelay = .milliseconds(200)
+        let startup = Task { await cancelled.enable(greet: false) }
+        await wait(.milliseconds(30))
+        startup.cancel()
+        await startup.value
+        expect(!cancelled.isEnabled && !cancelled.isListening, "a cancelled automatic start cannot take over the button microphone")
+    }
+
     func echoAndBargeIn() async {
         let session = await ready()
         var commands: [VoiceCommand] = []
@@ -231,7 +278,7 @@ final class VoiceSessionSuite {
         session.say("You can say pause or resume.", urgent: true)
         session.listener.emit("pause", final: false)
         expect(commands.isEmpty, "commands quoted inside spoken help do not execute themselves")
-        session.listener.emit("Hey Trident, pause", final: false)
+        session.listener.emit("Hey Beacon, pause", final: false)
         expect(commands == [.pause], "a wake-prefixed stop interrupts spoken help promptly")
         expect(session.speaker.currentText == nil, "a user command interrupts current speech")
         session.say("Looking for a bottle.", urgent: true)
@@ -279,6 +326,7 @@ struct VoiceSessionTests {
         await suite.activationRaces()
         await suite.feedbackReplacement()
         await suite.echoAndBargeIn()
+        await suite.beaconWakeWord()
         guard suite.failures == 0 else {
             print("Voice session: \(suite.failures) of \(suite.checks) checks failed")
             exit(EXIT_FAILURE)

@@ -2,6 +2,12 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject private var voice: VoiceSession
+
+    init(model: AppModel) {
+        self.model = model
+        self.voice = model.voice
+    }
     @State private var showSettings = false
     @AppStorage(Settings.guidanceSoundStyleKey) private var soundStyle = GuidanceSoundStyle.chest.rawValue
 
@@ -76,7 +82,7 @@ struct ContentView: View {
         .background(Color(.systemBackground))
         .sheet(isPresented: $showSettings, onDismiss: model.applySettings) { SettingsView(voice: model.voice) }
         .onChange(of: soundStyle) { _, _ in model.refreshGuidanceSound() }
-        .onChange(of: model.recordingFromActionButton) { _, recording in
+        .onChange(of: model.recordingFromButton) { _, recording in
             if recording { showSettings = false }
         }
     }
@@ -84,7 +90,7 @@ struct ContentView: View {
     private var header: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Trident").font(.title2.weight(.semibold))
+                Text("Beacon").font(.title2.weight(.semibold))
                 HStack(spacing: 6) {
                     Circle().fill(connected ? Color.green : Color.secondary).frame(width: 5, height: 5)
                     Text(connected ? "Connected" : "Not connected")
@@ -109,33 +115,30 @@ struct ContentView: View {
     }
 
     private var navigateButton: some View {
-        VStack(spacing: 16) {
-            Image(systemName: model.recording ? "waveform" : model.transcribing ? "ellipsis" : "mic.fill")
-                .font(.system(size: 28, weight: .medium))
-                .accessibilityHidden(true)
-            VStack(spacing: 6) {
-                Text(model.recordingFromActionButton ? "Listening…" : model.recording ? "Release to navigate" : model.transcribing ? "Sending request…" : "Hold to navigate")
-                    .font(.title2.weight(.semibold))
-                Text(model.recordingFromActionButton ? "Pause to send, or press Action again" : model.recording ? "Listening…" : model.transcribing ? "One moment" : "Say “find the bottle”, then release")
-                    .font(.subheadline)
-                    .opacity(0.7)
+        Button { model.talkToBeacon() } label: {
+            VStack(spacing: 16) {
+                Image(systemName: model.recording ? "waveform" : model.transcribing ? "ellipsis" : "mic.fill")
+                    .font(.system(size: 28, weight: .medium))
+                    .accessibilityHidden(true)
+                VStack(spacing: 6) {
+                    Text(model.recording ? "Listening…" : model.transcribing ? "Sending request…" : "Talk to Beacon")
+                        .font(.title2.weight(.semibold))
+                    Text(model.recording ? "Pause to send, or tap again" : model.transcribing ? "One moment" : voice.isListening ? "Or say “Beacon, find the bottle”" : "Tap, speak, then pause to send")
+                        .font(.subheadline)
+                        .opacity(0.7)
+                }
+                .multilineTextAlignment(.center)
             }
-            .multilineTextAlignment(.center)
+            .foregroundStyle(Color(.systemBackground))
+            .padding(24)
+            .frame(maxWidth: .infinity, minHeight: 190)
+            .background(Color.primary.opacity(connected ? 1 : 0.35), in: RoundedRectangle(cornerRadius: 22))
+            .contentShape(RoundedRectangle(cornerRadius: 22))
         }
-        .foregroundStyle(Color(.systemBackground))
-        .padding(24)
-        .frame(maxWidth: .infinity, minHeight: 190)
-        .background(Color.primary.opacity(connected ? 1 : 0.35), in: RoundedRectangle(cornerRadius: 22))
-        .contentShape(RoundedRectangle(cornerRadius: 22))
-        .gesture(DragGesture(minimumDistance: 0)
-            .onChanged { _ in model.startTalking() }
-            .onEnded { _ in model.stopTalking() })
+        .buttonStyle(.plain)
         .disabled(!connected || model.transcribing)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(model.recordingFromActionButton ? "Listening. Double tap to send" : model.recording ? "Release to navigate. Listening" : model.transcribing ? "Sending request" : "Hold to navigate")
-        .accessibilityHint("Double tap to start speaking, then double tap again to send. Say the object you want to find, or say resume.")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { model.toggleTalking() }
+        .accessibilityLabel(model.recording ? "Listening. Send request" : model.transcribing ? "Sending request" : "Talk to Beacon")
+        .accessibilityHint("Tap to speak. Pause to send automatically, or tap again to send now.")
     }
 
     private var statusTitle: String {
@@ -151,16 +154,16 @@ struct ContentView: View {
     }
 
     private var statusDetail: String {
-        if model.recordingFromActionButton { return "Say what to find. Your request sends when you pause." }
-        if model.recording { return "Speak your request, then release the button." }
+        if model.recording { return "Say what to find. Your request sends when you pause." }
         if model.transcribing { return "You can tap Stop to cancel." }
         if !connected { return "Connect to the same Wi-Fi and add your Mac’s address in Settings." }
         if model.tracking != "normal" { return "Point the camera at the room and move slowly while tracking settles." }
         if !model.choices.isEmpty { return "More than one match is in view." }
         if guiding { return "Follow the object’s sound. Tap Stop whenever you need to pause." }
         if model.mode == "searching" { return "Slowly scan the room with the camera." }
-        if model.stopReason != nil || model.mode == "stopped" { return "Hold the button to say “resume”, or ask for a different object." }
-        return "Calibrate, then hold the button and say what you want to find."
+        if model.stopReason != nil || model.mode == "stopped" { return "Tap to speak, or say “Beacon, resume”." }
+        if voice.errorMessage != nil { return "Tap below to speak. Allow hands-free access in Settings to use “Beacon” commands." }
+        return voice.isListening ? "Calibrate, then tap below or say “Beacon” followed by your request." : "Calibrate, then tap below and say what you want to find."
     }
 }
 
@@ -181,8 +184,8 @@ private struct SettingsView: View {
                 }
                 GuidanceSoundSettings()
                 Section("Action button") {
-                    Text("In iPhone Settings → Action Button, choose Shortcut → Trident → Push to Talk.")
-                    Text("Press and hold to start. Speak, then pause to send. Press again to send early. Unlock your iPhone so Trident can use the camera.")
+                    Text("In iPhone Settings → Action Button, choose Shortcut → Beacon → Talk to Beacon.")
+                    Text("Press and hold to start. Speak, then pause to send. Press again to send early. Unlock your iPhone so Beacon can use the camera.")
                         .foregroundStyle(.secondary)
                 }
                 Section("Connection") {

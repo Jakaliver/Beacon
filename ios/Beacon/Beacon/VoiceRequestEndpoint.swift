@@ -1,6 +1,6 @@
 import Foundation
 
-/// Ends an Action-button request after speech followed by a pause. The six-second
+/// Ends a button-initiated request after speech followed by a pause. The six-second
 /// cap also handles silence, background noise and a recorder that stops early.
 struct VoiceRequestEndpoint {
     private var speechDuration: TimeInterval = 0

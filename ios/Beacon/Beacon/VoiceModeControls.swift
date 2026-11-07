@@ -23,7 +23,7 @@ struct VoiceModeControls: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .accessibilityHint("After enabling, speak commands without holding a button. Voice mode listens while the app is open.")
+            .accessibilityHint("Say Beacon followed by your request while the app is open.")
             HStack {
                 Menu {
                     Button {

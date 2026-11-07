@@ -48,7 +48,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var mode = "idle"
     @Published private(set) var stopReason: String?
     @Published private(set) var recording = false
-    @Published private(set) var recordingFromActionButton = false
+    @Published private(set) var recordingFromButton = false
     @Published private(set) var transcribing = false
     @Published private(set) var choices: [Choice] = []
     @Published private(set) var headTracking = false
@@ -57,11 +57,12 @@ final class AppModel: ObservableObject {
     private let sensor = Connection(path: "/ws/sensor")
     private let ar = ARSensor()
     private let audio = AudioGuide()
-    let voice = VoiceSession()
+    let voice = VoiceSession(requiresWakeWord: true)
     private var transcription: Task<Void, Never>?
     private var transcriptionGeneration = 0
-    private var actionButtonRequest: Task<Void, Never>?
-    private var actionButtonRecording: Task<Void, Never>?
+    private var buttonRequest: Task<Void, Never>?
+    private var buttonRecording: Task<Void, Never>?
+    private var handsFreeStartup: Task<Void, Never>?
     // A reset remains authoritative until a new search. Network latency must never
     // let old guidance, choices or speech restart a cancelled session.
     private var searchCleared = false
@@ -114,7 +115,10 @@ final class AppModel: ObservableObject {
         configureAudioSession()
         audio.start()
         observeAudioSession()
-        AVAudioApplication.requestRecordPermission { _ in }
+        voice.onEnabledChanged = { enabled in
+            UserDefaults.standard.set(enabled, forKey: "handsFreeEnabled")
+        }
+        enableHandsFreeIfWanted()
 
         control.onOpen = { [weak self] in
             self?.controlUp = true
@@ -169,11 +173,11 @@ final class AppModel: ObservableObject {
     func calibrate() {
         guard let pose, pose.tracking == "normal" else {
             ar.reset()
-            voice.say("Resetting tracking. Hold the phone ahead, then say calibrate again.")
+            voice.say("Resetting tracking. Hold the phone ahead, then say Beacon, calibrate.")
             return
         }
         guard alignAudioForward() else {
-            voice.say("Hold the phone upright, pointing ahead, then say calibrate again.")
+            voice.say("Hold the phone upright, pointing ahead, then say Beacon, calibrate.")
             return
         }
         control.sendJSON(["type": "calibrate"])
@@ -205,7 +209,7 @@ final class AppModel: ObservableObject {
         case .finish: resetSearch(resetTracking: false)
         case .choose(let index):
             if let choice = choices.first(where: { $0.index == index }) { choose(choice) }
-            else { voice.say("That choice is not available. Say status to hear the current state.") }
+            else { voice.say("That choice is not available. Say Beacon, status to hear the current state.") }
         case .chooseSide(let side):
             let matches = choices.filter {
                 VoiceCommand.normalized($0.description).split(separator: " ").contains(Substring(side.rawValue))
@@ -217,7 +221,7 @@ final class AppModel: ObservableObject {
         case .status: voice.say(statusSummary)
         case .inspect: self.command("inspect")
         case .help:
-            voice.say("Ask me to find an object, calibrate, pause, resume, or start over. Say status for progress, repeat to hear me again, or found it to finish.")
+            voice.say("Say Beacon, followed by find an object, calibrate, pause, resume, or start over. Say Beacon, status for progress, or Beacon, found it to finish.")
         case .disableVoice: voice.disable()
         }
     }
@@ -235,13 +239,13 @@ final class AppModel: ObservableObject {
         searchCleared = true
         control.sendJSON(["type": "command", "text": "cancel"])
         if resetTracking { ar.reset() }
-        voice.say(resetTracking ? "Starting fresh. Say find, then the object." : "Finished. Ready for another object.", urgent: true)
+        voice.say(resetTracking ? "Starting fresh. Say Beacon, find, then the object." : "Finished. Say Beacon when you need another object.", urgent: true)
     }
 
     func resume() {
         cancelTranscription()
         guard !searchCleared else {
-            voice.say("There is no search to resume. Say find, then the object.")
+            voice.say("There is no search to resume. Say Beacon, find, then the object.")
             return
         }
         let blocker: String? =
@@ -261,7 +265,7 @@ final class AppModel: ObservableObject {
     }
 
     func command(_ text: String, confirmation: String? = nil) {
-        // Typed commands must use the same local interruption/reset behaviour.
+        // Every command uses the same local interruption/reset behaviour.
         let parsed = VoiceCommand.parse(text)
         switch parsed {
         case .pause: stop(); return
@@ -273,8 +277,8 @@ final class AppModel: ObservableObject {
             if let parsed { handleVoice(parsed) }
             return
         case .inspect where searchCleared || stopReason != nil:
-            voice.say(searchCleared ? "There is no target to inspect. Say find, then the object."
-                      : "Search paused. Say resume before inspecting the target.")
+            voice.say(searchCleared ? "There is no target to inspect. Say Beacon, find, then the object."
+                      : "Search paused. Say Beacon, resume before inspecting the target.")
             return
         default: break
         }
@@ -308,10 +312,27 @@ final class AppModel: ObservableObject {
         voice.say("Okay.")
     }
 
+    private func enableHandsFreeIfWanted() {
+        guard handsFreeStartup == nil, !voice.isEnabled,
+              UserDefaults.standard.object(forKey: "handsFreeEnabled") as? Bool != false else { return }
+        handsFreeStartup = Task { [weak self] in
+            guard let self else { return }
+            defer { if !Task.isCancelled { self.handsFreeStartup = nil } }
+            while self.buttonRequest != nil || self.recording || self.transcribing {
+                try? await Task.sleep(for: .milliseconds(100))
+                guard !Task.isCancelled else { return }
+            }
+            guard !Task.isCancelled, self.foreground else { return }
+            await self.voice.enable(greet: false)
+        }
+    }
+
     func startTalking() {
         guard !recording, !transcribing else { return }
         guard controlUp && sensorUp else { return voice.say("Not connected to the Mac.") }
         cancelTranscription(resumeVoice: false)
+        handsFreeStartup?.cancel()
+        handsFreeStartup = nil
         voice.listener.suspend()
         voice.hush()
         audio.silence()
@@ -323,25 +344,25 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Shortcuts receives an activation, not hardware down/up events. A second
-    /// activation sends early; otherwise a pause in speech ends this request.
-    func actionButtonPushToTalk() {
+    /// A screen tap or shortcut starts one request. A second activation sends
+    /// early; otherwise a pause in speech ends the request.
+    func talkToBeacon() {
         if recording { stopTalking(); return }
         guard !transcribing else { return }
-        if actionButtonRequest != nil {
+        if buttonRequest != nil {
             cancelTranscription()
             return
         }
-        actionButtonRequest = Task { [weak self] in
+        buttonRequest = Task { [weak self] in
             guard let self else { return }
-            defer { if !Task.isCancelled { self.actionButtonRequest = nil } }
+            defer { if !Task.isCancelled { self.buttonRequest = nil } }
             let deadline = ProcessInfo.processInfo.systemUptime + 8
             // A cold launch may invoke the intent before SwiftUI appears. Use the
             // same model as the screen and wait for foreground camera access.
             while UIApplication.shared.applicationState != .active {
                 guard !Task.isCancelled else { return }
                 if ProcessInfo.processInfo.systemUptime >= deadline {
-                    self.actionButtonRequest = nil
+                    self.buttonRequest = nil
                     return
                 }
                 try? await Task.sleep(for: .milliseconds(100))
@@ -351,7 +372,7 @@ final class AppModel: ObservableObject {
             while !(self.controlUp && self.sensorUp) {
                 guard !Task.isCancelled else { return }
                 if ProcessInfo.processInfo.systemUptime >= deadline {
-                    self.actionButtonRequest = nil
+                    self.buttonRequest = nil
                     self.voice.say("Not connected to the Mac.")
                     return
                 }
@@ -359,21 +380,21 @@ final class AppModel: ObservableObject {
             }
             let allowed = await AVAudioApplication.requestRecordPermission()
             guard !Task.isCancelled, self.foreground else { return }
-            self.actionButtonRequest = nil
+            self.buttonRequest = nil
             guard allowed else {
-                self.voice.say("Allow microphone access for Trident in iPhone Settings.")
+                self.voice.say("Allow microphone access for Beacon in iPhone Settings.")
                 return
             }
             self.startTalking()
             guard self.recording else { return }
-            self.recordingFromActionButton = true
+            self.recordingFromButton = true
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            self.actionButtonRecording = Task { [weak self] in
+            self.buttonRecording = Task { [weak self] in
                 var endpoint = VoiceRequestEndpoint()
                 let began = ProcessInfo.processInfo.systemUptime
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .milliseconds(50))
-                    guard !Task.isCancelled, let self, self.recordingFromActionButton else { return }
+                    guard !Task.isCancelled, let self, self.recordingFromButton else { return }
                     if endpoint.shouldFinish(at: ProcessInfo.processInfo.systemUptime - began,
                                              power: self.talk.averagePower, isRecording: self.talk.isRecording) {
                         self.stopTalking()
@@ -386,9 +407,9 @@ final class AppModel: ObservableObject {
 
     func stopTalking() {
         guard recording else { return }
-        actionButtonRecording?.cancel()
-        actionButtonRecording = nil
-        recordingFromActionButton = false
+        buttonRecording?.cancel()
+        buttonRecording = nil
+        recordingFromButton = false
         recording = false
         let wav = talk.stop()
         transcriptionGeneration += 1
@@ -420,11 +441,11 @@ final class AppModel: ObservableObject {
     }
 
     private func cancelTranscription(resumeVoice: Bool = true) {
-        actionButtonRequest?.cancel()
-        actionButtonRequest = nil
-        actionButtonRecording?.cancel()
-        actionButtonRecording = nil
-        recordingFromActionButton = false
+        buttonRequest?.cancel()
+        buttonRequest = nil
+        buttonRecording?.cancel()
+        buttonRecording = nil
+        recordingFromButton = false
         transcriptionGeneration += 1
         transcription?.cancel()
         transcription = nil
@@ -438,9 +459,9 @@ final class AppModel: ObservableObject {
 
     private func resumeVoiceAfterRecording() {
         Task { [weak self] in
-            guard let self, !self.recording,
-                  self.foreground, self.voice.isEnabled else { return }
-            await self.voice.listener.resume()
+            guard let self, !self.recording, self.foreground else { return }
+            if self.voice.isEnabled { await self.voice.listener.resume() }
+            else { self.enableHandsFreeIfWanted() }
         }
     }
 
@@ -469,6 +490,8 @@ final class AppModel: ObservableObject {
 
     func enteredBackground() {
         foreground = false
+        handsFreeStartup?.cancel()
+        handsFreeStartup = nil
         cancelTranscription(resumeVoice: false)
         if stopReason == nil { localStop("interrupted") }
         voice.enteredBackground()
@@ -478,6 +501,7 @@ final class AppModel: ObservableObject {
         foreground = true
         guard started else { return }
         voice.becameActive()
+        enableHandsFreeIfWanted()
         ar.resume()
         try? AVAudioSession.sharedInstance().setActive(true)
         audio.start()

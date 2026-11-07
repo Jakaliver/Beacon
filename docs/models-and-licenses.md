@@ -11,7 +11,7 @@ with `HF_HUB_OFFLINE=1` and `YOLO_OFFLINE=1`.
 | YOLO11n-seg (`yolo11n-seg.pt`, COCO classes) | [Ultralytics](https://github.com/ultralytics/ultralytics) | **AGPL-3.0** (or an Ultralytics Enterprise licence) |
 | Parakeet TDT 0.6B v3 via `parakeet-mlx` | [mlx-community/parakeet-tdt-0.6b-v3](https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3) | CC-BY-4.0 (model), Apache-2.0 (`parakeet-mlx`) |
 
-Note the AGPL-3.0 terms of Ultralytics if you distribute Trident or offer it as a network service.
+Note the AGPL-3.0 terms of Ultralytics if you distribute Beacon or offer it as a network service.
 
 Python dependencies are pinned in `mac/pyproject.toml` and `mac/uv.lock`. Web dependencies
 are pinned in `web/package.json` and `web/package-lock.json`.

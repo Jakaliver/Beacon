@@ -7,7 +7,7 @@ __pycache__/
 mac/models/
 mac/third_party/
 web/public/assets/
-ios/Trident/build/
+ios/Beacon/build/
 xcuserdata/
 *.xcuserstate
 DerivedData/

@@ -25,7 +25,7 @@
 		88040329777D90F730F89B10 /* Speech.swift in Sources */ = {isa = PBXBuildFile; fileRef = 604702D284EFE94A88B04A53 /* Speech.swift */; };
 		8A999AB239C34C17EE0C15A4 /* AudioGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308C7C8FAF760F96A7D562BD /* AudioGuide.swift */; };
 		9F3E8163128180A07B132007 /* GuidanceSoundSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CE2E3066EDD9706B7B4F783 /* GuidanceSoundSettings.swift */; };
-		AF642317531D6E0CFEE9ADFD /* TridentApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D3606D4B91643D76C2EE34 /* TridentApp.swift */; };
+		AF642317531D6E0CFEE9ADFD /* BeaconApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D3606D4B91643D76C2EE34 /* BeaconApp.swift */; };
 		C8747309B378D6F602F9009F /* VoiceListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517AC3B0527BB348E37B989E /* VoiceListener.swift */; };
 		CE25236A5DA80643629DA457 /* VoiceModeControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26BDB727AAE491B1B3CDD97 /* VoiceModeControls.swift */; };
 		D462A44B3408A13B8F314499 /* Speech.swift in Sources */ = {isa = PBXBuildFile; fileRef = 604702D284EFE94A88B04A53 /* Speech.swift */; };
@@ -48,7 +48,7 @@
 		5F577A93D3B5A320DC985C67 /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
 		604702D284EFE94A88B04A53 /* Speech.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Speech.swift; sourceTree = "<group>"; };
 		6EA97D92FF8CA7257357EB11 /* VoiceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSession.swift; sourceTree = "<group>"; };
-		83A4D838F67B55312BA55A50 /* TridentVoiceLab.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TridentVoiceLab.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		83A4D838F67B55312BA55A50 /* BeaconVoiceLab.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BeaconVoiceLab.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		83E5CB0422209FAD39344FB7 /* VoiceCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCommand.swift; sourceTree = "<group>"; };
 		8618FC10F163DFF865E31228 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		88593297C40A9B03AD0701FB /* ARSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARSensor.swift; sourceTree = "<group>"; };
@@ -56,8 +56,8 @@
 		A07C855A4B9703F7CFCBFC4E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A26BDB727AAE491B1B3CDD97 /* VoiceModeControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceModeControls.swift; sourceTree = "<group>"; };
 		C1CE1B4A5F861C5592AE6866 /* VoiceLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceLabView.swift; sourceTree = "<group>"; };
-		C2D42317C13FA6629FCC997F /* Trident.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Trident.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E9D3606D4B91643D76C2EE34 /* TridentApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TridentApp.swift; sourceTree = "<group>"; };
+		C2D42317C13FA6629FCC997F /* Beacon.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Beacon.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E9D3606D4B91643D76C2EE34 /* BeaconApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconApp.swift; sourceTree = "<group>"; };
 		EE6DDF5BCF93CDF29CCED18F /* Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connection.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -65,7 +65,7 @@
 		26E6D92631E3CE3CA201B562 = {
 			isa = PBXGroup;
 			children = (
-				8243A99044365329FE77F005 /* Trident */,
+				8243A99044365329FE77F005 /* Beacon */,
 				E0D030A3BEDC3C640B1EF63A /* VoiceLab */,
 				300FDC2BC26B512FBA6393E4 /* Products */,
 			);
@@ -74,13 +74,13 @@
 		300FDC2BC26B512FBA6393E4 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C2D42317C13FA6629FCC997F /* Trident.app */,
-				83A4D838F67B55312BA55A50 /* TridentVoiceLab.app */,
+				C2D42317C13FA6629FCC997F /* Beacon.app */,
+				83A4D838F67B55312BA55A50 /* BeaconVoiceLab.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		8243A99044365329FE77F005 /* Trident */ = {
+		8243A99044365329FE77F005 /* Beacon */ = {
 			isa = PBXGroup;
 			children = (
 				88593297C40A9B03AD0701FB /* ARSensor.swift */,
@@ -93,14 +93,14 @@
 				2B59A25BACFD98E15CDA2E09 /* Model.swift */,
 				5F577A93D3B5A320DC985C67 /* Settings.swift */,
 				604702D284EFE94A88B04A53 /* Speech.swift */,
-				E9D3606D4B91643D76C2EE34 /* TridentApp.swift */,
+				E9D3606D4B91643D76C2EE34 /* BeaconApp.swift */,
 				AA01B2C3D4E5F60718293042 /* VoiceRequestEndpoint.swift */,
 				83E5CB0422209FAD39344FB7 /* VoiceCommand.swift */,
 				517AC3B0527BB348E37B989E /* VoiceListener.swift */,
 				A26BDB727AAE491B1B3CDD97 /* VoiceModeControls.swift */,
 				6EA97D92FF8CA7257357EB11 /* VoiceSession.swift */,
 			);
-			path = Trident;
+			path = Beacon;
 			sourceTree = "<group>";
 		};
 		E0D030A3BEDC3C640B1EF63A /* VoiceLab */ = {
@@ -117,9 +117,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		3F3B910FD04FC8EB084BEB9F /* TridentVoiceLab */ = {
+		3F3B910FD04FC8EB084BEB9F /* BeaconVoiceLab */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = FBB65E0DAF79B15E2F3208F3 /* Build configuration list for PBXNativeTarget "TridentVoiceLab" */;
+			buildConfigurationList = FBB65E0DAF79B15E2F3208F3 /* Build configuration list for PBXNativeTarget "BeaconVoiceLab" */;
 			buildPhases = (
 				C2C7A9564D2CC41E4C718BB2 /* Sources */,
 				237E26901E191CD02B196E03 /* Resources */,
@@ -128,16 +128,16 @@
 			);
 			dependencies = (
 			);
-			name = TridentVoiceLab;
+			name = BeaconVoiceLab;
 			packageProductDependencies = (
 			);
-			productName = TridentVoiceLab;
-			productReference = 83A4D838F67B55312BA55A50 /* TridentVoiceLab.app */;
+			productName = BeaconVoiceLab;
+			productReference = 83A4D838F67B55312BA55A50 /* BeaconVoiceLab.app */;
 			productType = "com.apple.product-type.application";
 		};
-		6599E2CA25A5C26AFEE6193D /* Trident */ = {
+		6599E2CA25A5C26AFEE6193D /* Beacon */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3671F856DAB8C776E01CFA20 /* Build configuration list for PBXNativeTarget "Trident" */;
+			buildConfigurationList = 3671F856DAB8C776E01CFA20 /* Build configuration list for PBXNativeTarget "Beacon" */;
 			buildPhases = (
 				2A8800A0F03001AEEECAEDC1 /* Sources */,
 				98F1758F19095C1926EA12FF /* Resources */,
@@ -146,11 +146,11 @@
 			);
 			dependencies = (
 			);
-			name = Trident;
+			name = Beacon;
 			packageProductDependencies = (
 			);
-			productName = Trident;
-			productReference = C2D42317C13FA6629FCC997F /* Trident.app */;
+			productName = Beacon;
+			productReference = C2D42317C13FA6629FCC997F /* Beacon.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -172,7 +172,7 @@
 					};
 				};
 			};
-			buildConfigurationList = C1CD4170B33314F4AF7EC3B3 /* Build configuration list for PBXProject "Trident" */;
+			buildConfigurationList = C1CD4170B33314F4AF7EC3B3 /* Build configuration list for PBXProject "Beacon" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -186,8 +186,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				6599E2CA25A5C26AFEE6193D /* Trident */,
-				3F3B910FD04FC8EB084BEB9F /* TridentVoiceLab */,
+				6599E2CA25A5C26AFEE6193D /* Beacon */,
+				3F3B910FD04FC8EB084BEB9F /* BeaconVoiceLab */,
 			);
 		};
 /* End PBXProject section */
@@ -224,7 +224,7 @@
 				103EEC9C2E5B1B70D4813886 /* Model.swift in Sources */,
 				748E15202DBC14BEF324D870 /* Settings.swift in Sources */,
 				D462A44B3408A13B8F314499 /* Speech.swift in Sources */,
-				AF642317531D6E0CFEE9ADFD /* TridentApp.swift in Sources */,
+				AF642317531D6E0CFEE9ADFD /* BeaconApp.swift in Sources */,
 				AA01B2C3D4E5F60718293041 /* VoiceRequestEndpoint.swift in Sources */,
 				4C94184990D710D6E49D9745 /* VoiceCommand.swift in Sources */,
 				F45AA76CEF87253158F578BC /* VoiceListener.swift in Sources */,
@@ -419,13 +419,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				INFOPLIST_FILE = Trident/Info.plist;
+				INFOPLIST_FILE = Beacon/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.trident.app.m9ac3a7n78;
+				PRODUCT_MODULE_NAME = Trident;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
@@ -437,13 +438,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				INFOPLIST_FILE = Trident/Info.plist;
+				INFOPLIST_FILE = Beacon/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.trident.app.m9ac3a7n78;
+				PRODUCT_MODULE_NAME = Trident;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
@@ -452,7 +454,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		3671F856DAB8C776E01CFA20 /* Build configuration list for PBXNativeTarget "Trident" */ = {
+		3671F856DAB8C776E01CFA20 /* Build configuration list for PBXNativeTarget "Beacon" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				FBF3642A5C9259AD9B77917B /* Debug */,
@@ -461,7 +463,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		C1CD4170B33314F4AF7EC3B3 /* Build configuration list for PBXProject "Trident" */ = {
+		C1CD4170B33314F4AF7EC3B3 /* Build configuration list for PBXProject "Beacon" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				80E03785FD44362E2C95F37D /* Debug */,
@@ -470,7 +472,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		FBB65E0DAF79B15E2F3208F3 /* Build configuration list for PBXNativeTarget "TridentVoiceLab" */ = {
+		FBB65E0DAF79B15E2F3208F3 /* Build configuration list for PBXNativeTarget "BeaconVoiceLab" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				381810D09B5A5085229B2C91 /* Debug */,

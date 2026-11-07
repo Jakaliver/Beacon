@@ -1,4 +1,4 @@
-# Trident sensor and guidance protocol (v1)
+# Beacon sensor and guidance protocol (v1)
 
 The iPhone sends camera observations and commands to the Mac. The web room view
 only subscribes to `/ws/viewer`; it never opens a control or sensor connection.

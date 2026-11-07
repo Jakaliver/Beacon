@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from trident.targets import Observation, Tracker
+from beacon.targets import Observation, Tracker
 
 
 def observation(position, depth):

@@ -15,6 +15,9 @@ final class VoiceSession: ObservableObject {
     var onCommand: ((VoiceCommand) -> Void)?
     var onUserCommand: (() -> Void)?
     var onSpeakingChanged: ((Bool) -> Void)?
+    var onEnabledChanged: ((Bool) -> Void)?
+    private let requiresWakeWord: Bool
+    private var followUpUntil = Date.distantPast
 
     private var subscriptions: Set<AnyCancellable> = []
     private var commandTask: Task<Void, Never>?
@@ -36,7 +39,8 @@ final class VoiceSession: ObservableObject {
     var status: String { isEnabled ? listener.status : "Voice mode off" }
     var errorMessage: String? { listener.errorMessage }
 
-    init(allowsVoiceChat: Bool = false) {
+    init(allowsVoiceChat: Bool = false, requiresWakeWord: Bool = false) {
+        self.requiresWakeWord = requiresWakeWord
         listener = VoiceListener(allowsVoiceChat: allowsVoiceChat)
         listener.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &subscriptions)
         listener.$isListening.removeDuplicates().dropFirst().sink { [weak self] listening in
@@ -69,20 +73,29 @@ final class VoiceSession: ObservableObject {
         }
     }
 
-    func enable() async {
+    func enable(greet: Bool = true) async {
         guard !isEnabled, foreground else { return }
         lifecycleGeneration += 1
         let generation = lifecycleGeneration
         isEnabled = true
         await listener.start()
+        if Task.isCancelled {
+            if lifecycleGeneration == generation {
+                isEnabled = false
+                listener.suspend()
+            }
+            return
+        }
         // An older permission/start operation must not stop or greet a newer session.
         guard lifecycleGeneration == generation, isEnabled, foreground else { return }
         if listener.isListening {
-            say("Hi. What would you like to find?")
-            awaitingObject = true
+            if greet { say(requiresWakeWord ? "Ready." : "Hi. What would you like to find?") }
+            awaitingObject = !requiresWakeWord
+            onEnabledChanged?(true)
         } else {
             isEnabled = false
             awaitingObject = false
+            onEnabledChanged?(false)
         }
     }
 
@@ -95,6 +108,7 @@ final class VoiceSession: ObservableObject {
         cancelCommand()
         hush()
         listener.stop()
+        onEnabledChanged?(false)
     }
 
     func enteredBackground() {
@@ -180,6 +194,15 @@ final class VoiceSession: ObservableObject {
         if fromMicrophone {
             guard let cleaned = removingEcho(from: normalized) else { return }
             normalized = cleaned
+            if requiresWakeWord {
+                if awaitingObject && Date() >= followUpUntil { awaitingObject = false }
+                guard Self.hasWakePrefix(normalized) || awaitingObject else {
+                    cancelCommand()
+                    userUtteranceActive = false
+                    if final { listener.resetUtterance() }
+                    return
+                }
+            }
         }
         transcript = text
         // A revised hypothesis invalidates its predecessor even if the revision is not a command
@@ -216,6 +239,7 @@ final class VoiceSession: ObservableObject {
             self.onUserCommand?()
             if bareFind {
                 self.awaitingObject = true
+                self.followUpUntil = Date().addingTimeInterval(10)
                 self.say("What should I look for?")
                 return
             }
@@ -227,7 +251,7 @@ final class VoiceSession: ObservableObject {
             case .repeatLast:
                 self.repeatResponse()
             case .startOver, .finish:
-                self.awaitingObject = true
+                self.awaitingObject = !self.requiresWakeWord
                 self.onCommand?(command)
             case .find, .pause, .resume:
                 self.awaitingObject = false
@@ -292,13 +316,15 @@ final class VoiceSession: ObservableObject {
 
     private static func hasWakePrefix(_ text: String) -> Bool {
         let text = text.hasPrefix("please ") ? String(text.dropFirst(7)) : text
-        return text.hasPrefix("hey trident ") || text.hasPrefix("trident ")
+        return text == "beacon" || text == "hey beacon"
+            || text.hasPrefix("hey beacon ") || text.hasPrefix("beacon ")
     }
 
     private static func withoutAddress(_ text: String) -> String {
         var result = text
         if result.hasPrefix("please ") { result = String(result.dropFirst(7)) }
-        for prefix in ["hey trident ", "trident "] where result.hasPrefix(prefix) {
+        if result == "beacon" || result == "hey beacon" { return "" }
+        for prefix in ["hey beacon ", "beacon "] where result.hasPrefix(prefix) {
             result = String(result.dropFirst(prefix.count))
             break
         }
@@ -309,6 +335,7 @@ final class VoiceSession: ObservableObject {
 
     private static func isObjectPrompt(_ text: String) -> Bool {
         let request = withoutAddress(text)
+        if request.isEmpty && hasWakePrefix(text) { return true }
         if ["find an object", "find something"].contains(request) { return true }
         // Let the shared parser define find aliases, including any added by the real app.
         let marker = "requested object"
@@ -327,7 +354,7 @@ final class VoiceSession: ObservableObject {
             "no", "not", "never", "don't", "dont", "do", "does", "did", "cannot", "can't",
             "i", "i'm", "i've", "i'll", "you", "you're", "we", "they", "he", "she", "it",
             "what", "why", "when", "where", "how", "can", "could", "would", "should",
-            "that's", "that", "this", "please", "hey", "trident", "thank", "thanks",
+            "that's", "that", "this", "please", "hey", "beacon", "thank", "thanks",
         ]
         guard !conversationalStarts.contains(String(first)),
               !["yes", "yeah", "okay", "ok", "sure", "alright", "later", "never mind"].contains(reply)

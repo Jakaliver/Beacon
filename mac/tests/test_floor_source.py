@@ -1,6 +1,6 @@
 import unittest
 
-from trident.mapping import GridMap
+from beacon.mapping import GridMap
 
 
 class FloorSourceTests(unittest.TestCase):

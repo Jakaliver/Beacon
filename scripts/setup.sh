@@ -12,7 +12,7 @@ git -C "$DA2_DIR" checkout --quiet "$DA2_COMMIT"
 
 cd "$ROOT/mac"
 uv sync
-uv run python -m trident.setup_models
+uv run python -m beacon.setup_models
 
 cd "$ROOT/web"
 npm ci

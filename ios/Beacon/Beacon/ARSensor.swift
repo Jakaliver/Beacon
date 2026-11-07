@@ -17,8 +17,8 @@ final class ARSensor: NSObject, ARSessionDelegate {
     var onPose: ((PoseSample) -> Void)?
 
     private let session = ARSession()
-    private let queue = DispatchQueue(label: "trident.ar", qos: .userInteractive)
-    private let encodeQueue = DispatchQueue(label: "trident.encode", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "beacon.ar", qos: .userInteractive)
+    private let encodeQueue = DispatchQueue(label: "beacon.encode", qos: .userInitiated)
     private let ciContext = CIContext(options: [.cacheIntermediates: false])
     private let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
 

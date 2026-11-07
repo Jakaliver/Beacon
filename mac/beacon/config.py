@@ -9,14 +9,14 @@ DA2_DIR = MAC_DIR / "third_party" / "Depth-Anything-V2"
 DEPTH_CHECKPOINT = MODELS_DIR / "depth_anything_v2_metric_hypersim_vits.pth"
 DEPTH_REPO = "depth-anything/Depth-Anything-V2-Metric-Hypersim-Small"
 YOLO_CHECKPOINT = MODELS_DIR / "yolo11n-seg.pt"
-PARAKEET_MODEL = os.environ.get("TRIDENT_PARAKEET", "mlx-community/parakeet-tdt-0.6b-v3")
+PARAKEET_MODEL = os.environ.get("BEACON_PARAKEET", os.environ.get("TRIDENT_PARAKEET", "mlx-community/parakeet-tdt-0.6b-v3"))
 
 
 @dataclass
 class Config:
-    memory_budget_mb: int = int(os.environ.get("TRIDENT_MEMORY_BUDGET_MB", 16384))
+    memory_budget_mb: int = int(os.environ.get("BEACON_MEMORY_BUDGET_MB", os.environ.get("TRIDENT_MEMORY_BUDGET_MB", 16384)))
     # Room view updates per second. Only changed point clouds are sent, so faster Macs can go high.
-    viewer_hz: float = float(os.environ.get("TRIDENT_VIEWER_HZ", 5))
+    viewer_hz: float = float(os.environ.get("BEACON_VIEWER_HZ", os.environ.get("TRIDENT_VIEWER_HZ", 5)))
     depth_input_size: int = 518  # upstream default
     depth_max: float = 20.0
     detect_every_n_frames: int = 2

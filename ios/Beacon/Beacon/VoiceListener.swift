@@ -80,7 +80,7 @@ final class VoiceListener: NSObject, ObservableObject, SFSpeechRecognizerDelegat
         status = "Voice off"
     }
 
-    /// Temporarily releases the microphone (for example, for manual push-to-talk).
+    /// Temporarily releases the microphone (for example, for a button-initiated request).
     func suspend() {
         suspended = true
         stopCapture()
@@ -113,13 +113,13 @@ final class VoiceListener: NSObject, ObservableObject, SFSpeechRecognizerDelegat
         let speechPermission = await Self.speechPermission()
         guard token == generation, shouldRun else { return }
         guard speechPermission == .authorized else {
-            fail("Allow Speech Recognition for Trident in Settings to use local voice commands.")
+            fail("Allow Speech Recognition for Beacon in Settings to use local voice commands.")
             return
         }
         let microphoneAllowed = await AVAudioApplication.requestRecordPermission()
         guard token == generation, shouldRun else { return }
         guard microphoneAllowed else {
-            fail("Allow Microphone access for Trident in Settings to use voice commands.")
+            fail("Allow Microphone access for Beacon in Settings to use voice commands.")
             return
         }
         guard let recognizer, recognizer.supportsOnDeviceRecognition else {
@@ -248,6 +248,7 @@ final class VoiceListener: NSObject, ObservableObject, SFSpeechRecognizerDelegat
         next.shouldReportPartialResults = true
         next.requiresOnDeviceRecognition = true
         next.taskHint = .dictation
+        next.contextualStrings = ["Beacon", "Hey Beacon", "Beacon find", "Beacon pause", "Beacon calibrate"]
         request = next
         lastTranscript = ""
         utteranceStartedAt = Date()

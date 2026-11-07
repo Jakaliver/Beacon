@@ -455,7 +455,7 @@ final class AudioGuide {
     }
 
     private func diagnostic(_ message: String) {
-        NSLog("Trident audio: %@", message)
+        NSLog("Beacon audio: %@", message)
         onDiagnostic?(message)
     }
 

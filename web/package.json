@@ -1,5 +1,5 @@
 {
-  "name": "trident-web",
+  "name": "beacon-web",
   "private": true,
   "type": "module",
   "scripts": {

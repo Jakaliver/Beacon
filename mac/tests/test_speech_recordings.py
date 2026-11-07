@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import numpy as np
 
-from trident.speech import Speech
-from trident import server
+from beacon.speech import Speech
+from beacon import server
 
 
 class SpeechRecordingTests(unittest.TestCase):
@@ -61,7 +61,7 @@ class SpeechRecordingTests(unittest.TestCase):
             return await asyncio.gather(*(server.transcribe(request) for _ in range(3)))
 
         with ThreadPoolExecutor(max_workers=1) as worker:
-            with patch("trident.speech.Speech", ThreadBoundSpeech), \
+            with patch("beacon.speech.Speech", ThreadBoundSpeech), \
                     patch.object(server, "speech_thread", worker), \
                     patch.dict(server.speech, model=None):
                 result = asyncio.run(run())

@@ -3,7 +3,7 @@ import base64
 
 import numpy as np
 
-from trident.surfaces import SurfaceMap, depth_triangles, plane_snapshot
+from beacon.surfaces import SurfaceMap, depth_triangles, plane_snapshot
 
 
 class SurfaceTests(unittest.TestCase):

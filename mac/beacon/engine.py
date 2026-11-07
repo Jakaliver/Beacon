@@ -1,4 +1,4 @@
-"""Trident engine: reconstruction, target state, guidance modes and stop rules.
+"""Beacon engine: reconstruction, target state, guidance modes and stop rules.
 
 One engine serves whichever sensor source is connected (simulator or iPhone).
 Server-side times use time.monotonic(); source times are only compared with
@@ -25,7 +25,7 @@ from .surfaces import SurfaceMap, plane_snapshot
 cv2.setNumThreads(0)
 
 ACTIVE = {"hotcold", "walking", "probe"}
-DEBUG_DIR = os.environ.get("TRIDENT_DEBUG_DIR")  # writes the latest upright frame with detections
+DEBUG_DIR = os.environ.get("BEACON_DEBUG_DIR", os.environ.get("TRIDENT_DEBUG_DIR"))  # writes the latest upright frame with detections
 
 
 @dataclass

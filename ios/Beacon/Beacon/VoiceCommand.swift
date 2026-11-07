@@ -42,10 +42,10 @@ enum VoiceCommand: Equatable {
 
     static func parse(_ text: String) -> VoiceCommand? {
         var utterance = normalized(text)
-        // Permit "Please, Trident, stop" and "Hey Trident, please stop" without matching
-        // commands buried in conversation, such as "I told Trident to stop".
+        // Permit "Please, Beacon, stop" and "Hey Beacon, please stop" without matching
+        // commands buried in conversation, such as "I told Beacon to stop".
         utterance = removingPrefix("please ", from: utterance)
-        for prefix in ["hey trident ", "trident "] where utterance.hasPrefix(prefix) {
+        for prefix in ["hey beacon ", "beacon "] where utterance.hasPrefix(prefix) {
             utterance = String(utterance.dropFirst(prefix.count))
             break
         }
