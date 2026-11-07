@@ -1,5 +1,5 @@
 // Read-only room display. The iPhone owns commands, recording and guidance audio.
-import { RoomView } from "./room-view";
+import { RoomView, type RoomViewMode } from "./room-view";
 import type { Recon } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -15,6 +15,7 @@ let socket: WebSocket | null = null;
 let retry = 0;
 let destroyed = false;
 let pointCount = 0;
+let currentView: RoomViewMode = "3d";
 
 try {
   room = new RoomView($("roomCanvas"), $("targetLabel"), $("scaleBar"), $("phoneLabel"));
@@ -24,16 +25,26 @@ try {
   console.error("Room renderer unavailable", error);
 }
 
-function setView(view: "3d" | "plan") {
+function setView(view: RoomViewMode) {
+  currentView = view;
   room?.setView(view);
   $("view3d").setAttribute("aria-pressed", String(view === "3d"));
   $("viewPlan").setAttribute("aria-pressed", String(view === "plan"));
+  $("viewFirst").setAttribute("aria-pressed", String(view === "first"));
+  $("fitRoom").hidden = $("focusTarget").hidden = $("sceneScale").hidden = view === "first";
+  $("roomCanvas").setAttribute("aria-label", view === "first"
+    ? "First-person room scan following the iPhone camera. Move the phone to look around."
+    : view === "plan" ? "Overhead room scan. Drag to pan and scroll to zoom."
+    : "Interactive room scan. Drag to orbit, right-drag to pan, scroll to zoom.");
   $("interactionHint").textContent = view === "plan"
     ? "Drag to pan · Scroll to zoom"
+    : view === "first" ? "Following iPhone · Move the phone to look around"
     : "Drag to pause · Scroll to zoom · 3D to resume";
+  updateFreshness();
 }
 $("view3d").onclick = () => setView("3d");
 $("viewPlan").onclick = () => setView("plan");
+$("viewFirst").onclick = () => setView("first");
 $("fitRoom").onclick = () => room?.setAutoFit(true);
 $("focusTarget").onclick = () => room?.focusTarget();
 let colourEnabled = $("viewColour").getAttribute("aria-pressed") === "true";
@@ -55,6 +66,7 @@ function displaySnapshot(snapshot: Recon) {
   lastSnapshot = performance.now();
   const metric = room?.update(snapshot);
   pointCount = metric?.points ?? 0;
+  $<HTMLButtonElement>("viewFirst").disabled = !snapshot.phone.position || !snapshot.phone.forward || snapshot.phone.tracking !== "normal";
   $("pointCount").textContent = pointCount.toLocaleString();
   $("mappedArea").textContent = metric ? metric.area.toFixed(1) : "—";
   $("emptyState").hidden = !room || pointCount > 0;
@@ -81,6 +93,9 @@ function updateFreshness() {
     && typeof poseAge === "number" && poseAge + elapsed < 1000
     && recon?.stats.sensor_connected === true && recon.phone.tracking === "normal";
   const injected = recon?.perception === "injected";
+  if (currentView === "first") $("interactionHint").textContent = live
+    ? "Following iPhone · Move the phone to look around"
+    : "Last iPhone view · Waiting for live tracking";
   $("connection").dataset.state = live ? "live" : recon ? "paused" : "waiting";
   $("connectionText").textContent = live ? injected ? "Debug feed" : "Live" : !connected ? "Connecting" : pointCount ? "Scan paused" : "Waiting for iPhone";
   $("frameAge").textContent = !live && Number.isFinite(frameAge)

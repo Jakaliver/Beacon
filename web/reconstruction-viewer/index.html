@@ -13,7 +13,7 @@
   <header class="toolbar">
     <div class="brand"><strong>Trident</strong><span aria-hidden="true">/</span><h1>Room</h1></div>
     <nav aria-label="View controls">
-      <div class="view-switch"><button id="view3d" aria-pressed="true" title="Slow orbit from 30° above horizontal">3D</button><button id="viewPlan" aria-pressed="false">Overhead</button></div>
+      <div class="view-switch"><button id="view3d" aria-pressed="true" title="Slow orbit from 30° above horizontal">3D</button><button id="viewPlan" aria-pressed="false">Overhead</button><button id="viewFirst" aria-pressed="false" title="See the scan from the iPhone camera position" disabled>First person</button></div>
       <button id="viewColour" aria-pressed="false" title="Use the camera image colours">Colour</button>
       <button id="fitRoom" title="Keep the whole scan in view"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2H2v4m8-4h4v4M2 10v4h4m8-4v4h-4" /></svg>Fit</button>
     </nav>
@@ -27,7 +27,7 @@
     <div id="targetLabel" class="target-label" hidden><span id="targetLabelText"></span></div>
     <div class="canvas-footer">
       <p id="interactionHint">Drag to pause · Scroll to zoom · 3D to resume</p>
-      <div class="scale" aria-label="Scale: one metre, estimated depth"><span id="scaleBar"></span><span>1 m</span><span class="depth-note">Estimated depth</span></div>
+      <div id="sceneScale" class="scale" aria-label="Scale: one metre, estimated depth"><span id="scaleBar"></span><span>1 m</span><span class="depth-note">Estimated depth</span></div>
     </div>
   </main>
   <footer class="statusbar">

@@ -24,6 +24,9 @@ view. **3D** slowly circles the scan at 30° above horizontal, completing a turn
 seconds. Drag or zoom to pause and inspect; press **3D** to resume. **Overhead** shows a
 stationary floor plan, **Fit** restores automatic framing, and **Locate** centres the
 selected target. Right-drag to pan and scroll/pinch to zoom. In Overhead mode, drag to pan.
+**First person** follows the iPhone's position and viewing direction through the point
+cloud, with a level horizon and perspective depth. Move the phone to look around. If
+tracking pauses, it holds the last valid view; choose **3D** to return to the room orbit.
 
 **Colour** switches the grey LiDAR view to soft dots coloured from their source camera
 pixels. Selected targets remain red. The scan builds up to 60,000 points in 2.5 cm cells.

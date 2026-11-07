@@ -134,6 +134,9 @@ has a red outline and label; its distance appears in the bottom status bar.
 
 Use **3D** to see height, **Overhead** for a floor plan, and **Fit** to restore automatic
 framing after dragging or zooming. **Locate** centres the selected target.
+**First person** places the view at the iPhone camera and follows its direction, including
+looking up and down. Move the phone to look around; a paused scan holds the last valid
+camera position. Select **3D** or **Overhead** to return to the external room views.
 Use **Find object** in the iPhone app to select a target; the browser is read-only.
 The geometry comes from monocular depth estimates, not a hardware LiDAR scan.
 
