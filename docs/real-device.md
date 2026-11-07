@@ -121,6 +121,22 @@ Allow incoming connections for the backend if macOS prompts. Use the Mac's Wi-Fi
 6. **Stop** silences guidance locally; **Resume** restarts when the connection and tracking
    are ready. Audio changes and app interruptions can also stop guidance.
 
+### Reading the room view
+
+The view accumulates up to 20,000 measured points, retaining surfaces for up to 90 seconds
+as you turn the camera. Low surfaces are dark grey; higher surfaces are brighter. The
+white **YOU / iPhone** marker shows camera position and direction. Your selected object
+has a red box, floor ring and distance label; unrelated detections are hidden by default.
+
+Use **3D** to see height, **Overhead** for a floor plan, and **Fit room** to restore automatic
+framing after dragging or zooming. **View options** contains floor coverage, other detected
+objects and camera-follow controls. Type an object into the visible **Find** field to begin.
+The geometry comes from monocular depth estimates, not a hardware LiDAR scan.
+
+Trident keeps the iPhone screen awake while open. Manually locking it or leaving the app
+pauses capture. The viewer keeps the last scan and labels it paused until fresh frames return.
+Mac speech playback is opt-in under **Mac audio preview**; normal guidance plays on iPhone.
+
 ## Troubleshooting
 
 | Symptom | Check |

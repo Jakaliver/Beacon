@@ -122,3 +122,66 @@ footer { height: 33px; flex: 0 0 33px; display: flex; align-items: center; justi
 @media (max-width: 1100px) { main { grid-template-columns: minmax(0, 1fr) 280px; } .panel { padding-left: 20px; padding-right: 20px; } .view-heading { top: 24px; left: 24px; } .view-controls { top: 24px; right: 20px; } .view-controls button { padding: 7px; } .view-controls button span { display: none; } }
 @media (max-width: 700px) { body { height: auto; min-height: 100dvh; } .topbar { padding: 0 18px; height: 60px; flex-basis: 60px; gap: 12px; } .brand { font-size: 12px; gap: 8px; letter-spacing: 2px; } .brand svg { width: 19px; } .brand-sub, .brand-divider { display: none; } .connection { font-size: 9px; letter-spacing: .4px; } .lab-link { font-size: 10px; padding-left: 12px; } main { display: flex; flex-direction: column; } .room { height: 65dvh; min-height: 430px; } aside { overflow: visible; border-left: 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; } .panel { padding: 20px; } .scan-panel, .target-panel, .guidance-panel, details.panel, .aside-foot { grid-column: 1 / -1; } .panel:has(.switch-row) { grid-column: 1 / -1; } .target-title { margin-top: 15px; } .metrics { margin: 18px 0; } h1 { font-size: 25px; } .view-heading { top: 23px; left: 20px; } .view-heading p { font-size: 10px; max-width: 190px; } .view-controls { top: 23px; right: 15px; } .scene-bottom { left: 20px; right: 20px; bottom: 48px; } .legend { gap: 12px; font-size: 9px; } .interaction-hint { left: 20px; right: 20px; font-size: 7px; letter-spacing: .3px; bottom: 20px; } .interaction-hint span { margin: 0 5px; } footer { padding: 0 18px; font-size: 7px; } .footer-note { display: none; } .notice { padding: 8px 18px; font-size: 8px; letter-spacing: .1px; } .preview-notice { flex-wrap: wrap; gap: 3px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+
+/* Keep the scan dominant and the next action visible on laptop-sized screens. */
+.topbar { height: 60px; flex-basis: 60px; }
+main { grid-template-columns: minmax(0, 1fr) 300px; }
+.view-heading { top: 25px; left: 26px; }
+h1 { font-size: 23px; letter-spacing: -.6px; margin: 8px 0; }
+.view-heading p { font-size: 11px; max-width: 260px; line-height: 1.5; margin: 0; }
+.epoch-label { color: #5e7180; }
+.view-controls { top: 25px; right: 22px; }
+.view-controls button span { display: inline; }
+.view-controls button { padding: 7px 8px; }
+.view-heading, .view-controls { text-shadow: 0 1px 12px #0b1118; }
+.panel { padding: 19px 22px; }
+.metrics { margin: 17px 0; }
+.metrics strong { font-size: 26px; }
+.target-title { margin-top: 15px; }
+.target-title h3 { font-size: 26px; }
+.target-measures { margin-bottom: 15px; }
+.target-actions { margin-top: 10px; }
+#cmdForm { padding: 4px; border: 1px solid #6b454e; border-radius: 7px; background: #140f15; gap: 4px; }
+#cmd { background: transparent; border: 0; font-size: 12px; padding: 8px 5px; }
+#cmd::placeholder { color: #a49099; }
+#cmdForm button { color: #260e13; background: #ff6268; border-color: #ff6268; font-weight: 600; white-space: nowrap; padding: 8px 10px; }
+#findBottle { background: transparent; border: 0; color: #caa4ac; font-size: 10px; font-weight: 400; padding: 6px 0; }
+#findBottle:hover { background: transparent; color: #ffb6bf; }
+#focusTarget { padding: 6px 11px; font-size: 10px; }
+.target-label { font-size: 11px; font-weight: 600; color: #fff1f2; border-color: #ff6b75; background: #571f2bee; padding: 9px 12px; box-shadow: 0 4px 20px #0005; letter-spacing: .5px; }
+.target-label::after { background: #ff6b75; }
+.phone-label { position: absolute; z-index: 2; transform: translateX(-50%); padding: 5px 8px; border: 1px solid #627784; border-radius: 4px; background: #14202cef; color: #f1f6fa; font: 10px ui-monospace, monospace; white-space: nowrap; pointer-events: none; }
+.phone-label span { color: #97aebb; margin-left: 4px; }
+.height-key { position: absolute; right: 25px; top: 46%; display: flex; flex-direction: column; align-items: center; gap: 9px; color: #7f919e; font: 8px ui-monospace, monospace; letter-spacing: 1px; pointer-events: none; }
+.height-key i { width: 3px; height: 65px; background: linear-gradient(#eef2f5, #68737d 65%, #303a43); border-radius: 2px; }
+.scan-hint { position: absolute; left: 26px; bottom: 91px; color: #748a99; font: 8px ui-monospace, monospace; letter-spacing: 1.1px; pointer-events: none; }
+.scene-bottom { left: 26px; right: 26px; bottom: 48px; }
+.interaction-hint { left: 26px; bottom: 19px; }
+.legend { gap: 15px; font-size: 10px; }
+.guidance-panel p { margin: 13px 0 9px; }
+.guidance-panel small { font-size: 9px; }
+.view-options .switch-row { padding-top: 4px; }
+.aside-foot { padding: 17px 22px; }
+@media (max-width: 1100px) {
+  main { grid-template-columns: minmax(0, 1fr) 280px; }
+  .view-controls { top: 24px; right: 18px; }
+  .view-controls button { padding: 7px; }
+  .view-controls button span { display: inline; }
+  .view-heading { left: 22px; }
+  .view-heading p { max-width: 245px; }
+}
+@media (max-width: 700px) {
+  main { display: flex; }
+  .room { height: 68dvh; min-height: 440px; }
+  .view-heading { left: 18px; top: 22px; }
+  h1 { font-size: 21px; }
+  .view-heading p { max-width: 225px; font-size: 10px; }
+  .view-controls { left: 18px; right: auto; top: 112px; gap: 3px; }
+  .view-controls button { padding: 6px; }
+  .panel { padding: 18px 20px; }
+  .scan-hint { left: 18px; bottom: 84px; font-size: 7px; }
+  .height-key { right: 14px; }
+  .scene-bottom { left: 18px; right: 18px; }
+  .legend { gap: 10px; font-size: 8px; }
+  .interaction-hint { left: 18px; }
+}

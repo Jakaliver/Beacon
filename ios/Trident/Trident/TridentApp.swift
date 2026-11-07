@@ -8,12 +8,19 @@ struct TridentApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(model: model)
-                .onAppear { model.start() }
+                .onAppear {
+                    UIApplication.shared.isIdleTimerDisabled = true
+                    model.start()
+                }
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
-            case .background: model.enteredBackground()
-            case .active: model.becameActive()
+            case .background:
+                UIApplication.shared.isIdleTimerDisabled = false
+                model.enteredBackground()
+            case .active:
+                UIApplication.shared.isIdleTimerDisabled = true
+                model.becameActive()
             default: break
             }
         }

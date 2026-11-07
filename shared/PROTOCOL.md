@@ -185,3 +185,13 @@ Viewer `stats` also includes `sensor_connected` (boolean), `observation_age_ms`
 for every snapshot, even when the sensor stops sending. `frame_age_ms` remains
 the capture-to-processing latency measured for the last frame. The room viewer
 uses the elapsed ages plus time since receipt to distinguish live and cached data.
+
+`scan_id` is an opaque string that changes whenever the backend resets its world,
+including reconnects with a new sensor session and tracking resets within the same
+AR epoch. `stats.map_version` increments when depth observations are integrated.
+The viewer uses these to retain a bounded, 4.5 cm voxel display history (up to
+20,000 measured points, expiring after 90 seconds without observation), skipping
+duplicate snapshots and clearing history on a world reset. This display history
+does not affect the occupancy map, target positions, or navigation. Target entries
+also expose `locked`, so the viewer can distinguish a locked position from a fresh
+detection.

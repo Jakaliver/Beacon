@@ -30,8 +30,11 @@ labParams.set("lab", "1");
 $("labLink").setAttribute("href", `/?${labParams}`);
 
 try {
-  room = new RoomView($("roomCanvas"), $("targetLabel"), $("scaleBar"));
-  room.onInteract = () => { $<HTMLInputElement>("followCamera").checked = false; };
+  room = new RoomView($("roomCanvas"), $("targetLabel"), $("scaleBar"), $("phoneLabel"));
+  room.onInteract = () => {
+    $<HTMLInputElement>("followCamera").checked = false;
+    $<HTMLInputElement>("autoFit").checked = false;
+  };
 } catch (error) {
   $("renderError").hidden = false;
   $("emptyState").hidden = true;
@@ -43,15 +46,31 @@ function setView(view: "3d" | "plan") {
   room?.setView(view);
   $("view3d").setAttribute("aria-pressed", String(view === "3d"));
   $("viewPlan").setAttribute("aria-pressed", String(view === "plan"));
+  document.querySelector<HTMLElement>(".interaction-hint")!.textContent = view === "plan"
+    ? "DRAG TO PAN · SCROLL OR PINCH TO ZOOM"
+    : "DRAG TO ORBIT · SCROLL TO ZOOM · RIGHT-DRAG TO PAN";
 }
 $("view3d").onclick = () => setView("3d");
 $("viewPlan").onclick = () => setView("plan");
-$("fitRoom").onclick = () => { room?.setFollow(false); $<HTMLInputElement>("followCamera").checked = false; room?.fit(); };
+$("fitRoom").onclick = () => {
+  room?.setAutoFit(true);
+  $<HTMLInputElement>("followCamera").checked = false;
+  $<HTMLInputElement>("autoFit").checked = true;
+};
 $("focusTarget").onclick = () => room?.focusTarget();
-for (const [id, layer] of [["layerPoints", "points"], ["layerFloor", "floor"], ["layerRoute", "route"]] as const) {
+for (const [id, layer] of [["layerPoints", "points"], ["layerFloor", "floor"], ["layerRoute", "route"], ["layerDetections", "detections"]] as const) {
   $<HTMLInputElement>(id).onchange = e => room?.setLayer(layer, (e.target as HTMLInputElement).checked);
 }
-$<HTMLInputElement>("followCamera").onchange = e => room?.setFollow((e.target as HTMLInputElement).checked);
+$<HTMLInputElement>("followCamera").onchange = e => {
+  const enabled = (e.target as HTMLInputElement).checked;
+  room?.setFollow(enabled);
+  if (enabled) $<HTMLInputElement>("autoFit").checked = false;
+};
+$<HTMLInputElement>("autoFit").onchange = e => {
+  const enabled = (e.target as HTMLInputElement).checked;
+  room?.setAutoFit(enabled);
+  if (enabled) $<HTMLInputElement>("followCamera").checked = false;
+};
 
 function displaySnapshot(snapshot: Recon) {
   recon = snapshot;
@@ -64,16 +83,15 @@ function displaySnapshot(snapshot: Recon) {
   $("emptyState").hidden = !room || pointCount > 0;
   $("injected").hidden = snapshot.perception !== "injected";
   $("sourceLabel").textContent = preview ? "SAMPLE DATA" : snapshot.perception === "injected" ? "INJECTED DATA" : "CAMERA FEED";
-  $("sceneCaption").textContent = preview ? "An illustrative room, ready to explore." : "Camera observations, mapped in space.";
-  $("renderInfo").textContent = room ? `${pointCount.toLocaleString()} OBSERVATIONS / WORLD SPACE` : "WEBGL UNAVAILABLE";
+  $("renderInfo").textContent = room ? `${pointCount.toLocaleString()} POINTS / ACCUMULATED SCAN` : "WEBGL UNAVAILABLE";
   const s = snapshot.stats;
   $("stats").textContent = preview ? "Illustrative reconstruction. No sensor connected; guidance controls are disabled." :
     `vision ${Number(s.vision_fps).toFixed(1)} fps · depth ${Number(s.depth_ms).toFixed(0)} ms · detect ${Number(s.detect_ms).toFixed(0)} ms`
-    + ` · pose ${Number(s.pose_hz).toFixed(0)} Hz · dropped ${s.dropped_frames}`
+    + ` · dropped ${s.dropped_frames}`
     + ` · RSS ${s.rss_mb ?? "—"} / ${s.budget_mb ?? "—"} MB · MPS ${s.mps_mb ?? "—"} MB${s.over_budget ? " · OVER BUDGET" : ""}`;
   const t = snapshot.targets.find(t => t.selected);
-  $("targetName").textContent = t?.label ?? "No target yet";
-  $("targetMeta").textContent = t ? `${t.id} · ${t.injected ? "injected estimate" : preview ? "sample object" : "camera estimate"}` : "Choose an object to locate in your room.";
+  $("targetName").textContent = t?.label ?? "Find an object";
+  $("targetMeta").textContent = t ? `${t.id} · ${t.injected ? "injected estimate" : preview ? "sample object" : "camera estimate"}` : "Type an object below. It appears in red when located.";
   $("targetUncertainty").textContent = t ? `±${Math.round(t.sigma * 100)} cm` : "—";
   const p = snapshot.phone.position;
   $("targetDistance").textContent = t && p ? Math.hypot(...t.position.map((v, i) => v - p[i])).toFixed(2) : "—";
@@ -92,20 +110,23 @@ function updateFreshness() {
   const state = preview ? "preview" : live ? "live" : recon ? "stale" : "waiting";
   $("connection").dataset.state = state;
   $("connectionText").textContent = preview ? "Sample preview" : live ? "Live reconstruction" : !viewerConnected ? "Reconnecting" : !recon?.phone.position ? "Awaiting camera" : "Scan paused";
-  $("scanStatus").textContent = preview ? "Illustrative room scan" : live ? "Receiving observations" : !viewerConnected ? "Backend disconnected" : recon?.phone.tracking && recon.phone.tracking !== "normal" ? "Camera tracking limited" : "Waiting for fresh frames";
+  $("scanStatus").textContent = preview ? "Illustrative scan" : live ? "Camera connected" : !viewerConnected ? "Backend disconnected" : recon?.phone.tracking && recon.phone.tracking !== "normal" ? "Tracking limited" : "Waiting for camera";
+  $("sceneCaption").textContent = preview ? "Sample geometry · not your camera" : live ? "Move slowly. The scan builds as you look around." : pointCount ? "Scan paused. Open Trident to continue mapping." : "Open Trident and point the camera around your room.";
+  $("scanHint").textContent = preview ? "SAMPLE ROOM" : live ? "LIVE CAMERA · ACCUMULATED SCAN" : pointCount ? "LAST SCAN · WAITING FOR CAMERA" : "WAITING FOR CAMERA";
   $("frameAge").textContent = preview ? "PREVIEW" : Number.isFinite(frameAge) ? `${(frameAge / 1000).toFixed(1)}s ago` : "—";
   const t = recon?.targets.find(t => t.selected);
   const stale = !preview && (!live || !!t && t.age + elapsed / 1000 > 1.5);
-  $("targetState").textContent = !t ? "SEARCHING" : preview ? "SAMPLE" : !t.valid ? "UNVERIFIED" : stale ? "CACHED" : "TRACKED";
-  $("targetLabelText").textContent = t ? `${t.label.toUpperCase()} / ${!t.valid ? "UNVERIFIED" : stale ? "CACHED" : preview ? "SAMPLE" : "TARGET"}` : "";
-  if (t) $("targetMeta").textContent = `${t.id} · ${preview ? "sample object" : `${t.injected ? "injected · " : ""}seen ${(t.age + elapsed / 1000).toFixed(1)}s ago`}`;
+  const targetState = !t ? "NO TARGET" : preview ? "SAMPLE" : !t.valid ? "UNVERIFIED" : !live ? "PAUSED" : t.locked ? "LOCKED" : stale ? "LAST SEEN" : "TRACKED";
+  $("targetState").textContent = targetState;
+  $("targetLabelText").textContent = t ? `${t.label.toUpperCase()} · ${$("targetDistance").textContent} m` : "";
+  if (t) $("targetMeta").textContent = preview ? "Sample object on the table." : `${t.locked ? "Position locked" : "Estimated position"} · seen ${(t.age + elapsed / 1000).toFixed(1)}s ago`;
 }
 
 function connectViewer() {
   if (preview || destroyed) return;
   const ws = new WebSocket(socketURL("/ws/viewer"));
   viewer = ws;
-  ws.onopen = () => { viewerConnected = true; updateFreshness(); };
+  ws.onopen = () => { room?.resetScan(); viewerConnected = true; updateFreshness(); };
   ws.onmessage = e => {
     try {
       const snapshot = JSON.parse(e.data) as Recon;
@@ -128,7 +149,7 @@ async function startPreview() {
   $("emptyState").hidden = true;
   $("mode").textContent = "Preview";
   $("prox").textContent = "Connect a camera to enable live guidance.";
-  document.querySelectorAll<HTMLInputElement | HTMLButtonElement>(".guidance-panel button, .detail-body button, .detail-body input, #findBottle").forEach(el => { el.disabled = true; });
+  document.querySelectorAll<HTMLInputElement | HTMLButtonElement>(".guidance-panel button, .command-controls button, .command-controls input, .audio-controls button, .audio-controls input, #findBottle, #cmdForm input, #cmdForm button").forEach(el => { el.disabled = true; });
   const url = new URL(location.href); url.searchParams.set("preview", "1"); history.replaceState(null, "", url);
   const { sampleRoom } = await import("./sample-room");
   if (destroyed) return;
@@ -160,6 +181,7 @@ function log(text: string) {
 }
 function speak(text: string) {
   log(`🔊 ${text}`);
+  if (!audio.ok) return;
   speechSynthesis.cancel();
   speechSynthesis.speak(new SpeechSynthesisUtterance(text));
 }
@@ -180,13 +202,16 @@ function connectControl() {
 }
 
 function onGuidance(m: Guidance) {
-  $("mode").textContent = m.mode + (m.stop_reason ? ` (${m.stop_reason})` : "");
+  const modes: Record<string, string> = { idle: "Ready", stopped: "Paused", searching: "Searching", walking: "Guiding", probe: "Within reach", hotcold: "Locating", found: "Found" };
+  $("mode").textContent = modes[m.mode] ?? m.mode;
   $("mode").dataset.mode = m.mode;
   $<HTMLInputElement>("nav").checked = m.navigation;
   const p = m.proximity, w = m.waypoint;
-  $("prox").textContent = p ? `phone → target surface ${p.distance.toFixed(2)} m (confirm < ${p.threshold.toFixed(2)} m)${p.confirm ? " ✔ CLOSE" : ""}`
-    : w ? `waypoint ${w.distance.toFixed(1)} m · ${w.instruction}` : "–";
-  $("target").textContent = m.target ? `${m.target.id} ±${Math.round(m.target.sigma * 100)} cm · seen ${m.target.age.toFixed(1)} s ago${m.target.observed_now ? "" : " (cached, not verified now)"}` : "–";
+  const reasons: Record<string, string> = { audio: "Connect your AirPods to the iPhone, then tap Resume.", tracking: "Move the phone slowly until camera tracking returns.", sensor: "Keep Trident open on your iPhone.", user: "Tap Resume when you’re ready." };
+  $("prox").textContent = m.mode === "stopped" ? reasons[m.stop_reason ?? ""] ?? `Guidance paused: ${(m.stop_reason ?? "waiting for camera").replaceAll("_", " ")}.`
+    : p ? `${p.distance.toFixed(2)} m to the target surface${p.confirm ? " · Within reach" : ""}`
+    : w ? `${w.instruction} · ${w.distance.toFixed(1)} m` : "Find an object above to start guidance.";
+  $("target").textContent = "Listen on your iPhone · AirPods connected to iPhone";
   if ((m.mode === "probe" || m.mode === "hotcold") && p) audio.setProbe(p.distance, p.source_head);
   else if (m.mode === "walking" && w) audio.setWaypoint(w.pulse_interval, w.source_head);
   else audio.silence();

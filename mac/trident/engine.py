@@ -109,6 +109,7 @@ class Engine:
     # World state ---------------------------------------------------------
     def reset_world(self, epoch: int) -> None:
         self.epoch = epoch
+        self.scan_id = str(time.monotonic_ns())
         self.map = GridMap()
         self.tracker = Tracker()
         self.path: list[np.ndarray] = []
@@ -625,6 +626,7 @@ class Engine:
             return {
                 "type": "recon", "epoch": self.epoch, "perception": self.perception_mode,
                 "mode": self.mode, "stop_reason": self.stop_reason, "navigation": self.navigation,
+                "scan_id": self.scan_id,
                 "grid": {"origin": self.map.origin.tolist(), "res": self.map.res,
                          "w": self.map.n, "h": self.map.n,
                          "cells": base64.b64encode(states.tobytes()).decode()},
@@ -636,11 +638,12 @@ class Engine:
                 "targets": [{"id": t.id, "label": t.label, "position": t.position.round(3).tolist(),
                              "extent": t.extent.round(3).tolist(), "sigma": round(t.sigma_at(now), 3),
                              "age": round(now - t.last_seen, 1), "valid": t.valid_at(now),
-                             "selected": t.id == self.selected, "injected": t.injected}
+                             "selected": t.id == self.selected, "injected": t.injected, "locked": t.locked}
                             for t in self.tracker.tracks.values() if t.valid_at(now) or t.id == self.selected],
                 "path": [p.round(3).tolist() for p in self.path] if self.mode == "walking" else [],
                 "waypoint": self.waypoint.round(3).tolist() if self.waypoint is not None and self.mode == "walking" else None,
                 "stats": {**self.stats,
+                          "map_version": self.map.version,
                           "sensor_connected": self.sensor_connected,
                           "observation_age_ms": round(1000 * (now - self.last_frame_processed))
                           if self.last_frame_processed else None,
