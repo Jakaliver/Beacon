@@ -59,9 +59,9 @@ final class AudioGuide {
             listener.automaticHeadTrackingFlags = .orientation
         }
         // Beeps with soft harmonics: a pure sine cannot be placed in space; harmonics give the ear direction cues.
-        register("pulse", Self.beep(hz: 1000, seconds: 0.09))
-        register("confirm", Self.beep(hz: 1000, seconds: 0.09) + Self.silence(0.05) + Self.beep(hz: 1000, seconds: 0.09))
-        register("beacon", Self.beep(hz: 660, seconds: 0.16))
+        register("pulse", Self.beep(hz: 520, seconds: 0.1))
+        register("confirm", Self.beep(hz: 520, seconds: 0.1) + Self.silence(0.05) + Self.beep(hz: 520, seconds: 0.1))
+        register("beacon", Self.beep(hz: 380, seconds: 0.16))
         register("stop", Self.tone([(660, 0.1), (440, 0.18)], harmonic: 0.2))
         register("rescan", Self.tone([(700, 0.06), (0, 0.05), (700, 0.06)], harmonic: 0.2))
         headLock.withLock { updateListener() }
