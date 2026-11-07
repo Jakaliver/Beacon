@@ -52,6 +52,9 @@ process = psutil.Process(os.getpid())
 # All PyTorch MPS work (model load, inference, memory queries) stays on one thread:
 # calling into MPS from several threads deadlocked in testing.
 vision_thread = ThreadPoolExecutor(max_workers=1, thread_name_prefix="vision")
+# MLX streams belong to their creating thread. Keep model loading and every
+# transcription on the same worker, including simultaneous voice requests.
+speech_thread = ThreadPoolExecutor(max_workers=1, thread_name_prefix="speech")
 mps_mb = {"value": 0}
 
 
@@ -132,7 +135,7 @@ def memory_stats() -> dict:
 
 async def load_speech() -> None:
     from .speech import Speech
-    speech["model"] = await asyncio.to_thread(Speech)
+    speech["model"] = await asyncio.get_running_loop().run_in_executor(speech_thread, Speech)
     log.warning("speech model ready")
 
 
@@ -161,7 +164,7 @@ async def transcribe(request: Request) -> dict:
     body = await request.body()
     if len(body) > 2_000_000:
         return {"text": "", "error": "recording too long"}
-    text = await asyncio.to_thread(speech["model"].transcribe_wav, body)
+    text = await asyncio.get_running_loop().run_in_executor(speech_thread, speech["model"].transcribe_wav, body)
     events.info("heard (%.1f s of audio): %r", max(0, len(body) - 44) / 32000, text)
     return {"text": text}
 
