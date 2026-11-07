@@ -46,7 +46,6 @@ class Track:
     relocated: bool = False  # set when a locked target moved; the engine announces it
     observed_now: bool = True
     injected: bool = False
-    history: list = field(default_factory=list)
     refinements: list = field(default_factory=list)
 
     def sigma_at(self, now: float) -> float:

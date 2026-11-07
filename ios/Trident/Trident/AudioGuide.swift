@@ -16,8 +16,10 @@ final class AudioGuide {
     /// Paid developer teams: set true and restore the Head Pose entitlement in project.yml.
     static let automaticHeadTracking = false
 
-    /// For the status line: whether AirPods head motion is arriving.
-    private(set) var headTrackingLive = false
+    /// For the status line: whether AirPods head motion arrived in the last second.
+    var headTrackingLive: Bool {
+        headLock.withLock { ProcessInfo.processInfo.systemUptime - lastHeadSample < 1 }
+    }
 
     private let engine = PHASEEngine(updateMode: .automatic)
     private let listener: PHASEListener
@@ -48,6 +50,7 @@ final class AudioGuide {
     private let headLock = NSLock()
     private var headReference: CMAttitude?
     private var latestHead: CMAttitude?
+    private var lastHeadSample = -TimeInterval.infinity
     private var baseForward = SIMD3<Float>(0, 0, -1)
     private var listenerPosition = SIMD3<Float>(0, 0, 0)
     private var listenerForward = SIMD3<Float>(0, 0, -1)
@@ -163,10 +166,11 @@ final class AudioGuide {
     private func startHeadTracking() {
         guard headMotion.isDeviceMotionAvailable, !headMotion.isDeviceMotionActive else { return }
         headMotion.startDeviceMotionUpdates(to: headQueue) { [weak self] motion, _ in
-            guard let self, let attitude = motion?.attitude else { return }
+            guard let self, let motion else { return }
+            let attitude = motion.attitude
             self.headLock.withLock {
                 self.latestHead = attitude
-                self.headTrackingLive = true
+                self.lastHeadSample = motion.timestamp
                 if self.headReference == nil { self.headReference = attitude.copy() as? CMAttitude }
                 self.applyHead()
             }

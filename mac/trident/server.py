@@ -30,7 +30,9 @@ faulthandler.register(signal.SIGUSR1)  # `kill -USR1 <pid>` prints all thread st
 engine = Engine()
 control_clients: set[WebSocket] = set()
 viewer_clients: set[WebSocket] = set()
-viewer_points = {"version": None, "new_viewer": False}  # the point cloud is only resent when it changed
+# The point cloud (up to ~1.5 MB) is resent only when it changed, and at most POINTS_HZ times a second.
+viewer_points = {"version": None, "new_viewer": False, "sent": 0.0}
+POINTS_HZ = 5
 pending: dict = {"frame": None}
 # The newest sensor connection wins, so a forgotten simulator tab cannot fight a real phone.
 active_sensor: dict = {"ws": None}
@@ -118,21 +120,19 @@ async def ticker() -> None:
                 last_guidance = now
                 await publish_guidance()
             if viewer_clients:
-                snap = await asyncio.to_thread(engine.snapshot)
+                snap = await asyncio.to_thread(engine.snapshot, wants_points(engine.surfaces.version, now))
                 snap["stats"].update(memory_stats())
-                await broadcast(viewer_clients, [lighten(snap)])
+                await broadcast(viewer_clients, [snap])
         except Exception:
             log.exception("guidance/viewer tick failed")
 
 
-def lighten(snap: dict) -> dict:
-    """Drop the point cloud (most of a snapshot's ~500 KB) unless it changed or a viewer just joined."""
-    version = snap.get("points_version")
-    if version is not None and version == viewer_points["version"] and not viewer_points["new_viewer"]:
-        return {k: v for k, v in snap.items() if k not in ("points", "point_colors")}
-    viewer_points["version"] = version
-    viewer_points["new_viewer"] = False
-    return snap
+def wants_points(version: int, now: float) -> bool:
+    if not viewer_points["new_viewer"] and (
+            version == viewer_points["version"] or now - viewer_points["sent"] < 1 / POINTS_HZ):
+        return False
+    viewer_points.update(version=version, new_viewer=False, sent=now)
+    return True
 
 
 def process_and_measure(*item) -> None:

@@ -5,7 +5,8 @@ import cv2
 import numpy as np
 
 
-def depth_triangles(depth: np.ndarray, intrinsics, transform: np.ndarray, step: int = 8) -> np.ndarray:
+def depth_triangles(depth: np.ndarray, intrinsics, transform: np.ndarray, step: int = 8,
+                    smooth: np.ndarray | None = None) -> np.ndarray:
     """Connect neighbouring pixels only across short, continuous depth intervals.
 
     Invalid pixels and foreground/background edges stay open. Never triangulate an
@@ -13,7 +14,8 @@ def depth_triangles(depth: np.ndarray, intrinsics, transform: np.ndarray, step: 
     """
     depth = np.asarray(depth, dtype=np.float32)
     valid = np.isfinite(depth) & (depth > 0.2) & (depth < 6.0)
-    smooth = cv2.bilateralFilter(np.where(valid, depth, 0), 5, 0.04, 3)
+    if smooth is None:
+        smooth = cv2.bilateralFilter(np.where(valid, depth, 0), 5, 0.04, 3)
     h, w = depth.shape
     v, u = np.mgrid[step // 2:h:step, step // 2:w:step]
     if min(u.shape) < 2:
@@ -60,7 +62,7 @@ class SurfaceMap:
         self.candidate_since = np.empty(0, np.float64)
         self.candidate_last = np.empty(0, np.float64)
         self.version = 0
-        self.payload = {"version": 0, "points": "", "colors": "", "count": 0}
+        self._payload = {"version": 0, "points": "", "colors": "", "count": 0}
 
     def _unique(self, points):
         """One sample per voxel, using scalar keys instead of sorting XYZ records."""
@@ -160,7 +162,7 @@ class SurfaceMap:
 
         # Denser edge-aware samples fill in detail as the camera moves; they do
         # not bridge missing pixels or create surfaces across depth boundaries.
-        fresh = depth_triangles(depth, intrinsics, transform, step=6).reshape(-1, 3)
+        fresh = depth_triangles(depth, intrinsics, transform, step=6, smooth=smooth).reshape(-1, 3)
         fresh = fresh[self._unique(fresh)]
         _, ranges, u, v = self._project(fresh, intrinsics, transform)
         rgb = np.full(fresh.shape, 180, np.float32)
@@ -181,12 +183,18 @@ class SurfaceMap:
             keep = np.argpartition(self.seen, -self.limit)[-self.limit:]
             self._select(np.sort(keep))
         self.version += 1
-        confirmed = self.hits >= 2
-        points = self.points[confirmed].astype("<f4", copy=False)
-        colors = np.clip(np.rint(self.colors[confirmed]), 0, 255).astype(np.uint8)
-        self.payload = {"version": self.version, "count": len(points),
-                        "points": base64.b64encode(points.tobytes()).decode(),
-                        "colors": base64.b64encode(colors.tobytes()).decode()}
+
+    @property
+    def payload(self) -> dict:
+        """Confirmed points as base64, encoded only when a viewer asks for a new version."""
+        if self._payload["version"] != self.version:
+            confirmed = self.hits >= 2
+            points = self.points[confirmed].astype("<f4", copy=False)
+            colors = np.clip(np.rint(self.colors[confirmed]), 0, 255).astype(np.uint8)
+            self._payload = {"version": self.version, "count": len(points),
+                             "points": base64.b64encode(points.tobytes()).decode(),
+                             "colors": base64.b64encode(colors.tobytes()).decode()}
+        return self._payload
 
 
 def plane_snapshot(value) -> list[dict]:

@@ -625,7 +625,7 @@ class Engine:
                 "valid": t.valid_at(now), "observed_now": t.observed_now, "locked": t.locked, "injected": t.injected}
 
     # Viewer snapshot -------------------------------------------------------
-    def snapshot(self) -> dict:
+    def snapshot(self, with_points: bool = True) -> dict:
         import base64
         with self.lock:
             now = time.monotonic()
@@ -634,7 +634,7 @@ class Engine:
             if self.pose is not None:
                 phone = self.pose.T[:3, 3].round(3).tolist()
                 forward_vec = forward(self.pose.T).round(3).tolist()
-            return {
+            snap = {
                 "type": "recon", "epoch": self.epoch, "perception": self.perception_mode,
                 "mode": self.mode, "stop_reason": self.stop_reason, "navigation": self.navigation,
                 "scan_id": self.scan_id,
@@ -642,8 +642,6 @@ class Engine:
                          "w": self.map.n, "h": self.map.n,
                          "cells": base64.b64encode(states.tobytes()).decode()},
                 "floor_y": self.map.floor_y,
-                "points": self.surfaces.payload["points"],
-                "point_colors": self.surfaces.payload["colors"],
                 "points_version": self.surfaces.version,
                 "points_fused": True,
                 "phone": {"position": phone, "forward": forward_vec,
@@ -663,3 +661,8 @@ class Engine:
                           if self.last_frame_processed else None,
                           "pose_age_ms": round(1000 * (now - self.pose.received)) if self.pose else None},
             }
+            if with_points:
+                payload = self.surfaces.payload
+                snap["points_version"] = payload["version"]
+                snap["points"], snap["point_colors"] = payload["points"], payload["colors"]
+            return snap

@@ -44,7 +44,7 @@ enum Settings {
     static let reverseHeadTurnKey = "reverseHeadTurn"
     static let reverseHeadTiltKey = "reverseHeadTilt"
     static let soundHeightKey = "soundHeight"  // metres; positive raises sounds
-    static let defaultFrameRate = 15.0  // the Mac processes about 16 frames per second
+    static let defaultFrameRate = 20.0  // an M-series Mac processes about 23 frames per second
 
     static var host: String { UserDefaults.standard.string(forKey: hostKey) ?? defaultHost }
     static var frameRate: Double {
@@ -306,10 +306,15 @@ final class AppModel: ObservableObject {
         }
     }
 
+    private static let decoder: JSONDecoder = {
+        let d = JSONDecoder()
+        d.keyDecodingStrategy = .convertFromSnakeCase
+        return d
+    }()
+
     private func handle(_ text: String) {
         guard let data = text.data(using: .utf8) else { return }
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let decoder = Self.decoder
         guard let message = try? decoder.decode(Incoming.self, from: data) else { return }
         switch message.type {
         case "guidance":

@@ -1,36 +1,30 @@
-"""Room view feed: high update rates stay cheap because unchanged point clouds are not resent."""
+"""Room view feed: high update rates stay cheap because the point cloud is not resent every tick."""
 import unittest
 from unittest.mock import patch
 
 from trident import server
 
 
-def snapshot(version):
-    return {"type": "recon", "points_version": version, "points": "AAAA", "point_colors": "BBBB", "phone": {}}
-
-
-class LightSnapshotTests(unittest.TestCase):
+class PointCloudRateTests(unittest.TestCase):
     def setUp(self):
-        p = patch.object(server, "viewer_points", {"version": None, "new_viewer": False})
+        p = patch.object(server, "viewer_points", {"version": None, "new_viewer": False, "sent": 0.0})
         p.start()
         self.addCleanup(p.stop)
 
-    def test_unchanged_point_cloud_is_omitted(self):
-        self.assertIn("points", server.lighten(snapshot(1)))
-        light = server.lighten(snapshot(1))
-        self.assertNotIn("points", light)
-        self.assertNotIn("point_colors", light)
-        self.assertEqual(light["points_version"], 1)  # the viewer still sees which cloud is current
+    def test_unchanged_point_cloud_is_not_resent(self):
+        self.assertTrue(server.wants_points(1, 10.0))
+        self.assertFalse(server.wants_points(1, 11.0))
 
-    def test_changed_point_cloud_is_sent(self):
-        server.lighten(snapshot(1))
-        self.assertIn("points", server.lighten(snapshot(2)))
+    def test_changed_point_cloud_is_sent_at_most_points_hz(self):
+        server.wants_points(1, 10.0)
+        self.assertFalse(server.wants_points(2, 10.0 + 0.5 / server.POINTS_HZ))
+        self.assertTrue(server.wants_points(2, 10.0 + 1.01 / server.POINTS_HZ))
 
-    def test_a_new_viewer_gets_the_full_cloud(self):
-        server.lighten(snapshot(1))
+    def test_a_new_viewer_gets_the_full_cloud_at_once(self):
+        server.wants_points(1, 10.0)
         server.viewer_points["new_viewer"] = True
-        self.assertIn("points", server.lighten(snapshot(1)))
-        self.assertNotIn("points", server.lighten(snapshot(1)))
+        self.assertTrue(server.wants_points(1, 10.01))
+        self.assertFalse(server.wants_points(1, 11.0))
 
 
 if __name__ == "__main__":

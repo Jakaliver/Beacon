@@ -26,9 +26,6 @@ class GridMap:
         self.expect_arkit_floor = False
         self.scale = 1.0  # running depth-scale correction
         self.n_scale = 0
-        self.points = np.zeros((CONFIG.max_points, 3), np.float32)
-        self.n_points = 0
-        self.write = 0
         self.version = 0
 
     @property
@@ -166,13 +163,6 @@ class GridMap:
         np.add.at(crossed, (r[ok2], c[ok2]), 1.0)
         self.hits = np.maximum(0, self.hits - np.minimum(crossed, 1.0) * (frame_hits == 0))
 
-        keep_pts = pts[is_floor | is_obst]
-        if len(keep_pts):
-            keep_pts = keep_pts[np.random.choice(len(keep_pts), min(400, len(keep_pts)), replace=False)]
-            idx = (self.write + np.arange(len(keep_pts))) % CONFIG.max_points
-            self.points[idx] = keep_pts
-            self.write = int((idx[-1] + 1) % CONFIG.max_points)
-            self.n_points = min(CONFIG.max_points, self.n_points + len(keep_pts))
         self.version += 1
 
     def mark_walked(self, xz: np.ndarray, t: float) -> None:
@@ -192,13 +182,6 @@ class GridMap:
         s[inflated & (s != UNKNOWN)] = INFLATED
         s[occupied] = OCCUPIED
         return s
-
-    def recent_points(self, n: int = 6000) -> np.ndarray:
-        if self.n_points < CONFIG.max_points:
-            pts = self.points[: self.n_points]
-        else:
-            pts = np.roll(self.points, -self.write, axis=0)
-        return pts[-n:]
 
 
 if __name__ == "__main__":

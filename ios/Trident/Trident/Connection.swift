@@ -27,6 +27,7 @@ final class Connection: NSObject, URLSessionWebSocketDelegate {
     var isConnected: Bool { lock.withLock { connected } }
 
     func connect(host: String) {
+        if host == self.host, lock.withLock({ task != nil }) { return }
         self.host = host
         backoff = 0.5
         open()
@@ -44,13 +45,13 @@ final class Connection: NSObject, URLSessionWebSocketDelegate {
     }
 
     private func open() {
-        let old = lock.withLock { () -> URLSessionWebSocketTask? in
-            let old = task
-            task = nil
-            connected = false
-            return old
+        let (old, wasConnected) = lock.withLock { () -> (URLSessionWebSocketTask?, Bool) in
+            defer { task = nil; connected = false }
+            return (task, connected)
         }
         old?.cancel(with: .goingAway, reason: nil)
+        pingTimer?.invalidate()
+        if wasConnected { onClose?() }
         guard let url = URL(string: "ws://\(host):8787\(path)") else { return scheduleReconnect() }
         let newTask = urlSession.webSocketTask(with: url)
         lock.withLock { task = newTask }

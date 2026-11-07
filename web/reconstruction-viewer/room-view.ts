@@ -39,6 +39,12 @@ export class RoomView {
   private scan = new ScanCloud(MAX_POINTS);
   private scanId: string | undefined;
   private mapVersion: number | boolean | null | undefined;
+  // The point colours, floor texture and route are rebuilt only when their inputs change.
+  private cloudKey = "";
+  private gridCells = "";
+  private routeKey = "";
+  private pointCount = 0;
+  private observedCells = 0;
   private autoFit = true;
   private orbit = false;
   private lastFit = 0;
@@ -296,59 +302,72 @@ export class RoomView {
         this.imageColors = null;
       }
       this.mapVersion = version;
+      this.cloudKey = "";
     }
     const selected = recon.targets.find(t => t.selected && t.valid);
-    const count = recon.points_fused ? this.decodedCount : this.scan.writeTo(this.positions);
-    for (let j = 0; j < count * 3; j += 3) {
-      const x = this.positions[j], y = this.positions[j + 1], z = this.positions[j + 2];
-      const inTarget = selected
-        && Math.abs(x - selected.position[0]) < selected.extent[0] / 2 + 0.025
-        && Math.abs(y - selected.position[1]) < selected.extent[1] / 2 + 0.025
-        && Math.abs(z - selected.position[2]) < selected.extent[2] / 2 + 0.025;
-      // Quiet floor returns; bright furniture and walls make height legible.
-      const shade = THREE.MathUtils.clamp(0.20 + (y - floorY) * 0.40, 0.16, 0.9);
-      if (this.colourMode && this.imageColors && this.imageColors.length >= count * 3) {
-        this.rgb.setRGB(this.imageColors[j] / 255, this.imageColors[j + 1] / 255,
-          this.imageColors[j + 2] / 255, THREE.SRGBColorSpace);
-        this.colors[j] = inTarget ? 1 : this.rgb.r;
-        this.colors[j + 1] = inTarget ? 0.065 : this.rgb.g;
-        this.colors[j + 2] = inTarget ? 0.08 : this.rgb.b;
-      } else {
-        this.colors[j] = inTarget ? 1 : shade;
-        this.colors[j + 1] = inTarget ? 0.065 : shade;
-        this.colors[j + 2] = inTarget ? 0.08 : shade;
+    const cloudKey = [this.mapVersion, this.colourMode, floorY, selected?.id, selected?.position, selected?.extent].join("|");
+    if (!recon.points_fused || cloudKey !== this.cloudKey) {
+      this.cloudKey = cloudKey;
+      const count = this.pointCount = recon.points_fused ? this.decodedCount : this.scan.writeTo(this.positions);
+      for (let j = 0; j < count * 3; j += 3) {
+        const x = this.positions[j], y = this.positions[j + 1], z = this.positions[j + 2];
+        const inTarget = selected
+          && Math.abs(x - selected.position[0]) < selected.extent[0] / 2 + 0.025
+          && Math.abs(y - selected.position[1]) < selected.extent[1] / 2 + 0.025
+          && Math.abs(z - selected.position[2]) < selected.extent[2] / 2 + 0.025;
+        // Quiet floor returns; bright furniture and walls make height legible.
+        const shade = THREE.MathUtils.clamp(0.20 + (y - floorY) * 0.40, 0.16, 0.9);
+        if (this.colourMode && this.imageColors && this.imageColors.length >= count * 3) {
+          this.rgb.setRGB(this.imageColors[j] / 255, this.imageColors[j + 1] / 255,
+            this.imageColors[j + 2] / 255, THREE.SRGBColorSpace);
+          this.colors[j] = inTarget ? 1 : this.rgb.r;
+          this.colors[j + 1] = inTarget ? 0.065 : this.rgb.g;
+          this.colors[j + 2] = inTarget ? 0.08 : this.rgb.b;
+        } else {
+          this.colors[j] = inTarget ? 1 : shade;
+          this.colors[j + 1] = inTarget ? 0.065 : shade;
+          this.colors[j + 2] = inTarget ? 0.08 : shade;
+        }
       }
+      this.cloudGeometry.setDrawRange(0, count);
+      this.cloudGeometry.attributes.position.needsUpdate = this.cloudGeometry.attributes.color.needsUpdate = true;
     }
-    this.cloudGeometry.setDrawRange(0, count);
-    this.cloudGeometry.attributes.position.needsUpdate = this.cloudGeometry.attributes.color.needsUpdate = true;
 
     const { w, h, res, origin } = recon.grid;
-    if (!this.texture || this.texture.image.width !== w || this.texture.image.height !== h) {
-      this.texture?.dispose();
-      this.texture = new THREE.DataTexture(new Uint8Array(w * h * 4), w, h);
-      this.texture.colorSpace = THREE.SRGBColorSpace;
-      this.texture.magFilter = this.texture.minFilter = THREE.NearestFilter;
-      this.floor.material.map = this.texture;
-      this.floor.material.needsUpdate = true;
+    if (recon.grid.cells !== this.gridCells) {
+      this.gridCells = recon.grid.cells;
+      if (!this.texture || this.texture.image.width !== w || this.texture.image.height !== h) {
+        this.texture?.dispose();
+        this.texture = new THREE.DataTexture(new Uint8Array(w * h * 4), w, h);
+        this.texture.colorSpace = THREE.SRGBColorSpace;
+        this.texture.magFilter = this.texture.minFilter = THREE.NearestFilter;
+        this.floor.material.map = this.texture;
+        this.floor.material.needsUpdate = true;
+      }
+      const cells = decode(recon.grid.cells);
+      const pixels = this.texture.image.data as Uint8Array;
+      let observed = 0;
+      for (let row = 0; row < h; row++) for (let col = 0; col < w; col++) {
+        const cell = cells[row * w + col] ?? 0;
+        if (cell) observed++;
+        // Plane UV +Y maps to world -Z; reverse rows so the occupancy map matches the cloud.
+        pixels.set(PALETTE[cell] ?? PALETTE[0], ((h - 1 - row) * w + col) * 4);
+      }
+      this.texture.needsUpdate = true;
+      this.observedCells = observed;
+      this.hasFloor = observed > 0;
     }
-    const cells = decode(recon.grid.cells);
-    const pixels = this.texture.image.data as Uint8Array;
-    let observed = 0;
-    for (let row = 0; row < h; row++) for (let col = 0; col < w; col++) {
-      const cell = cells[row * w + col] ?? 0;
-      if (cell) observed++;
-      // Plane UV +Y maps to world -Z; reverse rows so the occupancy map matches the cloud.
-      pixels.set(PALETTE[cell] ?? PALETTE[0], ((h - 1 - row) * w + col) * 4);
-    }
-    this.texture.needsUpdate = true;
-    this.hasFloor = observed > 0;
     this.floor.visible = this.viewMode !== "first" && this.hasFloor;
     this.floor.scale.set(w * res, h * res, 1);
     this.floor.position.set(origin[0] + w * res / 2, floorY - 0.025, origin[1] + h * res / 2);
     this.updateTargets(recon);
 
-    this.route.geometry.dispose();
-    this.route.geometry = new THREE.BufferGeometry().setFromPoints(recon.path.map(([x, z]) => new THREE.Vector3(x, floorY + 0.06, z)));
+    const routeKey = `${floorY}|${recon.path.join(";")}`;
+    if (routeKey !== this.routeKey) {
+      this.routeKey = routeKey;
+      this.route.geometry.dispose();
+      this.route.geometry = new THREE.BufferGeometry().setFromPoints(recon.path.map(([x, z]) => new THREE.Vector3(x, floorY + 0.06, z)));
+    }
     this.waypoint.visible = this.route.visible && !!recon.waypoint;
     if (recon.waypoint) this.waypoint.position.set(recon.waypoint[0], floorY + 0.09, recon.waypoint[1]);
     this.phone.visible = this.viewMode !== "first" && !!recon.phone.position;
@@ -359,11 +378,11 @@ export class RoomView {
       this.phoneMaterial.color.setHex(recon.phone.tracking === "normal" ? 0xe5e5e5 : 0x999999);
     }
     const now = performance.now();
-    if (this.viewMode !== "first" && count && (this.needsFit || this.autoFit && now - this.lastFit > 2000)) {
+    if (this.viewMode !== "first" && this.pointCount && (this.needsFit || this.autoFit && now - this.lastFit > 2000)) {
       this.fit(); this.needsFit = false; this.lastFit = now;
     }
     this.invalidate();
-    return { points: count, area: observed * res * res };
+    return { points: this.pointCount, area: this.observedCells * res * res };
   }
 
   private updateTargets(recon: Recon) {

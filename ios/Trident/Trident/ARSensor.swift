@@ -82,10 +82,10 @@ final class ARSensor: NSObject, ARSessionDelegate {
         let (tracking, reason) = Self.describe(camera.trackingState)
         let pose = Self.columnMajor(camera.transform)
         let t = frame.timestamp
-        if tracking == "normal" { updateFloor(frame) }
 
         if t - lastPoseT >= 1.0 / 30 - 0.002 {
             lastPoseT = t
+            if tracking == "normal" { updateFloor(frame) }
             poseSeq += 1
             var message: [String: Any] = [
                 "v": 1, "type": "pose", "session": sessionID, "epoch": epoch, "seq": poseSeq, "t": t,

@@ -23,7 +23,6 @@ class Config:
 
     map_size_m: float = 8.0
     cell_m: float = 0.1
-    max_points: int = 20000
 
     obstacle_min_h: float = 0.15  # above floor
     map_max_range_m: float = 4.0
