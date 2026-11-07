@@ -76,6 +76,9 @@ struct ContentView: View {
         .background(Color(.systemBackground))
         .sheet(isPresented: $showSettings, onDismiss: model.applySettings) { SettingsView(voice: model.voice) }
         .onChange(of: soundStyle) { _, _ in model.refreshGuidanceSound() }
+        .onChange(of: model.recordingFromActionButton) { _, recording in
+            if recording { showSettings = false }
+        }
     }
 
     private var header: some View {
@@ -111,9 +114,9 @@ struct ContentView: View {
                 .font(.system(size: 28, weight: .medium))
                 .accessibilityHidden(true)
             VStack(spacing: 6) {
-                Text(model.recording ? "Release to navigate" : model.transcribing ? "Sending request…" : "Hold to navigate")
+                Text(model.recordingFromActionButton ? "Listening…" : model.recording ? "Release to navigate" : model.transcribing ? "Sending request…" : "Hold to navigate")
                     .font(.title2.weight(.semibold))
-                Text(model.recording ? "Listening…" : model.transcribing ? "One moment" : "Say “find the bottle”, then release")
+                Text(model.recordingFromActionButton ? "Pause to send, or press Action again" : model.recording ? "Listening…" : model.transcribing ? "One moment" : "Say “find the bottle”, then release")
                     .font(.subheadline)
                     .opacity(0.7)
             }
@@ -129,7 +132,7 @@ struct ContentView: View {
             .onEnded { _ in model.stopTalking() })
         .disabled(!connected || model.transcribing)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(model.recording ? "Release to navigate. Listening" : model.transcribing ? "Sending request" : "Hold to navigate")
+        .accessibilityLabel(model.recordingFromActionButton ? "Listening. Double tap to send" : model.recording ? "Release to navigate. Listening" : model.transcribing ? "Sending request" : "Hold to navigate")
         .accessibilityHint("Double tap to start speaking, then double tap again to send. Say the object you want to find, or say resume.")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { model.toggleTalking() }
@@ -148,6 +151,7 @@ struct ContentView: View {
     }
 
     private var statusDetail: String {
+        if model.recordingFromActionButton { return "Say what to find. Your request sends when you pause." }
         if model.recording { return "Speak your request, then release the button." }
         if model.transcribing { return "You can tap Stop to cancel." }
         if !connected { return "Connect to the same Wi-Fi and add your Mac’s address in Settings." }
@@ -176,6 +180,11 @@ private struct SettingsView: View {
                     VoiceModeControls(voice: voice)
                 }
                 GuidanceSoundSettings()
+                Section("Action button") {
+                    Text("In iPhone Settings → Action Button, choose Shortcut → Trident → Push to Talk.")
+                    Text("Press and hold to start. Speak, then pause to send. Press again to send early. Unlock your iPhone so Trident can use the camera.")
+                        .foregroundStyle(.secondary)
+                }
                 Section("Connection") {
                     TextField("Mac host", text: $host)
                         .textInputAutocapitalization(.never)

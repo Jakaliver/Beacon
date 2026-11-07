@@ -121,6 +121,28 @@ Allow incoming connections for the backend if macOS prompts. Use the Mac's Wi-Fi
    any pending voice request. To continue, hold the main button and say **resume**, or ask
    for another object. Audio changes and app interruptions can also stop guidance.
 
+### iPhone Action button
+
+In iPhone **Settings → Action Button → Shortcut → Choose a Shortcut**, choose
+**Trident → Push to Talk**. This App Shortcut is available after installing Trident;
+no custom shortcut needs to be created. iOS requires the user to choose the assignment.
+
+Press and hold the Action button to open Trident and start a request. A haptic marks
+the start of recording. Say what to find, then pause: roughly one second of silence
+after speech sends the request. Activate the Action button again to send early.
+Recording is capped at six seconds. **Stop** cancels the request without sending it.
+The on-screen **Hold to navigate** keeps its hold/release behavior.
+
+This uses Apple's App Shortcut activation, which does not supply a button-release
+event. Unlock the iPhone when prompted: Trident needs its foreground camera session
+and a reachable Mac. If disconnected, it waits up to eight seconds before reporting
+the connection problem. Leaving the app cancels pending recording and transcription.
+
+Check a cold launch, a second press to send, silence after speaking, and Stop while
+recording or sending. `bash scripts/test-action-button.sh` checks the automatic
+end-of-request timing; the physical button assignment and microphone need an iPhone.
+See [Apple's Action button setup](https://support.apple.com/guide/iphone/use-and-customize-the-action-button-iphe89d61d66/ios).
+
 ### Reading the room view
 
 The view builds up to 60,000 depth points. Move slowly and revisit areas from closer views:

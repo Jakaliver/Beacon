@@ -26,6 +26,8 @@ See [iPhone setup](docs/real-device.md) for signing, installation and connection
 
 On the iPhone, tap **Calibrate**, then **Hold to navigate**: say what to find and release.
 **Stop** appears during active requests or guidance. Connection settings live behind the gear.
+You can also assign **Trident → Push to Talk** to the iPhone's Action button in Settings.
+Press to start, speak, then pause to send; press again to send early.
 Use the iPhone app to find an object. Its selected target appears automatically in the room
 view. **3D** slowly circles the scan at 30° above horizontal, completing a turn in 90
 seconds. Drag or zoom to pause and inspect; press **3D** to resume. **Overhead** shows a
