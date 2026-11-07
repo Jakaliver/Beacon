@@ -43,6 +43,7 @@ enum Settings {
     static let defaultHost = "Malins-Macbook-Pro-3.local"
     static let reverseHeadTurnKey = "reverseHeadTurn"
     static let reverseHeadTiltKey = "reverseHeadTilt"
+    static let soundHeightKey = "soundHeight"  // metres; positive raises sounds
     static let defaultFrameRate = 10.0
 
     static var host: String { UserDefaults.standard.string(forKey: hostKey) ?? defaultHost }

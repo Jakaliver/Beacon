@@ -116,6 +116,7 @@ private struct SettingsView: View {
     @AppStorage(Settings.frameRateKey) private var frameRate = Settings.defaultFrameRate
     @AppStorage(Settings.reverseHeadTurnKey) private var reverseHeadTurn = false
     @AppStorage(Settings.reverseHeadTiltKey) private var reverseHeadTilt = false
+    @AppStorage(Settings.soundHeightKey) private var soundHeight = 0.0
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -130,6 +131,12 @@ private struct SettingsView: View {
                     .accessibilityHint("Turn on if sounds move the wrong way when you turn your head")
                 Toggle("Reverse head tilt", isOn: $reverseHeadTilt)
                     .accessibilityHint("Turn on if sounds move the wrong way when you look up or down")
+                VStack(alignment: .leading) {
+                    Text("Sound height: \(soundHeight > 0 ? "+" : "")\(Int((soundHeight * 100).rounded())) cm")
+                    Slider(value: $soundHeight, in: -0.6...0.6, step: 0.05)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityHint("Moves all guidance sounds up or down to match where objects are")
             }
             .navigationTitle("Settings")
             .toolbar { Button("Done") { dismiss() } }

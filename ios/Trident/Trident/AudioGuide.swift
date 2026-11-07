@@ -59,9 +59,9 @@ final class AudioGuide {
             listener.automaticHeadTrackingFlags = .orientation
         }
         // Beeps with soft harmonics: a pure sine cannot be placed in space; harmonics give the ear direction cues.
-        register("pulse", Self.beep(hz: 520, seconds: 0.1))
-        register("confirm", Self.beep(hz: 520, seconds: 0.1) + Self.silence(0.05) + Self.beep(hz: 520, seconds: 0.1))
-        register("beacon", Self.beep(hz: 380, seconds: 0.16))
+        register("pulse", Self.beep(hz: 1000, seconds: 0.09))
+        register("confirm", Self.beep(hz: 1000, seconds: 0.09) + Self.silence(0.05) + Self.beep(hz: 1000, seconds: 0.09))
+        register("beacon", Self.beep(hz: 660, seconds: 0.16))
         register("stop", Self.tone([(660, 0.1), (440, 0.18)], harmonic: 0.2))
         register("rescan", Self.tone([(700, 0.06), (0, 0.05), (700, 0.06)], harmonic: 0.2))
         headLock.withLock { updateListener() }
@@ -153,10 +153,13 @@ final class AudioGuide {
                                                      SIMD4(listenerPosition, 1)))
     }
 
-    /// `position` is the body estimate at phone height; the ears are higher, so a table-top target sounds below.
+    /// `position` is the body estimate at phone height. The phone is held at the chest and the ears are about
+    /// 0.45 m higher, so a table-top target sounds below. The user's "Sound height" setting shifts this, also to
+    /// offset the common perception of frontal headphone sources as higher than they are.
     func setListener(_ position: SIMD3<Float>) {
+        let adjust = Float(UserDefaults.standard.double(forKey: Settings.soundHeightKey))
         headLock.withLock {
-            listenerPosition = position + SIMD3<Float>(0, 0.3, 0)
+            listenerPosition = position + SIMD3<Float>(0, 0.45 - adjust, 0)
             updateListener()
         }
     }
