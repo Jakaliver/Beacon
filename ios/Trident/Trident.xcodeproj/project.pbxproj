@@ -23,7 +23,6 @@
 		604702D284EFE94A88B04A53 /* Speech.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Speech.swift; sourceTree = "<group>"; };
 		8618FC10F163DFF865E31228 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		88593297C40A9B03AD0701FB /* ARSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARSensor.swift; sourceTree = "<group>"; };
-		95D86479D65557427FCBC62F /* Trident.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Trident.entitlements; sourceTree = "<group>"; };
 		C2D42317C13FA6629FCC997F /* Trident.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Trident.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E9D3606D4B91643D76C2EE34 /* TridentApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TridentApp.swift; sourceTree = "<group>"; };
 		EE6DDF5BCF93CDF29CCED18F /* Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connection.swift; sourceTree = "<group>"; };
@@ -56,7 +55,6 @@
 				00888A4EF1F1884442A5E887 /* Info.plist */,
 				2B59A25BACFD98E15CDA2E09 /* Model.swift */,
 				604702D284EFE94A88B04A53 /* Speech.swift */,
-				95D86479D65557427FCBC62F /* Trident.entitlements */,
 				E9D3606D4B91643D76C2EE34 /* TridentApp.swift */,
 			);
 			path = Trident;
@@ -92,7 +90,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					6599E2CA25A5C26AFEE6193D = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = M9AC3A7N78;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -170,7 +168,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = M9AC3A7N78;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -228,7 +226,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = M9AC3A7N78;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -261,7 +259,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Trident/Trident.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Trident/Info.plist;
@@ -270,7 +267,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ai.trident.app;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.trident.app.m9ac3a7n78;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
@@ -280,7 +277,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Trident/Trident.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Trident/Info.plist;
@@ -289,7 +285,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ai.trident.app;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.trident.app.m9ac3a7n78;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
