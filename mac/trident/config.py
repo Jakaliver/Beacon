@@ -48,6 +48,7 @@ class Config:
 
     offscreen_max_age_s: float = 30.0
     max_sigma_m: float = 0.35
+    misses_to_lose: int = 8  # at most one miss per 0.5 s while the target should be visible
     sigma_growth_per_s: float = 0.01
 
     pose_timeout_s: float = 1.0

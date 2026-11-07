@@ -18,7 +18,7 @@ from .geometry import forward, head_local, pose_matrix, to_world, unproject, wra
 from .mapping import UNCERTAIN, GridMap
 from .planner import line_clear, plan, ring_cells, walkable_grid
 from .speech import parse_command
-from .targets import IGNORED, Tracker, observe
+from .targets import IGNORED, Tracker, canonical, observe
 
 # OpenCV's own thread pool, used from several threads next to PyTorch, deadlocked the vision thread.
 cv2.setNumThreads(0)
@@ -85,6 +85,7 @@ class Engine:
         self.stop_reason: str | None = None
         self.resume_mode: str | None = None
         self.want_label: str | None = None
+        self.want_word: str | None = None  # what the user called it, for speech
         self.selected: str | None = None
         self.choice_ids: list[str] = []
         self.navigation = False
@@ -207,7 +208,7 @@ class Engine:
             dets = []
             if run_detect:
                 raw = self.perception.detect(upright)
-                dets = [(d.label, np.rot90(d.mask, -k)) for d in raw if d.label not in IGNORED]
+                dets = [(canonical(d.label), np.rot90(d.mask, -k)) for d in raw if d.label not in IGNORED]
                 self.stats["detect_ms"] = 1000 * (time.monotonic() - t1)
                 if DEBUG_DIR and header["seq"] % 20 == 0:
                     dbg = upright.copy()
@@ -256,14 +257,15 @@ class Engine:
     def _handle(self, c: dict) -> None:
         cmd = c["cmd"]
         if cmd == "find":
-            self.want_label = c["label"]
+            self.want_label = canonical(c["label"])
+            self.want_word = c["spoken"] or c["label"]
             self.selected = None
             self.choice_ids = []
             self.mode = "searching"
             self.stop_reason = None
             if self.audio_yaw_offset is None:
                 self.calibrate(quiet=True)
-            self.say(f"Looking for {self.spoken(c['label'])}. Scan slowly around you.")
+            self.say(f"Looking for {self.spoken(self.want_label)}. Scan slowly around you.")
         elif cmd == "unsupported":
             self.say(f"Sorry, I can't recognise {c['spoken'] or 'that'}. "
                      "I can find bottles, cups, chairs, sofas, tables and other common objects.")
@@ -289,8 +291,9 @@ class Engine:
         else:
             self.say("Say find, then an object. Or stop, cancel, repeat, inspect or resume.")
 
-    @staticmethod
-    def spoken(label: str) -> str:
+    def spoken(self, label: str) -> str:
+        if label == self.want_label and self.want_word:
+            return "the " + self.want_word
         names = {"couch": "sofa", "dining table": "table", "cell phone": "phone"}
         return "the " + names.get(label, label)
 
@@ -481,13 +484,13 @@ class Engine:
                     options.append({"index": i, "id": tid,
                                     "description": f"{dist:.1f} metres {describe_direction(az)}"})
                 self.outbox.append({"type": "choices", "options": options})
-                self.say(f"I see {len(found)} {self.want_label}s. "
+                self.say(f"I see {len(found)} {self.want_word or self.want_label}s. "
                          + ". ".join(f"Number {o['index']}: {o['description']}" for o in options)
                          + ". Say choose and a number.")
             return
         if self.mode in ACTIVE and self.selected:
             t = self.tracker.tracks.get(self.selected)
-            if t is None or t.misses >= 4:
+            if t is None or t.misses >= CONFIG.misses_to_lose:
                 self.mode = "searching"
                 self.selected = None
                 self.cue("rescan")
