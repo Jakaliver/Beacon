@@ -39,7 +39,8 @@ Mac is slow. Stay in a clear area while checking spatial audio.
 1. Open Beacon, allow Microphone and Speech Recognition access, and wait for listening.
    If previously disabled, enable Hands-free voice in Settings. Say **"Beacon, calibrate"** with the phone
    held ahead. With compatible AirPods, face the same direction as the phone.
-2. Say **"Beacon, find the bottle"**. Check the **Heard:** text in Settings and that the Mac starts a search.
+2. Say **"Beacon, loot mode on"**, then **"Beacon, find the bottle"**. Check the **Heard:**
+   text in Settings and that the Mac starts a search.
    Close Settings to return to the main controls; hands-free listening continues.
    Once a valid target is acquired, a single continuous chest sound should come from
    its position. There should be no repeating guidance beeps in Chest mode. Searching
@@ -55,6 +56,14 @@ Mac is slow. Stay in a clear area while checking spatial audio.
    Each switch should take effect immediately, with only one style playing. Dismissing
    Settings without changing Mac host should preserve the connection and target.
    Relaunch and confirm the selected sound style is remembered.
+   Also say **"Beacon, loot mode off"** to switch to Beeps, then **"Beacon, loot mode on"**
+   to select the chest. **"Beacon, turn on/off loot mode"** and **"Beacon, enable/disable
+   loot mode"** also work. Confirm the Settings selection follows the command, the same
+   object stays selected, and no old sound continues after switching. Try this while
+   paused and before finding an object: only the preference should change, without
+   starting or resuming guidance. Tap **Talk to Beacon** or use the Action button to
+   submit the same commands without the wake word. Loot mode off restores normal guidance,
+   including the torch tone within reach in probe mode.
 6. Say **"Beacon, pause"**, then **"Beacon, resume"**. Audio should stop promptly and resume only when
    connection and tracking are ready. Repeat using **Stop**, then tap **Talk to Beacon**, say **"Beacon, resume"** and pause. A partially heard command must not restart guidance after Stop.
 7. Say **"Beacon, start over"**. The target and old guidance should clear and tracking should
@@ -96,7 +105,7 @@ Set its signing team and unique bundle identifier as well. It uses the same spee
 recognizer, command coordinator, voice selection and PHASE chest playback as Beacon,
 with sample targets instead of live detections.
 
-Start voice mode and say **"find a bottle"**. When offered two matches, say **"left"**
+Start voice mode, say **"loot mode on"**, then **"find a bottle"**. When offered two matches, say **"left"**
 or **"the one on the right"**. A chest loop should play from the selected sample
 position. Test pause/resume, start over, found it, speech ducking and the gear menu's
 Chest/Beeps setting. Voice Lab cannot validate AR tracking, real object detection,
@@ -107,10 +116,11 @@ network behavior or world alignment in the full app.
 Build both **Beacon** and **BeaconVoiceLab** with Xcode, then run these focused checks
 after changes:
 
-- `scripts/test-voice-directions.sh`: 74 utterances and 4 semantic checks.
-- `scripts/test-voice-session.sh`: 64 speech coordination checks.
-- `scripts/test-voice-lab-directional.sh`: 35 dialogue checks.
-- `scripts/test-voice-lab-sound.sh`: 32 audio lifecycle checks using a fake audio output.
+- `scripts/test-voice-directions.sh`: directional choices, loot commands and rejected phrases.
+- `scripts/test-voice-session.sh`: speech coordination, wake words, revised commands and cancellation.
+- `scripts/test-voice-lab-directional.sh`: object-selection dialogue.
+- `scripts/test-voice-lab-sound.sh`: sound switching, saved loot preferences and audio lifecycle
+  checks using a fake audio output.
 
 These checks do not exercise a real microphone, speech voice, PHASE playback or ARKit.
 Run the physical-device checks above to validate microphone recognition and spatial

@@ -248,7 +248,8 @@ final class VoiceListener: NSObject, ObservableObject, SFSpeechRecognizerDelegat
         next.shouldReportPartialResults = true
         next.requiresOnDeviceRecognition = true
         next.taskHint = .dictation
-        next.contextualStrings = ["Beacon", "Hey Beacon", "Beacon find", "Beacon pause", "Beacon calibrate"]
+        next.contextualStrings = ["Beacon", "Hey Beacon", "Beacon find", "Beacon pause", "Beacon calibrate",
+                                  "Beacon loot mode on", "Beacon loot mode off", "loot mode on", "loot mode off"]
         request = next
         lastTranscript = ""
         utteranceStartedAt = Date()

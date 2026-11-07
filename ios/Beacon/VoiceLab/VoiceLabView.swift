@@ -5,7 +5,7 @@ struct VoiceLabView: View {
     @State private var command = ""
     @FocusState private var commandFocused: Bool
     @State private var showSettings = false
-    @AppStorage(Settings.guidanceSoundStyleKey) private var soundStyle = GuidanceSoundStyle.chest.rawValue
+    @AppStorage(Settings.guidanceSoundStyleKey) private var soundStyle = GuidanceSoundStyle.beeps.rawValue
 
     var body: some View {
         NavigationStack {

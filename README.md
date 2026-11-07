@@ -9,6 +9,8 @@ the bottle"**, **"Beacon, calibrate"**, **"Beacon, pause"** or **"Beacon, resume
 Microphone and Speech Recognition permissions are requested on first use; hands-free
 listening can be turned off in Settings.
 Found objects play spatial beeps by default; choose **Beeps** or **Chest** in Settings.
+Say **"Beacon, loot mode on"** for the chest sound or **"Beacon, loot mode off"** for
+Beeps. The choice is remembered and does not resume a paused search.
 Within reach (probe mode) the phone works like a torch: the beep's pitch rises from low
 to middle to high as the phone points nearer to the object, and it beeps faster as the
 phone gets closer. A double beep means you have reached it. See the [voice and audio test guide](docs/voice-audio-testing.md)
