@@ -213,7 +213,8 @@ class Engine:
             depth = np.ascontiguousarray(np.rot90(self.perception.depth(upright), -k))
             t1 = time.monotonic()
             self.stats["depth_ms"] = 1000 * (t1 - t0)
-            run_detect = (header["seq"] % CONFIG.detect_every_n_frames == 0) or self.mode == "searching"
+            # Probe mode refines the lock from every close-up view.
+            run_detect = (header["seq"] % CONFIG.detect_every_n_frames == 0) or self.mode in {"searching", "probe"}
             dets = []
             if run_detect:
                 raw = self.perception.detect(upright)
@@ -286,7 +287,7 @@ class Engine:
             self.say(f"Looking for {self.spoken(self.want_label)}.")
         elif cmd == "unsupported":
             self.say(f"Sorry, I can't recognise {c['spoken'] or 'that'}. "
-                     "I can find bottles, cups, chairs, sofas, tables and other common objects.")
+                     "I can find bottles, cups, chairs, doors, light switches, keys and other common objects.")
         elif cmd == "stop":
             self.stop("user", "Stopped.")
         elif cmd == "cancel":
@@ -533,7 +534,7 @@ class Engine:
             self.listener_anchor = self.walking_body()
             self.path, self.waypoint = [], None
             self.say(f"Stop walking. {self.spoken(target.label).capitalize()} is within reach. "
-                     "Move the phone slowly to find it.")
+                     "Sweep the phone slowly. A high beep means you are pointing at it.")
         elif self.mode == "probe":
             drift = math.hypot(phone[0] - self.listener_anchor[0], phone[2] - self.listener_anchor[2])
             if drift > CONFIG.probe_leave and dh > CONFIG.probe_enter:

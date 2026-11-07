@@ -1,11 +1,12 @@
 """Download and warm up every local model. Run once with internet access."""
+import os
 import shutil
 import time
 
 import numpy as np
 from huggingface_hub import hf_hub_download, snapshot_download
 
-from .config import DEPTH_CHECKPOINT, DEPTH_REPO, MODELS_DIR, PARAKEET_MODEL, YOLO_CHECKPOINT
+from .config import DEPTH_CHECKPOINT, DEPTH_REPO, DETECTOR_BASE, DETECTOR_CHECKPOINT, MODELS_DIR, PARAKEET_MODEL
 
 
 def main() -> None:
@@ -13,9 +14,7 @@ def main() -> None:
     if not DEPTH_CHECKPOINT.exists():
         path = hf_hub_download(DEPTH_REPO, DEPTH_CHECKPOINT.name)
         shutil.copy(path, DEPTH_CHECKPOINT)
-    if not YOLO_CHECKPOINT.exists():
-        from ultralytics.utils.downloads import attempt_download_asset
-        shutil.move(attempt_download_asset("yolo11n-seg.pt"), YOLO_CHECKPOINT)
+    build_detector()
     snapshot_download(PARAKEET_MODEL)
 
     from .perception import Perception
@@ -32,6 +31,22 @@ def main() -> None:
     t = time.time()
     print("speech warm-up:", repr(Speech().transcribe_pcm(np.zeros(16000, np.float32), 16000)),
           f"({time.time() - t:.1f}s)")
+
+
+def build_detector() -> None:
+    """Bake the prompt embeddings into the detector, so the server never needs the text model."""
+    from ultralytics import YOLOE
+    from .perception import prompts
+    if DETECTOR_CHECKPOINT.exists() and list(YOLOE(str(DETECTOR_CHECKPOINT)).names.values()) == prompts():
+        return
+    cwd = os.getcwd()
+    os.chdir(MODELS_DIR)  # Ultralytics downloads the weights and the 600 MB MobileCLIP model here
+    try:
+        model = YOLOE(DETECTOR_BASE)
+        model.set_classes(prompts())
+        model.save(DETECTOR_CHECKPOINT.name)
+    finally:
+        os.chdir(cwd)
 
 
 if __name__ == "__main__":

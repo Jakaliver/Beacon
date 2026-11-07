@@ -6,6 +6,7 @@ struct Guidance: Decodable {
     struct Target: Decodable {
         let valid: Bool
         let position: [Float]?
+        let extent: [Float]?
         let surface: [[Float]]?
     }
     struct Proximity: Decodable {
@@ -75,6 +76,7 @@ final class AppModel: ObservableObject {
     private var phoneInterval: Double?
     private var phoneConfirm = false
     private var wasConfirming = false
+    private var torch = Torch()
     private var lastPulse = Date.distantPast
     private var lastBeacon = Date.distantPast
 
@@ -499,8 +501,10 @@ final class AppModel: ObservableObject {
                 audio.beaconPing(at: SIMD3(p[0], p[1], p[2]))
                 lastBeacon = now
             }
-        case "probe", "hotcold":
-            // hotcold: direct target proximity without routing (milestone 1 behaviour).
+        case "probe":
+            torchTick(g, now: now)
+        case "hotcold":
+            // Direct target proximity without routing (milestone 1 behaviour).
             probeTick(g, now: now)
         default:
             resetProbe()
@@ -544,7 +548,33 @@ final class AppModel: ObservableObject {
         wasConfirming = confirming
     }
 
+    /// Within reach the phone is a torch: a steady tone whose pitch says whether it points at the object
+    /// and whose loudness says how near it is.
+    /// Computed from the phone's own pose every tick, so it has no network delay.
+    private func torchTick(_ g: Guidance, now: Date) {
+        guard let target = g.target, target.valid, let pose, pose.tracking == "normal", pose.epoch == g.epoch,
+              let c = target.position, c.count == 3 else {
+            audio.stopTorch()
+            return probeTick(g, now: now)
+        }
+        let centre = SIMD3(c[0], c[1], c[2])
+        let surface = (target.surface ?? []).filter { $0.count == 3 }.map { SIMD3($0[0], $0[1], $0[2]) }
+        let out = torch.update(camera: pose.transform, centre: centre, extent: target.extent?.max() ?? 0.1,
+                               surface: surface)
+        let threshold = g.proximity?.threshold ?? 0.2
+        phoneConfirm = phoneConfirm ? out.distance < threshold * 1.3 : out.distance < threshold
+        // Reached: the tone stops and the double beep repeats, so arrival cannot be mistaken for aim.
+        audio.setTorch(phoneConfirm ? nil : out.aim, gain: out.gain, at: centre)
+        if phoneConfirm, !wasConfirming || now.timeIntervalSince(lastPulse) >= 0.8 {
+            audio.confirm(at: centre)
+            lastPulse = now
+        }
+        wasConfirming = phoneConfirm
+    }
+
     private func resetProbe() {
+        torch.reset()
+        audio.stopTorch()
         smoothedDistance = nil
         phoneInterval = nil
         phoneConfirm = false

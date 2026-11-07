@@ -37,8 +37,10 @@ implementation comes from the main iPhone app and uses PHASE.
 
 ## Detection and guidance
 
-- Object recognition is limited to the detector's supported COCO classes. Small, cropped,
-  distant and partly hidden objects may be missed or mislabelled.
+- Object recognition is limited to the detector's vocabulary: the COCO classes plus the
+  household prompts in `EXTRA_PROMPTS` (`mac/trident/perception.py`), such as doors and light
+  switches. Small, cropped, distant and partly hidden objects may be missed or mislabelled.
+  Extreme close-ups of a light switch, with no wall around it, are often missed.
 - Depth may fall on an occluder instead of the requested object, shifting the target's
   estimated position. Proximity confirmation is an estimate, not grasp detection.
 - Selected identity is retained offscreen, while new sightings refine its geometry. Closer

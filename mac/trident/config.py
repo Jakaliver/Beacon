@@ -8,7 +8,9 @@ DA2_DIR = MAC_DIR / "third_party" / "Depth-Anything-V2"
 
 DEPTH_CHECKPOINT = MODELS_DIR / "depth_anything_v2_metric_hypersim_vits.pth"
 DEPTH_REPO = "depth-anything/Depth-Anything-V2-Metric-Hypersim-Small"
-YOLO_CHECKPOINT = MODELS_DIR / "yolo11n-seg.pt"
+# YOLOE-11s-seg with the prompt vocabulary built in (made by setup_models).
+DETECTOR_BASE = "yoloe-11s-seg.pt"
+DETECTOR_CHECKPOINT = MODELS_DIR / "yoloe-11s-seg-trident.pt"
 PARAKEET_MODEL = os.environ.get("TRIDENT_PARAKEET", "mlx-community/parakeet-tdt-0.6b-v3")
 
 

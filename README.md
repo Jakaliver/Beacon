@@ -6,8 +6,10 @@ commands and plays guidance through headphones. The Mac runs depth estimation, o
 recognition, hold-to-talk speech recognition, mapping and target tracking locally.
 Hands-free voice mode recognizes commands on the iPhone. Say "find the bottle",
 "calibrate", "pause", "resume", "start over" or "found it" while the app is open.
-Found objects play a continuous spatial chest sound by default; choose **Chest** or
-**Beeps** in Settings. See the [voice and audio branch test guide](docs/voice-audio-testing.md)
+Found objects play spatial beeps by default; choose **Beeps** or **Chest** in Settings.
+Within reach (probe mode) Beeps switch to a steady torch tone: its pitch rises from low to
+middle to high as the phone points nearer to the object, and it gets louder as the phone
+gets closer. A double beep means you have reached it. See the [voice and audio branch test guide](docs/voice-audio-testing.md)
 for installation, expected behavior and checks on a real iPhone.
 
 The browser is a **read-only room visualization**: grey LiDAR-style dots, a white iPhone
