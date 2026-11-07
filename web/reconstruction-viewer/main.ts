@@ -121,7 +121,7 @@ function connect() {
   ws.onmessage = event => {
     try {
       const snapshot = JSON.parse(event.data) as Recon;
-      if (snapshot.grid && snapshot.phone && Array.isArray(snapshot.targets) && typeof snapshot.points === "string") displaySnapshot(snapshot);
+      if (snapshot.grid && snapshot.phone && Array.isArray(snapshot.targets) && (typeof snapshot.points === "string" || snapshot.points === undefined)) displaySnapshot(snapshot);
     } catch (error) { console.warn("Skipped invalid reconstruction snapshot", error); }
   };
   ws.onclose = () => {

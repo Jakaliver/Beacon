@@ -44,7 +44,7 @@ enum Settings {
     static let reverseHeadTurnKey = "reverseHeadTurn"
     static let reverseHeadTiltKey = "reverseHeadTilt"
     static let soundHeightKey = "soundHeight"  // metres; positive raises sounds
-    static let defaultFrameRate = 10.0
+    static let defaultFrameRate = 15.0  // the Mac processes about 16 frames per second
 
     static var host: String { UserDefaults.standard.string(forKey: hostKey) ?? defaultHost }
     static var frameRate: Double {

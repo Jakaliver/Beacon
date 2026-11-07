@@ -2,7 +2,7 @@ export type Recon = {
   scan_id?: string;
   epoch: number; perception: string; mode: string; stop_reason: string | null; navigation: boolean;
   grid: { origin: [number, number]; res: number; w: number; h: number; cells: string };
-  floor_y: number | null; points: string;
+  floor_y: number | null; points?: string;
   point_colors?: string;
   points_version?: number;
   points_fused?: boolean;

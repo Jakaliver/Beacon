@@ -3,6 +3,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export HF_HUB_OFFLINE=1 YOLO_OFFLINE=1 PYTORCH_ENABLE_MPS_FALLBACK=1
+# Per-machine settings (kept out of Git), e.g. TRIDENT_VIEWER_HZ=30 on a fast Mac.
+if [ -f "$ROOT/mac/local.env" ]; then set -a; source "$ROOT/mac/local.env"; set +a; fi
 (cd "$ROOT/mac" && uv run uvicorn trident.server:app --host 0.0.0.0 --port 8787 --log-level warning) &
 BACKEND=$!
 trap 'kill $BACKEND 2>/dev/null' EXIT

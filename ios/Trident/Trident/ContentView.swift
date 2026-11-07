@@ -126,7 +126,7 @@ private struct SettingsView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
-                Stepper("Frame rate: \(Int(frameRate)) per second", value: $frameRate, in: 2...15)
+                Stepper("Frame rate: \(Int(frameRate)) per second", value: $frameRate, in: 2...30)
                 Toggle("Reverse head turn", isOn: $reverseHeadTurn)
                     .accessibilityHint("Turn on if sounds move the wrong way when you turn your head")
                 Toggle("Reverse head tilt", isOn: $reverseHeadTilt)

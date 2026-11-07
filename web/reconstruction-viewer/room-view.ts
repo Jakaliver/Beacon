@@ -283,7 +283,8 @@ export class RoomView {
     const floorY = recon.floor_y ?? 0;
     this.grid.position.set(Math.round(recon.grid.origin[0] + recon.grid.w * recon.grid.res / 2), floorY - 0.04, Math.round(recon.grid.origin[1] + recon.grid.h * recon.grid.res / 2));
     const version = recon.points_version ?? recon.stats.map_version;
-    if (version === undefined || version !== this.mapVersion) {
+    // Light snapshots omit an unchanged point cloud; keep the one already decoded.
+    if (recon.points !== undefined && (version === undefined || version !== this.mapVersion)) {
       const bytes = decode(recon.points);
       const points = new Float32Array(bytes.buffer, 0, Math.floor(bytes.byteLength / 12) * 3);
       if (recon.points_fused) {

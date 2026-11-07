@@ -65,6 +65,10 @@ height; camera geometry can still display while floor detection settles.
 
 - `TRIDENT_PARAKEET`: speech model, default `mlx-community/parakeet-tdt-0.6b-v3`.
 - `TRIDENT_MEMORY_BUDGET_MB`: memory budget reported by `/api/health`, default `16384`.
+- `TRIDENT_VIEWER_HZ`: room view updates per second, default `5`. The point cloud is only resent
+  when it changes, so a fast Mac can use `30`. Put per-machine values in `mac/local.env`
+  (not in Git), for example `TRIDENT_VIEWER_HZ=30`; `scripts/dev.sh` loads it.
+- The iPhone's camera frame rate is in the app's Settings (2–30 per second, default 15).
 - `TRIDENT_DEBUG_DIR`: optional local image, point-cloud and observation logs.
 - Mapping and guidance settings: `mac/trident/config.py`.
 - Requirements: Apple-silicon Mac, Python 3.11, uv, Node and Xcode supporting your iPhone.

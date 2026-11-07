@@ -30,6 +30,7 @@ faulthandler.register(signal.SIGUSR1)  # `kill -USR1 <pid>` prints all thread st
 engine = Engine()
 control_clients: set[WebSocket] = set()
 viewer_clients: set[WebSocket] = set()
+viewer_points = {"version": None, "new_viewer": False}  # the point cloud is only resent when it changed
 pending: dict = {"frame": None}
 # The newest sensor connection wins, so a forgotten simulator tab cannot fight a real phone.
 active_sensor: dict = {"ws": None}
@@ -106,19 +107,32 @@ async def vision_worker() -> None:
 
 
 async def ticker() -> None:
-    """Keeps stop rules running even when pose updates stop arriving."""
-    n = 0
+    """Keeps stop rules running even when pose updates stop arriving, and feeds the room view."""
+    period = 1 / max(1.0, CONFIG.viewer_hz)
+    last_guidance = 0.0
     while True:
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(min(0.1, period))
         try:
-            await publish_guidance()
-            n += 1
-            if n % 2 == 0 and viewer_clients:
+            now = asyncio.get_running_loop().time()
+            if now - last_guidance >= 0.1:
+                last_guidance = now
+                await publish_guidance()
+            if viewer_clients:
                 snap = await asyncio.to_thread(engine.snapshot)
                 snap["stats"].update(memory_stats())
-                await broadcast(viewer_clients, [snap])
+                await broadcast(viewer_clients, [lighten(snap)])
         except Exception:
             log.exception("guidance/viewer tick failed")
+
+
+def lighten(snap: dict) -> dict:
+    """Drop the point cloud (most of a snapshot's ~500 KB) unless it changed or a viewer just joined."""
+    version = snap.get("points_version")
+    if version is not None and version == viewer_points["version"] and not viewer_points["new_viewer"]:
+        return {k: v for k, v in snap.items() if k not in ("points", "point_colors")}
+    viewer_points["version"] = version
+    viewer_points["new_viewer"] = False
+    return snap
 
 
 def process_and_measure(*item) -> None:
@@ -269,6 +283,7 @@ async def control(ws: WebSocket) -> None:
 @app.websocket("/ws/viewer")
 async def viewer(ws: WebSocket) -> None:
     await ws.accept()
+    viewer_points["new_viewer"] = True  # the next snapshot carries the full point cloud
     viewer_clients.add(ws)
     with suppress(WebSocketDisconnect):
         while True:
