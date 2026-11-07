@@ -30,7 +30,7 @@ function setView(view: "3d" | "plan") {
   $("viewPlan").setAttribute("aria-pressed", String(view === "plan"));
   $("interactionHint").textContent = view === "plan"
     ? "Drag to pan · Scroll to zoom"
-    : "Drag to orbit · Scroll to zoom · Right-drag to pan";
+    : "Drag to pause · Scroll to zoom · 3D to resume";
 }
 $("view3d").onclick = () => setView("3d");
 $("viewPlan").onclick = () => setView("plan");

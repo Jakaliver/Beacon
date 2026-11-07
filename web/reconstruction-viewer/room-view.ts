@@ -5,6 +5,7 @@ import type { Recon } from "./types";
 
 const MAX_POINTS = 60_000;
 const RED = 0xee5252;
+const ORBIT_ELEVATION = Math.PI / 6;
 const decode = (base64: string) => {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
@@ -31,6 +32,7 @@ export class RoomView {
   private scanId: string | undefined;
   private mapVersion: number | boolean | null | undefined;
   private autoFit = true;
+  private orbit = false;
   private lastFit = 0;
   private floor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide }));
   private texture: THREE.DataTexture | null = null;
@@ -73,13 +75,17 @@ export class RoomView {
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = !matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.controls.dampingFactor = 0.12;
+    this.controls.autoRotateSpeed = 60 / 90; // One full turn in 90 seconds.
     this.controls.minZoom = 0.35;
     this.controls.maxZoom = 8;
     this.controls.maxPolarAngle = Math.PI * 0.47;
     this.controls.minPolarAngle = 0;
     this.controls.screenSpacePanning = false;
     this.controls.addEventListener("change", () => this.invalidate());
-    this.controls.addEventListener("start", () => { this.autoFit = false; });
+    this.controls.addEventListener("start", () => {
+      this.autoFit = false;
+      this.orbit = this.controls.autoRotate = false;
+    });
     this.setView("3d");
 
     this.cloudGeometry.setAttribute("position", new THREE.BufferAttribute(this.positions, 3).setUsage(THREE.DynamicDrawUsage));
@@ -141,13 +147,17 @@ export class RoomView {
   }
 
   setView(view: "3d" | "plan") {
-    const offset = view === "plan" ? new THREE.Vector3(0, 14, 0.001) : new THREE.Vector3(4, 12, 6);
+    this.orbit = view === "3d";
+    this.controls.autoRotate = false;
+    this.autoFit = true;
+    const offset = view === "plan" ? new THREE.Vector3(0, 14, 0.001)
+      : new THREE.Vector3().setFromSphericalCoords(14, Math.PI / 2 - ORBIT_ELEVATION, Math.PI / 4);
     this.camera.position.copy(this.controls.target).add(offset);
     this.controls.enableRotate = view !== "plan";
     this.controls.mouseButtons.LEFT = view === "plan" ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
     this.controls.touches.ONE = view === "plan" ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE;
     this.camera.lookAt(this.controls.target);
-    this.controls.update();
+    this.controls.update(0);
     if (this.autoFit) this.fit();
     this.invalidate();
   }
@@ -163,10 +173,11 @@ export class RoomView {
     const target = this.recon?.targets.find(t => t.selected);
     if (!target) return;
     this.autoFit = false;
+    this.orbit = this.controls.autoRotate = false;
     this.delta.fromArray(target.position).sub(this.controls.target);
     this.camera.position.add(this.delta);
     this.controls.target.add(this.delta);
-    this.controls.update();
+    this.controls.update(0);
     this.invalidate();
   }
 
@@ -189,14 +200,23 @@ export class RoomView {
     this.camera.updateMatrixWorld();
     // Fit projected bounds, including height, for both plan and oblique views.
     let extentX = 0.25, extentY = 0.25;
-    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
-      this.project.set(x, y, z).project(this.camera);
-      extentX = Math.max(extentX, Math.abs(this.project.x));
-      extentY = Math.max(extentY, Math.abs(this.project.y));
+    if (this.orbit) {
+      // Fit every heading of the orbit so rotation doesn't pump the zoom or crop walls.
+      box.getSize(this.delta);
+      const radius = Math.hypot(this.delta.x, this.delta.z) / 2;
+      const vertical = this.delta.y / 2 * Math.cos(ORBIT_ELEVATION) + radius * Math.sin(ORBIT_ELEVATION);
+      extentX = Math.max(extentX, radius / this.camera.right);
+      extentY = Math.max(extentY, vertical / this.camera.top);
+    } else {
+      for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+        this.project.set(x, y, z).project(this.camera);
+        extentX = Math.max(extentX, Math.abs(this.project.x));
+        extentY = Math.max(extentY, Math.abs(this.project.y));
+      }
     }
     this.camera.zoom = THREE.MathUtils.clamp(0.82 / Math.max(extentX, extentY), 0.35, 4);
     this.camera.updateProjectionMatrix();
-    this.controls.update();
+    this.controls.update(0);
     this.invalidate();
   }
 
@@ -321,8 +341,10 @@ export class RoomView {
 
   private animate = (time: number) => {
     if (this.disposed || document.hidden || time - this.lastFrame < 1000 / 30) return;
+    const deltaSeconds = this.lastFrame ? Math.min((time - this.lastFrame) / 1000, 0.1) : 0;
     this.lastFrame = time;
-    this.controls.update();
+    this.controls.autoRotate = this.orbit && this.cloudGeometry.drawRange.count > 0;
+    this.controls.update(deltaSeconds);
     if (!this.dirty) return;
     this.dirty = false;
     const pixelsPerMeter = this.height / (this.camera.top - this.camera.bottom) * this.camera.zoom;

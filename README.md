@@ -20,9 +20,10 @@ Open <http://localhost:5173>. Keep Trident open on an iPhone connected to the sa
 See [iPhone setup](docs/real-device.md) for signing, installation and connection settings.
 
 Use the iPhone app to find an object. Its selected target appears automatically in the room
-view. **3D** shows height, **Overhead** shows the floor plan, **Fit** restores automatic
-framing, and **Locate** centres the selected target. Drag to orbit, right-drag to pan and
-scroll/pinch to zoom. In Overhead mode, drag to pan.
+view. **3D** slowly circles the scan at 30° above horizontal, completing a turn in 90
+seconds. Drag or zoom to pause and inspect; press **3D** to resume. **Overhead** shows a
+stationary floor plan, **Fit** restores automatic framing, and **Locate** centres the
+selected target. Right-drag to pan and scroll/pinch to zoom. In Overhead mode, drag to pan.
 
 **Colour** switches the grey LiDAR view to soft dots coloured from their source camera
 pixels. Selected targets remain red. The scan builds up to 60,000 points in 2.5 cm cells.
