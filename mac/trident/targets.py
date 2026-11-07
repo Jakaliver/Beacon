@@ -8,6 +8,13 @@ from .config import CONFIG
 from .geometry import project, to_world, unproject
 
 IGNORED = {"person"}
+# COCO splits drink containers inconsistently: a real flask flipped between "cup" and "bottle".
+# Track them as one family so a request for either keeps one stable target.
+FAMILY = {"cup": "bottle", "vase": "bottle", "wine glass": "bottle"}
+
+
+def canonical(label: str) -> str:
+    return FAMILY.get(label, label)
 
 
 @dataclass
@@ -31,15 +38,22 @@ class Track:
     last_seen: float
     n_obs: int = 1
     misses: int = 0
+    last_miss: float = 0.0
+    # Locked: the 3D position is fixed; guidance relies on phone tracking only, not on seeing it again.
+    locked: bool = False
     observed_now: bool = True
     injected: bool = False
     history: list = field(default_factory=list)
 
     def sigma_at(self, now: float) -> float:
-        return float(self.sigma) + CONFIG.sigma_growth_per_s * max(0.0, now - self.last_seen) + 0.05 * self.misses
+        if self.locked:
+            return float(self.sigma)
+        return float(self.sigma) + CONFIG.sigma_growth_per_s * max(0.0, now - self.last_seen) + 0.02 * self.misses
 
     def valid_at(self, now: float) -> bool:
-        return bool(self.misses < 4 and now - self.last_seen < CONFIG.offscreen_max_age_s
+        if self.locked:
+            return True
+        return bool(self.misses < CONFIG.misses_to_lose and now - self.last_seen < CONFIG.offscreen_max_age_s
                     and self.sigma_at(now) < CONFIG.max_sigma_m)
 
 
@@ -96,6 +110,9 @@ class Tracker:
                 gate = max(0.35, 2.5 * np.hypot(t.sigma_at(now), obs.sigma))
                 if d < gate and d < best_d:
                     best, best_d = t, d
+            if best is not None and best.locked:
+                matched.add(best.id)  # a sighting of the locked target: absorb it, never move it
+                continue
             if best is None:
                 self._new(obs, now, injected)
                 continue
@@ -105,7 +122,7 @@ class Tracker:
         # Negative evidence: a track that should be visible and unoccluded but was not detected.
         h, w = depth.shape
         for t in self.tracks.values():
-            if t.id in matched:
+            if t.id in matched or t.locked:
                 continue
             p = project(T, K, t.position)
             if p is None:
@@ -118,7 +135,9 @@ class Tracker:
             if detectable and 0.1 * w < u < 0.9 * w and 0.1 * h < v < 0.9 * h:
                 seen = depth[int(v), int(u)]
                 if seen > d - 0.3:  # the line of sight reaches the cached position
-                    t.misses += 1
+                    if now - t.last_miss > 0.5:  # a weak detector misses some frames anyway
+                        t.misses += 1
+                        t.last_miss = now
         self._merge_duplicates()
 
     def _new(self, obs: Observation, now: float, injected: bool) -> None:
@@ -144,7 +163,7 @@ class Tracker:
         t.observed_now = True
 
     def _merge_duplicates(self) -> None:
-        ids = sorted(self.tracks, key=lambda i: -self.tracks[i].n_obs)
+        ids = sorted(self.tracks, key=lambda i: (not self.tracks[i].locked, -self.tracks[i].n_obs))
         for i, a in enumerate(ids):
             for b in ids[i + 1:]:
                 ta, tb = self.tracks.get(a), self.tracks.get(b)
@@ -153,7 +172,7 @@ class Tracker:
 
     def confirmed(self, label: str, now: float) -> list[Track]:
         return [t for t in self.tracks.values()
-                if t.label == label and t.n_obs >= 2 and t.valid_at(now)]
+                if t.label == label and t.n_obs >= 3 and t.valid_at(now)]
 
 
 if __name__ == "__main__":
@@ -169,10 +188,22 @@ if __name__ == "__main__":
     tr = Tracker()
     tr.update([obs], depth, K, T, 0.0, False)
     tr.update([obs], depth, K, T, 0.1, False)
+    tr.update([obs], depth, K, T, 0.15, False)
     assert len(tr.confirmed("bottle", 0.2)) == 1
     # The bottle disappears while in view: misses accumulate and the cache becomes invalid.
     empty = np.full((480, 640), 5.0, np.float32)
-    for i in range(4):
+    for i in range(CONFIG.misses_to_lose):
         tr.update([], empty, K, T, 1.0 + i, False)
     assert not tr.confirmed("bottle", 5.0)
+    # A locked target keeps its place and validity without being seen again.
+    locked = Tracker()
+    for t_ in (0.0, 0.1, 0.2):
+        locked.update([obs], depth, K, T, t_, False)
+    track = next(iter(locked.tracks.values()))
+    track.locked = True
+    before = track.position.copy()
+    moved = observe("bottle", mask, depth * 1.2, K, T)
+    for i in range(20):
+        locked.update([moved] if i % 2 else [], empty, K, T, 1.0 + i, False)
+    assert track.valid_at(500.0) and np.allclose(track.position, before) and len(locked.tracks) == 1
     print("targets ok")

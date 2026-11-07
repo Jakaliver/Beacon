@@ -41,6 +41,7 @@ enum Settings {
     static let hostKey = "host"
     static let frameRateKey = "frameRate"
     static let defaultHost = "Malins-Macbook-Pro-3.local"
+    static let reverseHeadTurnKey = "reverseHeadTurn"
     static let defaultFrameRate = 10.0
 
     static var host: String { UserDefaults.standard.string(forKey: hostKey) ?? defaultHost }

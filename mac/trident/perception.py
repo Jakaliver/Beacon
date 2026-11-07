@@ -37,8 +37,9 @@ class Perception:
         return self.depth_model.infer_image(bgr, CONFIG.depth_input_size).astype(np.float32)
 
     def detect(self, bgr: np.ndarray) -> list[Detection]:
-        result = self.yolo.predict(bgr, imgsz=640, device=self.device, retina_masks=True,
-                                   conf=0.25, verbose=False)[0]
+        # 960 px and a low threshold: real flasks scored 0.2-0.5 at best (about 2 ms extra on MPS).
+        result = self.yolo.predict(bgr, imgsz=960, device=self.device, retina_masks=True,
+                                   conf=0.15, verbose=False)[0]
         if result.masks is None:
             return []
         masks = result.masks.data.cpu().numpy() > 0.5

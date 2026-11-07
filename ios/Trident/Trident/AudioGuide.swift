@@ -1,13 +1,21 @@
 import AVFoundation
+import CoreMotion
 import simd
 
 /// Spatial guidance sounds. Positions are ARKit world coordinates; both frames are right-handed, +Y up, −Z forward.
 ///
-/// The headphones' own orientation is NOT assumed to be in ARKit coordinates. The system head tracking
-/// (`isListenerHeadTrackingEnabled`) rotates the listener relative to the user's calibrated forward, so on
-/// Calibrate we set the listener's base orientation to the phone's horizontal forward in the AR world.
-/// We never rotate the listener by head motion ourselves.
+/// Head tracking: Apple's automatic listener head tracking needs the Head Pose capability, which
+/// personal (free) development teams cannot sign. So the listener is rotated from AirPods motion
+/// (CMHeadphoneMotionManager) instead, never together with the automatic mode. The headphones'
+/// orientation is not assumed to be in ARKit coordinates: Calibrate stores the head attitude while the
+/// user faces where the phone points, and later head turns are applied relative to that.
 final class AudioGuide {
+    private let headMotion = CMHeadphoneMotionManager()
+    private var headReference: CMAttitude?
+    private var latestHead: CMAttitude?
+    private var baseForward = SIMD3<Float>(0, 0, -1)
+    /// Paid developer teams: set true and restore the Head Pose entitlement in project.yml.
+    static let automaticHeadTracking = false
     private let engine = AVAudioEngine()
     private let environment = AVAudioEnvironmentNode()
     private let beacon = AVAudioPlayerNode()
@@ -35,7 +43,7 @@ final class AudioGuide {
             player.sourceMode = .pointSource
             player.pointSourceInHeadMode = .bypass
         }
-        environment.isListenerHeadTrackingEnabled = true
+        environment.isListenerHeadTrackingEnabled = Self.automaticHeadTracking
         environment.distanceAttenuationParameters.distanceAttenuationModel = .inverse
         environment.distanceAttenuationParameters.referenceDistance = 1
         environment.distanceAttenuationParameters.rolloffFactor = 0.5
@@ -46,6 +54,31 @@ final class AudioGuide {
         try? engine.start()
         beacon.play()
         probe.play()
+        if !Self.automaticHeadTracking { startHeadTracking() }
+    }
+
+    private func startHeadTracking() {
+        guard headMotion.isDeviceMotionAvailable, !headMotion.isDeviceMotionActive else { return }
+        headMotion.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
+            guard let self, let attitude = motion?.attitude else { return }
+            self.latestHead = attitude
+            if self.headReference == nil { self.headReference = attitude.copy() as? CMAttitude }
+            self.applyHead()
+        }
+    }
+
+    /// Listener forward = calibrated world forward, turned by the head's yaw since calibration.
+    private func applyHead() {
+        var yaw: Float = 0
+        if let head = latestHead?.copy() as? CMAttitude, let reference = headReference {
+            head.multiply(byInverseOf: reference)
+            yaw = Float(head.yaw) * (UserDefaults.standard.bool(forKey: Settings.reverseHeadTurnKey) ? -1 : 1)
+        }
+        // Rotation about +Y: a positive yaw (turn left) swings forward towards −X.
+        let c = cos(yaw), s = sin(yaw)
+        let f = SIMD3<Float>(baseForward.x * c + baseForward.z * s, 0, -baseForward.x * s + baseForward.z * c)
+        environment.listenerVectorOrientation = AVAudio3DVectorOrientation(
+            forward: AVAudio3DVector(x: f.x, y: 0, z: f.z), up: AVAudio3DVector(x: 0, y: 1, z: 0))
     }
 
     func restart() {
@@ -66,11 +99,11 @@ final class AudioGuide {
         environment.listenerPosition = AVAudio3DPoint(x: position.x, y: position.y, z: position.z)
     }
 
-    /// Sets the listener's base yaw so that audio forward equals the given world direction.
+    /// Call while the user faces where the phone points: that world direction becomes "ahead".
     func setForward(_ forward: SIMD3<Float>) {
-        environment.listenerVectorOrientation = AVAudio3DVectorOrientation(
-            forward: AVAudio3DVector(x: forward.x, y: 0, z: forward.z),
-            up: AVAudio3DVector(x: 0, y: 1, z: 0))
+        baseForward = forward
+        headReference = latestHead?.copy() as? CMAttitude
+        applyHead()
     }
 
     func beaconPing(at position: SIMD3<Float>) {

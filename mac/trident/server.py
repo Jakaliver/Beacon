@@ -16,7 +16,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import CONFIG
-from .engine import Engine
+from .engine import DEBUG_DIR, Engine
 
 log = logging.getLogger("trident")
 faulthandler.register(signal.SIGUSR1)  # `kill -USR1 <pid>` prints all thread stacks
@@ -167,6 +167,11 @@ async def sensor(ws: WebSocket) -> None:
                 continue
             if msg.get("bytes") is not None:
                 header, jpeg, depth = parse_frame(msg["bytes"])
+                if DEBUG_DIR and header["seq"] % 15 == 0:
+                    with open(f"{DEBUG_DIR}/raw.jpg", "wb") as f:
+                        f.write(jpeg)
+                    with open(f"{DEBUG_DIR}/raw.json", "w") as f:
+                        json.dump(header, f)
                 if pending["frame"] is not None:
                     engine.stats["dropped_frames"] += 1
                 pending["frame"] = (header, jpeg, depth)
