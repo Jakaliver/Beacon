@@ -251,7 +251,12 @@ final class AppModel: ObservableObject {
         if stopReason == nil { localStop("interrupted") }
     }
 
-    func becameActive() { if started { ar.resume() } }
+    func becameActive() {
+        guard started else { return }
+        ar.resume()
+        try? AVAudioSession.sharedInstance().setActive(true)
+        audio.start()
+    }
 
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()

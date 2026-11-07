@@ -147,7 +147,14 @@ final class AudioGuide {
     }
 
     private func play(_ buffer: AVAudioPCMBuffer, on player: AVAudioPlayerNode) {
-        guard engine.isRunning else { return }
+        // The engine can fail to start (app launched in the background) or stop (route or interruption
+        // changes). Recover here, or every guidance sound is silently lost while speech still works.
+        if !engine.isRunning {
+            try? AVAudioSession.sharedInstance().setActive(true)
+            start()
+            guard engine.isRunning else { return }
+        }
+        if !player.isPlaying { player.play() }
         player.scheduleBuffer(buffer, at: nil, options: .interrupts)
     }
 
