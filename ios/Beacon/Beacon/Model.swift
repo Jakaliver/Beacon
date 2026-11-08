@@ -469,6 +469,7 @@ final class AppModel: ObservableObject {
     func becameActive() {
         foreground = true
         guard started else { return }
+        voice.speaker.refreshVoices()
         voice.becameActive()
         ar.resume()
         try? AVAudioSession.sharedInstance().setActive(true)

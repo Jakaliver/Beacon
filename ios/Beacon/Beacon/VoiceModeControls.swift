@@ -46,9 +46,16 @@ struct VoiceModeControls: View {
                         }
                     }
                 } label: {
-                    Label(voice.speaker.currentVoiceLabel, systemImage: "waveform")
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(voice.speaker.currentVoiceLabel)
+                            Text(voice.speaker.currentVoiceQualityLabel)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: { Image(systemName: "waveform") }
                 }
-                .accessibilityLabel("Speaking voice, \(voice.speaker.currentVoiceLabel)")
+                .accessibilityLabel("Speaking voice, \(voice.speaker.currentVoiceLabel), \(voice.speaker.currentVoiceQualityLabel)")
                 .accessibilityIdentifier("speaking-voice")
                 Spacer()
                 Button("Try voice") {

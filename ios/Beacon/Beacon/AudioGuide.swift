@@ -4,7 +4,7 @@ import PHASE
 import simd
 
 /// Spatial guidance sounds, rendered with PHASE (Apple's Physical Audio Spatialization Engine): each sound
-/// has a direct path and a short diffuse reverb tail, plus geometric distance
+/// has only a direct binaural path, plus geometric distance
 /// spreading. Positions are ARKit world coordinates; ARKit and PHASE are both right-handed, +Y up, −Z forward.
 ///
 /// Head tracking: Apple's automatic head tracking needs the Head Pose capability, which personal (free)
@@ -85,7 +85,7 @@ final class AudioGuide {
         // Explicitly use PHASE's externalizing renderer, including on headphones
         // whose route might otherwise be treated as a conventional stereo output.
         engine.outputSpatializationMode = .alwaysUseBinaural
-        engine.defaultReverbPreset = .smallRoom
+        engine.defaultReverbPreset = .none
         listener = PHASEListener(engine: engine)
         targetSource = PHASESource(engine: engine)
         targetLoopSource = PHASESource(engine: engine)
@@ -107,16 +107,14 @@ final class AudioGuide {
         headLock.withLock { updateListener() }
     }
 
-    /// Keep the target's direct direction clear, with only a quiet diffuse tail.
-    /// No early-reflection paths or occluders compete with the actual source.
+    /// One direct path for every cue, including Chest. No room-effect layers.
     private func guidancePipeline() -> PHASESpatialPipeline? {
-        guard let pipeline = PHASESpatialPipeline(flags: [.directPathTransmission, .lateReverb]) else { return nil }
+        guard let pipeline = PHASESpatialPipeline(flags: .directPathTransmission) else { return nil }
         pipeline.entries[PHASESpatialCategory.directPathTransmission]?.sendLevel = 1.0
-        pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = GuidanceSounds.lateReverb
         return pipeline
     }
 
-    /// One PHASE event per sound: sampler → spatial mixer with direct sound and reverb.
+    /// One PHASE event per sound: sampler → direct binaural spatial mixer.
     private func register(_ name: String, _ samples: [Float], gain: Double = 1) {
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
         do {
@@ -325,7 +323,7 @@ final class AudioGuide {
     }
 
     func reportStatus() {
-        diagnostic("state=\(engine.renderingState.rawValue); spatializer=binaural; effects=direct+reverb; listener=\(headLock.withLock { phonePose == nil ? "preview" : "local AR" }); headTracking=\(headTrackingLive); assets=\(mixerIDs.count); prepared=\(prepared.values.reduce(0) { $0 + $1.count }); active=\(playing.count); chestRegistered=\(targetLoopMixerID != nil); chestEvent=\(targetLoopEvent != nil); ducked=\(guidanceDucked)")
+        diagnostic("state=\(engine.renderingState.rawValue); spatializer=binaural; effects=direct-only; reverb=off; reflections=off; listener=\(headLock.withLock { phonePose == nil ? "preview" : "local AR" }); headTracking=\(headTrackingLive); assets=\(mixerIDs.count); prepared=\(prepared.values.reduce(0) { $0 + $1.count }); active=\(playing.count); chestRegistered=\(targetLoopMixerID != nil); chestEvent=\(targetLoopEvent != nil); ducked=\(guidanceDucked)")
     }
 
     #if DEBUG

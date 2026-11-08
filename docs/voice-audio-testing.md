@@ -1,6 +1,6 @@
 # Voice and spatial audio testing
 
-Beacon uses **Calibrate** and **Talk to Beacon** on the main screen. Hold to record,
+Beacon uses a large **Talk to Beacon** control on the main screen. Hold to record,
 speak and release to send. The Mac transcribes the recording.
 The Action button shortcut also supports activate-to-start, activate-again-to-send.
 There is no wake-word listening in the main app. Use a
@@ -38,7 +38,7 @@ Mac is slow. Stay in a clear area while checking spatial audio.
 
 For each spoken request below, hold **Talk to Beacon**, speak and release to send.
 
-1. Open Beacon and tap **Calibrate** with the phone pointing ahead. With compatible
+1. Open Beacon, hold **Talk to Beacon**, say **"calibrate"** and release with the phone pointing ahead. With compatible
    AirPods, face the same direction. Allow Microphone access when first recording.
 2. Send **"loot mode on"**, then **"find the bottle"**. Check the **Heard:** text under
    Settings → Speaking voice and that the Mac starts a search. A single continuous
@@ -69,25 +69,25 @@ Exercise that dialogue in the separate Voice Lab below.
 For the **Beeps** sound, move the phone towards a found object: the clean beeps should
 speed up and turn into a short, rising double beep when close (normally within 20 cm of the observed surface).
 Rotate the phone while keeping its position fixed; this must not change the proximity
-cue. The sound stays anchored to the object, with a short diffuse reverb tail. Small position
+cue. The damped sound stays anchored to the object, without a room tail. Small position
 wobbles near the threshold should not alternate rapidly between single and double beeps.
 
 Check the beeps very close to the object as well as farther away. They use fixed PCM
 headroom, no automatic loudness boost, and distance gain capped at unity. New notes wait
-for the preceding cue to finish; guidance also waits while the app speaks. The
-reverb remains enabled. Listen for crackle during quick approach/close transitions.
+for the preceding cue to finish; guidance also waits while the app speaks.
+Listen for crackle during quick approach/close transitions.
 Live listener-position and target-position updates are smoothed, and output-route notifications only restart
 audio when the actual output or format changes. Compare stationary test beeps with live
 guidance while moving the phone; both should remain clean.
 
-PHASE uses head-tracked binaural rendering with a clear direct path and the same
-quiet late-reverb send for all guidance cues, including Chest. Early reflections
-are disabled, and there are no simulated walls, ceilings, floors or occluders.
-A small-room reverb preset supplies a short diffuse tail without a room geometry
-model. Check that turning your head gives one clear source direction without
-secondary reflected directions or muffling at an imaginary room boundary.
-The beep retains its 988 Hz fundamental and short rising pair; brief, softly fading
-upper harmonics give the renderer more directional detail without a low thud.
+PHASE uses only the direct head-tracked binaural path for all guidance cues, including
+Chest. Both early reflections and late reverb are absent from the pipeline, and the
+engine's reverb preset is None. There are no simulated walls, ceilings, floors or
+occluders. Check that turning your head gives one clear source direction without
+secondary reflected directions or a lingering room tail.
+The beep retains its 988 Hz fundamental and short rising pair. Its 60 ms notes have
+a faster natural decay, softer upper detail and a brief textured attack for localization.
+Listen for a clean, damped onset without a low thud, hiss or clipped ending.
 The listener follows local AR translation in every guidance mode,
 including the final approach, instead of the backend's stationary probe anchor.
 Calibrate with the phone held at chest height and your head facing the same direction.
@@ -99,7 +99,7 @@ Route waypoints still provide walking instructions when a path is active.
 Head position remains an estimate (30 cm behind and 45 cm above the phone in the
 calibrated direction); AirPods supply rotation, not absolute head translation. Keep
 the phone near that calibrated holding position for the most accurate placement.
-The reverb is an effect, not a measurement of the current room. Judge placement and realism with AirPods;
+Judge placement and realism with AirPods;
 build checks and PCM headroom tests cannot establish the perceptual result.
 
 With either Beeps or Chest selected, proximity vibrations begin within 1.5 m during
@@ -115,7 +115,7 @@ Test left/right turns and looking up/down, then rotate only the phone: head-faci
 feedback follows the AirPods, while close-range feedback still depends only on phone
 position. Stronger proximity pulses take precedence near the object without stacking
 vibrations. No live head tracking, invalid/stale guidance, Stop, recording or backgrounding
-must clear the head-facing cue. Pitch, reverb and volume remain consistent.
+must clear the head-facing cue. Pitch and volume remain consistent.
 
 For the Action button, choose Settings → Action Button → Shortcut → Beacon →
 **Talk to Beacon**. iOS activates it with a press-and-hold: the first activation starts
@@ -125,18 +125,22 @@ should start after cancellation. The on-screen control remains hold-to-talk.
 
 ## Speaking voice
 
-Leave the voice picker on **Automatic**, then tap **Try voice**. Automatic prefers a
-Siri voice **only if iOS exposes one to the app**, otherwise the best available Apple
-English voice, preferring premium/enhanced quality and British English on ties.
-The UI shows the actual selected voice and explains the fallback. An explicit choice
-in the picker is remembered and takes precedence over Automatic.
+In Beacon **Settings → Speaking voice**, tap the current voice name, select an
+installed voice and tap **Try voice**. The selected voice's quality is shown below
+its name; menu entries also include language and quality. Your explicit choice is
+remembered and takes precedence over Automatic.
+Automatic retains its existing preference for a Siri voice only if iOS exposes one
+to the app, then premium/enhanced quality and British English on ties.
 
 Installing a Siri voice does not guarantee it is available to third-party speech
 synthesis. Apple's public API does not provide a switch to use the user's Siri voice;
 see [Apple's speech synthesis presentation](https://developer.apple.com/videos/play/wwdc2020/10022/).
 The implementation uses the supported voice inventory, with no private Siri identifiers.
-If an enhanced English voice is installed in iPhone accessibility speech settings,
-return to the app to refresh the list and compare **Try voice**.
+Download additional voices in iPhone **Settings → Accessibility → Read & Speak →
+Voices → English** (called Spoken Content on older iOS versions). Open a voice and
+use the cloud icon to download a Premium or Enhanced version when offered. Return
+to Beacon to refresh the installed list, select the voice and compare **Try voice**.
+Returning to the app refreshes availability without replacing your manual choice.
 
 ## Optional Voice Lab check
 

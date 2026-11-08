@@ -108,7 +108,7 @@ Allow incoming connections for the backend if macOS prompts. Use the Mac's Wi-Fi
 2. Sweep slowly across a well-lit floor and nearby furniture. A floor patch of about 1 m²
    helps ARKit establish the floor height. The Mac view should show **Live**
    and an increasing point count.
-3. Hold the phone ahead of your torso, facing forward, and tap **Calibrate**. If testing
+3. Hold the phone ahead of your torso, facing forward, and use **Talk to Beacon** to say **"calibrate"**. If testing
    head tracking, wear compatible AirPods paired with the phone during calibration.
 4. Hold **Talk to Beacon**, say **find the bottle**, then release to send.
    With VoiceOver, double-tap and hold, then lift your finger. The app must remain open.
@@ -178,13 +178,13 @@ Guidance defaults to **Beeps**: clean beeps accelerate as the phone approaches t
 then become a short, rising double beep inside the close-distance threshold (normally 20 cm).
 Phone rotation does not change proximity feedback. Vibrations become stronger and faster
 inside 1.2 m, reaching full strength in the last 5 cm with either sound style.
-Sounds retain distance attenuation
-and audible small-room reverb. Settings → **Object sound** also offers **Chest**, a
+Sounds retain distance attenuation and head-tracked binaural direction, with no added
+reflections or reverb. Settings → **Object sound** also offers **Chest**, a
 continuous sound at the object that lowers while the app speaks.
 For voice controls and audio acceptance checks, use the
 [voice and audio test guide](voice-audio-testing.md).
-With AirPods on, face where the phone points and press **Calibrate** so head turns keep
-the sound aligned with the object. The reverb is a room preset, not measured room acoustics.
+With AirPods on, face where the phone points and say **"calibrate"** through **Talk to Beacon** so head turns keep
+the sound aligned with the object. Guidance uses a direct sound path with no simulated room.
 
 ## Troubleshooting
 

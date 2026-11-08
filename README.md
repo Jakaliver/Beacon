@@ -11,8 +11,9 @@ Found objects play spatial beeps by default; choose **Beeps** or **Chest** in Se
 Hold and say **"loot mode on"** for the chest sound or **"loot mode off"** for
 Beeps. The choice is remembered and does not resume a paused search.
 Guidance uses one clean beep sound that speeds up as the phone approaches the object.
-Inside the close-distance threshold (normally 20 cm), they become a short, rising double beep with a
-small-room reverb tail. Only the phone's position matters; its pointing angle does not.
+Inside the close-distance threshold (normally 20 cm), they become a short, rising double beep.
+The damped cues use direct head-tracked binaural sound, with no added reflections or reverb.
+Only the phone's position matters for proximity; its pointing angle does not.
 Distance uses the nearest observed object surface, falling back to its centre. Nearby
 vibration pulses get stronger and faster as the phone approaches, reaching full strength
 in the last 5 cm. They work with either sound style and stop when guidance stops.
@@ -33,7 +34,8 @@ scripts/dev.sh     # backend on :8787, room view on :5173
 Open <http://localhost:5173>. Keep Beacon open on an iPhone connected to the same Wi-Fi.
 See [iPhone setup](docs/real-device.md) for signing, installation and connection settings.
 
-On the iPhone, tap **Calibrate**, then hold **Talk to Beacon**, speak and release to send.
+On the iPhone, hold **Talk to Beacon**, speak and release to send.
+Face ahead and say **"calibrate"** through that same button to align the audio.
 **Stop** appears during active requests or guidance. Connection settings live behind the gear.
 Use the iPhone app to find an object. Its selected target appears automatically in the room
 view. **3D** slowly circles the scan at 30° above horizontal, completing a turn in 90

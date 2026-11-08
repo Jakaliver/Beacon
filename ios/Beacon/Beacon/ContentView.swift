@@ -16,7 +16,7 @@ struct ContentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header
-                    Spacer(minLength: 48)
+                    Spacer(minLength: 16)
                     VStack(alignment: .leading, spacing: 12) {
                         Text(statusTitle)
                             .font(.largeTitle.weight(.semibold))
@@ -46,19 +46,9 @@ struct ContentView: View {
                         }
                         .padding(.top, 24)
                     }
-                    Spacer(minLength: 40)
+                    Spacer(minLength: 16)
                     VStack(spacing: 12) {
-                        Button { model.calibrate() } label: {
-                            Label("Calibrate", systemImage: "scope")
-                                .font(.body.weight(.semibold))
-                                .frame(maxWidth: .infinity, minHeight: 56)
-                                .contentShape(RoundedRectangle(cornerRadius: 16))
-                        }
-                        .buttonStyle(.plain)
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.primary.opacity(0.16), lineWidth: 1))
-                        .disabled(model.recording || model.transcribing)
-                        .accessibilityHint("Face ahead with the phone pointing forwards, then activate to align the audio.")
-                        navigateButton
+                        navigateButton(height: max(420, min(660, geometry.size.height * 0.64)))
                         Button("Stop", role: .destructive) { model.stop() }
                             .font(.body.weight(.semibold))
                             .frame(maxWidth: .infinity, minHeight: 48)
@@ -68,8 +58,8 @@ struct ContentView: View {
                             .accessibilityHint("Stops recording, cancels a pending request and silences guidance immediately.")
                     }
                 }
-                .frame(minHeight: max(0, geometry.size.height - 48))
-                .padding(24)
+                .frame(minHeight: max(0, geometry.size.height - 32))
+                .padding(16)
             }
             .scrollIndicators(.hidden)
         }
@@ -109,13 +99,13 @@ struct ContentView: View {
         }
     }
 
-    private var navigateButton: some View {
-        VStack(spacing: 16) {
+    private func navigateButton(height: CGFloat) -> some View {
+        VStack(spacing: 24) {
             Image(systemName: model.recording ? "waveform" : model.transcribing ? "ellipsis" : "mic.fill")
-                .font(.system(size: 28, weight: .medium))
+                .font(.system(size: 56, weight: .medium))
             VStack(spacing: 6) {
                 Text(model.recording ? "Listening…" : model.transcribing ? "Sending request…" : "Talk to Beacon")
-                    .font(.title2.weight(.semibold))
+                    .font(.largeTitle.weight(.semibold))
                 Text(model.recording ? (model.recordingFromActionButton ? "Press Action button again to send" : "Release to send") : model.transcribing ? "One moment" : "Hold to speak · release to send")
                     .font(.subheadline)
                     .opacity(0.7)
@@ -124,7 +114,7 @@ struct ContentView: View {
         }
         .foregroundStyle(Color(.systemBackground))
         .padding(24)
-        .frame(maxWidth: .infinity, minHeight: 220)
+        .frame(maxWidth: .infinity, minHeight: height)
         .background(Color.primary.opacity(connected ? (model.recording ? 0.8 : 1) : 0.35), in: RoundedRectangle(cornerRadius: 22))
         .accessibilityHidden(true)
         .overlay {
@@ -161,7 +151,7 @@ struct ContentView: View {
         if guiding { return "Follow the sound. Vibrations get stronger as your phone gets closer." }
         if model.mode == "searching" { return "Slowly scan the room with the camera." }
         if model.stopReason != nil || model.mode == "stopped" { return "Hold below and say “resume”, or ask for a different object." }
-        return "Calibrate, then hold below and say what you want to find."
+        return "Hold below and say “calibrate”, or tell Beacon what you want to find."
     }
 }
 

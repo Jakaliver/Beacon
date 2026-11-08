@@ -1,14 +1,12 @@
 import Foundation
 import simd
 
-/// One clean beep timbre throughout; the close cue pairs two short, rising notes.
-/// PHASE supplies directional placement and a short diffuse reverb tail.
+/// One damped beep timbre throughout; the close cue pairs two short, rising notes.
+/// PHASE supplies direct binaural placement with no reflections or reverb.
 enum GuidanceSounds {
     static let sampleRate = 44_100.0
-    // Leave more than 12 dB of sample headroom before spatialization and room tails.
+    // Leave more than 12 dB of sample headroom before spatialization.
     static let peak: Float = 0.24
-    // Keep a little room around the source without the diffuse tail masking its bearing.
-    static let lateReverb = 0.10
     // Softened inverse-distance spreading, capped at unity beside the listener.
     // Avoid a flat close-range plateau so small movements still change loudness.
     static let distanceGains: [SIMD2<Double>] = [
@@ -25,17 +23,17 @@ enum GuidanceSounds {
     /// more frequency detail than a nearly pure sine. The upper partials fade
     /// quickly, keeping the same lower pitch without a shrill sustained tone.
     private static func beep(hz: Double) -> [Float] {
-        let count = Int(0.065 * sampleRate)
+        let count = Int(0.060 * sampleRate)
         let detail = localizationAttack(count: count)
         let samples = (0..<count).map { i -> Float in
             let t = Double(i) / sampleRate
             let phase = 2 * Double.pi * hz * t
             let attack = sin(.pi / 2 * min(1, t / 0.003))
             let release = sin(.pi / 2 * min(1, Double(count - 1 - i) / (sampleRate * 0.012)))
-            let envelope = attack * attack * release * release * exp(-t / 0.045)
+            let envelope = attack * attack * release * release * exp(-t / 0.028)
             let partials = 0.22 * sin(2 * phase) + 0.12 * sin(3 * phase)
                 + 0.075 * sin(4 * phase) + 0.04 * sin(5 * phase) + 0.02 * sin(6 * phase)
-            let tone = sin(phase) + partials * exp(-t / 0.035)
+            let tone = sin(phase) + partials * exp(-t / 0.025)
             return Float(tone * envelope + detail[i])
         }
         let sourcePeak = samples.map { abs($0) }.max() ?? 1
@@ -49,7 +47,7 @@ enum GuidanceSounds {
         var seed: UInt32 = 0x42656163
         var low = 0.0, high = 0.0
         let lowBlend = 1 - exp(-2 * Double.pi * 1_800 / sampleRate)
-        let highBlend = 1 - exp(-2 * Double.pi * 7_000 / sampleRate)
+        let highBlend = 1 - exp(-2 * Double.pi * 5_500 / sampleRate)
         return (0..<count).map { i in
             let t = Double(i) / sampleRate
             guard t < 0.018 else { return 0 }
@@ -59,7 +57,7 @@ enum GuidanceSounds {
             high += highBlend * (noise - high)
             let fadeIn = sin(.pi / 2 * min(1, t / 0.002))
             let fadeOut = cos(.pi / 2 * t / 0.018)
-            return 0.45 * (high - low) * fadeIn * fadeIn * fadeOut * fadeOut
+            return 0.40 * (high - low) * fadeIn * fadeIn * fadeOut * fadeOut
         }
     }
 
@@ -83,7 +81,7 @@ enum GuidanceListenerGeometry {
 }
 
 /// Let an existing note finish before starting another cue, including mode transitions.
-/// This gates new starts; it never cuts off a note or removes its room tail.
+/// This gates new starts; it never cuts off a note's natural decay.
 struct GuidanceCueTiming {
     private var readyAt = -Double.infinity
 

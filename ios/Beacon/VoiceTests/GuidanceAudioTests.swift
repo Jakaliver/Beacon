@@ -163,10 +163,12 @@ struct GuidanceAudioTests {
         precondition(Double(GuidanceSounds.pulse.count) / GuidanceSounds.sampleRate < TargetProximity.interval(forDistance: 0),
                      "Approach taps must fit within the fastest repeat interval")
 
-        let totalSend = 1 + GuidanceSounds.lateReverb
+        let lateBody = GuidanceSounds.pulse.dropFirst(Int(0.04 * GuidanceSounds.sampleRate))
+        precondition(energy(lateBody) / energy(GuidanceSounds.pulse[...]) < 0.05,
+                     "The damped cue must decay promptly without a lingering tonal ring")
         let peak = sounds.flatMap { $0.1 }.map { abs($0) }.max()!
-        precondition(Double(peak) * totalSend * 2 < 0.75,
-                     "Two coincident direct/reverb peaks should still retain mixing headroom")
+        precondition(Double(peak) * 2 < 0.75,
+                     "Two coincident direct peaks should still retain mixing headroom")
         let curve = GuidanceSounds.distanceGains
         for point in curve { precondition((0...1).contains(point.y), "Distance attenuation must never amplify") }
         for (before, after) in zip(curve, curve.dropFirst()) {

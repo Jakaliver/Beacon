@@ -68,6 +68,10 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
 
     var currentVoiceLabel: String { resolvedVoice?.name ?? "No English voice installed" }
 
+    var currentVoiceQualityLabel: String {
+        resolvedVoice.map { Self.qualityLabel($0.quality) } ?? "Unavailable"
+    }
+
     var siriVoiceAvailable: Bool {
         installedVoices.contains { Self.metadata(for: $0).identifiesSiri }
     }
