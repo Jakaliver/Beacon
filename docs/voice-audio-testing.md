@@ -71,6 +71,11 @@ Rotate the phone while keeping its position fixed; this must not change the prox
 cue. The sound stays anchored to the object, with a small-room reverb tail. Small position
 wobbles near the threshold should not alternate rapidly between single and double beeps.
 
+Check the beeps very close to the object as well as farther away. They use fixed PCM
+headroom, no automatic loudness boost, and distance gain capped at unity. New notes wait
+for the preceding cue to finish; guidance also waits while the app speaks. The room
+reverb remains enabled. Listen for crackle during quick approach/close transitions.
+
 ## Speaking voice
 
 Leave the voice picker on **Automatic**, then tap **Try voice**. Automatic prefers a
@@ -110,7 +115,8 @@ after changes:
 - `scripts/test-voice-lab-sound.sh`: sound switching, saved loot preferences and audio lifecycle
   checks using a fake audio output.
 - `scripts/test-guidance-audio.sh`: position-only proximity, rotation independence, close-distance
-  hysteresis, and generated sound headroom, low-frequency content and two-note separation. An optional directory argument exports WAV previews.
+  hysteresis, waveform/mix headroom, bounded distance gain, note overlap prevention and
+  two-note separation. An optional directory argument exports WAV previews.
 
 These checks do not exercise a real microphone, speech voice, PHASE playback or ARKit.
 Run the physical-device checks above to validate microphone recognition and spatial

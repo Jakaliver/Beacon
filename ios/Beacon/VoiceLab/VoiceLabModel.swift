@@ -10,7 +10,7 @@ protocol VoiceLabAudioOutput: AnyObject {
     func silence()
     func setListener(_ position: SIMD3<Float>)
     func setForward(_ forward: SIMD3<Float>)
-    func pulse(at position: SIMD3<Float>?)
+    @discardableResult func pulse(at position: SIMD3<Float>?) -> Bool
     func startOrUpdateTargetLoop(at position: SIMD3<Float>)
     func stopTargetLoop()
     func setGuidanceDucked(_ ducked: Bool)
