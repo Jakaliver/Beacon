@@ -404,7 +404,9 @@ export class RoomView {
           this.phoneForward.normalize();
           this.phoneUp.copy(this.worldUp);
           if (up?.length === 3 && up.every(Number.isFinite)) {
-            this.phoneUp.fromArray(up);
+            // `up` is the camera's +Y. ARKit camera axes follow the sensor's landscape orientation:
+            // +X runs from the handset's top to its bottom, so the model's top (+Y) is up × forward.
+            this.phoneUp.fromArray(up).cross(this.phoneForward);
             if (this.phoneUp.lengthSq() < 1e-6) this.phoneUp.copy(this.worldUp);
             else this.phoneUp.normalize();
           }

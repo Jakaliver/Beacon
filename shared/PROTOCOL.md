@@ -192,7 +192,8 @@ the server does not queue intermediate phone positions for later playback.
 
 `phone.position` is the camera centre in world metres, `forward` is its world-space
 −Z axis, and `up` is its world-space +Y axis. Forward and up together preserve phone
-tilt and roll. Vectors are null before a pose arrives or if their values are not finite;
+tilt and roll. ARKit camera axes follow the sensor's landscape orientation, so `up`
+points along the handset's side; the handset's top is `up × forward` (camera −X). Vectors are null before a pose arrives or if their values are not finite;
 `tracking`, `seq`, and `t` are null before the first pose. `floor_y` remains null until
 the existing floor estimator has a measured floor; it is never replaced with zero.
 Height above the floor is `phone.position[1] - floor_y` only when both are known.
