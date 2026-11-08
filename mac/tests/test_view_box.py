@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from beacon.targets import BOX_PAD, blend_yaw, view_box
+from beacon.targets import BOX_PAD, BOX_SCALE, blend_yaw, view_box
 
 
 def face(centre, width, height, yaw):
@@ -18,26 +18,26 @@ class ViewBoxTests(unittest.TestCase):
     def test_a_bottle_box_extends_behind_its_visible_face(self):
         front = face([0, 0, -1], 0.08, 0.25, np.pi)  # camera at origin looks along -Z
         centre, size, _ = view_box("bottle", front, np.zeros(3))
-        np.testing.assert_allclose(size, np.array([0.08, 0.25, 0.08]) + BOX_PAD, atol=0.002)
-        self.assertAlmostEqual(centre[2], -1 + BOX_PAD / 2 - size[2] / 2, places=3)
+        np.testing.assert_allclose(size, np.array([0.08, 0.25, 0.08]) * BOX_SCALE + BOX_PAD, atol=0.003)
+        self.assertAlmostEqual(centre[2], -1 - 0.04, places=3)  # half the bottle's assumed 8 cm depth
 
     def test_a_door_stays_flat(self):
         front = face([0, 1, -2], 0.9, 2.0, np.pi)
         _, size, _ = view_box("door", front, np.zeros(3))
-        self.assertLessEqual(size[2], 0.03 + BOX_PAD + 1e-9)
+        self.assertLessEqual(size[2], 0.03 * BOX_SCALE + BOX_PAD + 1e-9)
 
     def test_the_box_turns_with_an_object_seen_at_an_angle(self):
         yaw = np.pi + 0.6
         front = face(2 * np.array([np.sin(yaw), 0, np.cos(yaw)]), 0.5, 0.5, yaw)
         _, size, box_yaw = view_box("chair", front, np.zeros(3))
         self.assertAlmostEqual((box_yaw - yaw + np.pi) % (2 * np.pi) - np.pi, 0, places=3)
-        self.assertAlmostEqual(size[0], 0.5 + BOX_PAD, delta=0.002)  # not inflated by the turn
+        self.assertAlmostEqual(size[0], 0.5 * BOX_SCALE + BOX_PAD, delta=0.003)  # not inflated by the turn
 
     def test_the_outline_sets_width_and_height(self):
         surface = face([0, 0, -1], 0.06, 0.15, np.pi)  # depth edges trimmed the visible points
         outline = face([0, 0, -1], 0.08, 0.25, np.pi)
         _, size, _ = view_box("bottle", surface, np.zeros(3), outline)
-        np.testing.assert_allclose(size[:2], np.array([0.08, 0.25]) + BOX_PAD, atol=0.002)
+        np.testing.assert_allclose(size[:2], np.array([0.08, 0.25]) * BOX_SCALE + BOX_PAD, atol=0.003)
 
     def test_yaw_blends_the_short_way_round(self):
         self.assertAlmostEqual(blend_yaw(3.1, -3.1, 0.5), 3.1 + 0.5 * (2 * np.pi - 6.2), places=6)

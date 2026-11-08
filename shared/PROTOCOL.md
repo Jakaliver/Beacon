@@ -143,6 +143,7 @@ protocol compatibility; the current room visualization does not send control mes
   },
   "proximity": null | {"distance": 0.82, "pulse_interval": 0.45, "confirm": false, "threshold": 0.2},
   "waypoint": null | {"position": [x, y, z], "distance": 1.4, "azimuth_head": -0.4, "azimuth_phone": -0.3, "instruction": "turn left"},
+  "obstacle": null | {"level": "caution" | "stop", "distance": 0.9, "position": [x, y, z]},
   "listener": [x, y, z],
   "audio_yaw_offset": 0.0
 }
@@ -258,6 +259,13 @@ for older snapshots. Display geometry never feeds navigation.
 Fresh sightings refine position, extent and target surface, with greater weight for
 closer views. Larger corrections require three agreeing sightings. `age` and
 `observed_now` describe how recently the target was actually seen.
+
+`obstacle` warns about mapped obstacles in the lane the user walks into, while
+searching, in hot/cold and in walking modes. It is null when the user stands still or
+moves slower than 0.2 m/s, within reach (probe mode), and for the target and what it
+rests on. `distance` is the gap from the body to the obstacle's near edge: `caution`
+below 1.4 m, `stop` below 0.6 m, each held until the gap opens by 0.2 m. `position`
+is the obstacle's middle, so the phone can play the warning from there.
 
 A target's box is `extent` = [across, up, along] metres, turned by `yaw` radians about +Y
 (three.js `rotation.y`; local +Z is the direction it was viewed from). `position` is the box

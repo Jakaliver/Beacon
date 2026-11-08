@@ -54,12 +54,27 @@ struct TargetProximity {
 
     mutating func reset() { self = Self() }
 
-    static func distance(camera: simd_float4x4, centre: SIMD3<Float>, surface: [SIMD3<Float>]) -> Float? {
+    /// The target's box: `extent` is [across, up, along] metres, turned by `yaw` about +Y (as in the protocol).
+    struct Box {
+        let extent: SIMD3<Float>
+        let yaw: Float
+    }
+
+    /// Distance to the nearest surface sample, or to the target's box when that is nearer (0 inside it):
+    /// reaching the generous box counts as reaching the object.
+    static func distance(camera: simd_float4x4, centre: SIMD3<Float>, surface: [SIMD3<Float>], box: Box? = nil) -> Float? {
         let position = SIMD3(camera.columns.3.x, camera.columns.3.y, camera.columns.3.z)
         func finite(_ p: SIMD3<Float>) -> Bool { p.x.isFinite && p.y.isFinite && p.z.isFinite }
         guard finite(position) else { return nil }
-        if let nearest = surface.filter(finite).map({ simd_distance(position, $0) }).min() { return nearest }
-        return finite(centre) ? simd_distance(position, centre) : nil
+        let toBox = box.flatMap { finite(centre) && finite($0.extent) && $0.yaw.isFinite ? boxDistance(position - centre, $0) : nil }
+        if let nearest = surface.filter(finite).map({ simd_distance(position, $0) }).min() { return min(nearest, toBox ?? .infinity) }
+        return toBox ?? (finite(centre) ? simd_distance(position, centre) : nil)
+    }
+
+    private static func boxDistance(_ offset: SIMD3<Float>, _ box: Box) -> Float {
+        let c = cos(box.yaw), s = sin(box.yaw)
+        let local = SIMD3(offset.x * c - offset.z * s, offset.y, offset.x * s + offset.z * c)
+        return simd_length(simd_max(simd_abs(local) - box.extent / 2, .zero))
     }
 
     /// A calm approach rhythm: 1 s at 3 m, down to 0.22 s near the object.

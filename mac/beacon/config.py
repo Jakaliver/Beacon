@@ -40,6 +40,13 @@ class Config:
     depth_uncertainty: float = 0.05
     latency_margin: float = 0.03
 
+    # Obstacle warnings while walking: caution, then stop, by the gap ahead of the body.
+    obstacle_caution_m: float = 1.4
+    obstacle_stop_m: float = 0.6
+    obstacle_hysteresis_m: float = 0.2
+    obstacle_min_speed: float = 0.2  # m/s towards the obstacle; standing still never warns
+    obstacle_lane_half_width: float = 0.32  # body radius plus a margin
+
     approach_min: float = 0.35
     approach_max: float = 0.75
     probe_enter: float = 0.7  # horizontal phone-to-target distance

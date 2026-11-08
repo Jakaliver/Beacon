@@ -11,30 +11,30 @@
 </head>
 <body>
   <header class="toolbar">
-    <div class="brand"><strong>Beacon</strong><span aria-hidden="true">/</span><h1>Room</h1></div>
+    <h1 class="brand">Beacon</h1>
     <nav aria-label="View controls">
-      <div class="view-switch"><button id="view3d" aria-pressed="true" title="Slow orbit from 30° above horizontal">3D</button><button id="viewPlan" aria-pressed="false">Overhead</button><button id="viewFirst" aria-pressed="false" title="See the scan from the iPhone camera position" disabled>First person</button></div>
+      <div class="view-switch">
+        <button id="viewFirst" aria-pressed="false" aria-label="First person" title="See the scan from the iPhone camera" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle cx="8" cy="8" r="2" /></svg>1st</button>
+        <button id="view3d" aria-pressed="true" aria-label="3D" title="Orbit the room scan"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l5.5 3v7L8 14.5l-5.5-3v-7zM2.5 4.5L8 7.5l5.5-3M8 7.5v7" /></svg>3D</button>
+      </div>
       <button id="viewColour" aria-pressed="false" title="Use the camera image colours">Colour</button>
       <button id="fitRoom" title="Keep the whole scan in view"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2H2v4m8-4h4v4M2 10v4h4m8-4v4h-4" /></svg>Fit</button>
+      <button id="debugToggle" aria-pressed="false" aria-controls="debugPanel" title="Show debug information (D)">Debug</button>
     </nav>
   </header>
   <main aria-label="Room reconstruction">
-    <canvas id="roomCanvas" tabindex="0" aria-label="Interactive room scan. Drag to orbit, right-drag to pan, scroll to zoom. Use Overhead for a floor plan."></canvas>
-    <div id="injected" class="notice" hidden>Debug observations · not live camera inference</div>
+    <canvas id="roomCanvas" tabindex="0" aria-label="Interactive room scan. Drag to orbit, right-drag to pan, scroll to zoom."></canvas>
     <div id="emptyState" class="empty-state"><h2>No scan yet</h2><p id="emptyHint">Open Beacon on your iPhone and scan the room.</p></div>
     <div id="renderError" class="empty-state" hidden><h2>3D view unavailable</h2><p>Enable hardware acceleration or use a browser with WebGL 2 support.</p></div>
     <div id="targetLabel" class="target-label" hidden><span id="targetLabelText"></span></div>
-    <div class="canvas-footer">
-      <p id="interactionHint">Drag to pause · Scroll to zoom · 3D to resume</p>
-      <div id="sceneScale" class="scale" aria-label="Scale: one metre, estimated depth"><span id="scaleBar"></span><span>1 m</span><span class="depth-note">Estimated depth</span></div>
-    </div>
+    <aside id="debugPanel" class="debug" aria-label="Debug information" hidden>
+      <div class="connection" id="connection" data-state="waiting"><i aria-hidden="true"></i><span id="connectionText" role="status">Connecting</span><span id="frameAge"></span></div>
+      <p id="injected" class="notice" hidden>Debug observations · not live camera inference</p>
+      <div id="targetCard" class="selection" hidden><strong id="targetName"></strong><span id="targetDistance"></span><span id="targetState"></span><button id="focusTarget" title="Centre the selected target">Locate</button></div>
+      <dl id="debugStats"></dl>
+      <div id="sceneScale" class="scale" aria-label="Scale: one metre, estimated depth"><span id="scaleBar"></span><span>1 m · estimated depth</span></div>
+    </aside>
   </main>
-  <footer class="statusbar">
-    <div class="connection" id="connection" data-state="waiting"><i aria-hidden="true"></i><span id="connectionText" role="status">Connecting</span><span id="frameAge"></span></div>
-    <div id="targetCard" class="selection" hidden><i aria-hidden="true"></i><strong id="targetName"></strong><span id="targetDistance"></span><span id="targetState"></span><button id="focusTarget" title="Centre the selected target">Locate</button></div>
-    <p id="noTarget" class="no-target">Select an object on iPhone</p>
-    <div class="metrics"><span><span id="pointCount">0</span> points</span><span><span id="mappedArea">—</span> m²</span></div>
-  </footer>
   <script type="module" src="./main.ts"></script>
 </body>
 </html>

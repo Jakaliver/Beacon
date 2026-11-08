@@ -171,6 +171,29 @@ class GridMap:
         self.floor[rows[ok], cols[ok]] = np.maximum(self.floor[rows[ok], cols[ok]], 2)
         self.last_seen[rows[ok], cols[ok]] = t
 
+    def nearest_ahead(self, start: np.ndarray, direction: np.ndarray, half_width: float, max_range: float,
+                      exclude: tuple[np.ndarray, float] | None = None) -> tuple[float, np.ndarray, float] | None:
+        """Nearest occupied cell in a lane from `start` along unit `direction` (X–Z).
+
+        Returns (gap from start to the cell's near edge, cell centre X–Z, obstacle top above the floor).
+        Cells within `exclude` = (centre X–Z, radius) are ignored, e.g. the target and what it rests on.
+        """
+        rows, cols = np.nonzero(self.hits >= 3)
+        if not len(rows):
+            return None
+        centres = self.origin + (np.stack([cols, rows], axis=1) + 0.5) * self.res
+        rel = centres - start
+        along = rel @ direction
+        across = np.abs(rel[:, 0] * direction[1] - rel[:, 1] * direction[0])
+        keep = (along > 0) & (along < max_range + self.res) & (across < half_width + self.res / 2)
+        if exclude is not None:
+            keep &= np.linalg.norm(centres - exclude[0], axis=1) > exclude[1]
+        if not keep.any():
+            return None
+        i = np.flatnonzero(keep)[np.argmin(along[keep])]
+        top = self.top[rows[i], cols[i]]
+        return max(0.0, float(along[i]) - self.res / 2), centres[i], float(top) if np.isfinite(top) else 1.0
+
     def states(self) -> np.ndarray:
         s = np.full(self.hits.shape, UNKNOWN, np.uint8)
         s[self.cleared >= 2] = UNCERTAIN

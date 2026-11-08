@@ -102,6 +102,8 @@ final class AudioGuide {
         register("beacon", GuidanceSounds.waypoint)
         register("stop", GuidanceSounds.stop)
         register("rescan", GuidanceSounds.rescan)
+        register("obstacle", GuidanceSounds.obstacleCaution, gain: 0.7)
+        register("obstacle-stop", GuidanceSounds.obstacleStop)
         registerTargetLoop()
         headLock.withLock { updateListener() }
     }
@@ -477,6 +479,15 @@ final class AudioGuide {
     func pulse(at position: SIMD3<Float>?) -> Bool { play("pulse", from: targetSource, at: position) }
     @discardableResult
     func confirm(at position: SIMD3<Float>?) -> Bool { play("confirm", from: targetSource, at: position) }
+
+    @discardableResult
+    func obstacleCaution(at position: SIMD3<Float>) -> Bool { play("obstacle", from: cueSource, at: position) }
+
+    /// Cuts off whatever is playing: a stop must never wait behind a guidance note.
+    func obstacleStop(at position: SIMD3<Float>) {
+        silence()
+        play("obstacle-stop", from: cueSource, at: position)
+    }
 
     func cue(_ name: String) {
         switch name {

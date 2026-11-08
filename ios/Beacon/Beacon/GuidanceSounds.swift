@@ -19,6 +19,10 @@ enum GuidanceSounds {
     static let onObject = pulse + silence(0.022) + beep(hz: 1319)
     static let stop = pulse
     static let rescan = pulse
+    // Obstacles are lower than all guidance notes. Caution is one soft tap; stop falls, unlike the
+    // rising arrival cue, so the two can never be confused.
+    static let obstacleCaution = beep(hz: 330)
+    static let obstacleStop = beep(hz: 440) + silence(0.03) + beep(hz: 294)
 
     /// A soft tonal attack across several harmonics gives the spatial renderer
     /// more frequency detail than a nearly pure sine. The upper partials fade

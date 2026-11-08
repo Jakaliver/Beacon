@@ -13,7 +13,9 @@ IGNORED = {"person"}
 FAMILY = {"cup": "bottle", "vase": "bottle", "wine glass": "bottle"}
 # Flat things on a wall: their box keeps the depth that was seen instead of an assumed one.
 FLAT = {"door", "window", "light switch", "power outlet", "tv"}
-BOX_PAD = 0.02  # metres added to each box size, so the box encloses the object rather than cutting it
+# Boxes are drawn generously: monocular depth and masks err, and the phone counts reaching the box as arrival.
+BOX_SCALE = 1.25
+BOX_PAD = 0.10  # metres added to each size after scaling
 
 
 def canonical(label: str) -> str:
@@ -64,8 +66,16 @@ class Track:
                     and self.sigma_at(now) < CONFIG.max_sigma_m)
 
 
+def box_mask(box, shape: tuple[int, int]) -> np.ndarray:
+    """The detector's xyxy rectangle as a mask."""
+    m = np.zeros(shape, bool)
+    x0, y0, x1, y1 = (int(round(v)) for v in box)
+    m[max(y0, 0):max(y1, 0), max(x0, 0):max(x1, 0)] = True
+    return m
+
+
 def observe(label: str, mask: np.ndarray, depth: np.ndarray, K, T: np.ndarray,
-            floor_y: float | None = None) -> Observation | None:
+            floor_y: float | None = None, rect: np.ndarray | None = None) -> Observation | None:
     """Robust target estimate from the depth inside an eroded instance mask."""
     m = cv2.erode(mask.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
     if m.sum() < 40:
@@ -91,7 +101,8 @@ def observe(label: str, mask: np.ndarray, depth: np.ndarray, K, T: np.ndarray,
     surface = world[np.random.default_rng(0).choice(len(world), min(48, len(world)), replace=False)]
     # Width and height come from the whole instance outline placed at the object's distance:
     # erosion and depth-edge rejection above trimmed the top, bottom and sides.
-    outline, _ = unproject(np.full(mask.shape, med, np.float32), K, step=2, mask=mask)
+    outline, _ = unproject(np.full(mask.shape, med, np.float32), K, step=2,
+                           mask=mask if rect is None else mask | rect)
     centre, extent, yaw = view_box(label, world, cam, to_world(T, outline) if len(outline) else None)
     return Observation(label, centre, extent, surface, 0.05 + 0.1 * med, med, yaw)
 
@@ -112,10 +123,11 @@ def view_box(label: str, world: np.ndarray, cam: np.ndarray,
     flat = np.stack([outline @ across, outline[:, 1]], axis=1)
     lo, hi = np.percentile(flat, 1, axis=0), np.percentile(flat, 99, axis=0)
     front, back = np.percentile(world @ along, [5, 95])
-    size = np.maximum([hi[0] - lo[0], hi[1] - lo[1], back - front], 0.03) + BOX_PAD
+    size = np.maximum([hi[0] - lo[0], hi[1] - lo[1], back - front], 0.03)
     if label not in FLAT:
         size[2] = max(size[2], min(size[0], 0.6))
-    mid = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, front - BOX_PAD / 2 + size[2] / 2])
+    mid = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, front + size[2] / 2])
+    size = size * BOX_SCALE + BOX_PAD  # grows evenly around the object, towards the camera too
     centre = mid[0] * across + mid[2] * along
     centre[1] = mid[1]
     return centre, size, yaw
@@ -296,9 +308,13 @@ if __name__ == "__main__":
     mask[195:285, 295:345] = True  # mask a bit larger than the object
     obs = observe("bottle", mask, depth, K, T)
     # The box centre sits behind the visible face, half the bottle's width deeper.
-    assert obs and abs(obs.position[2] + 1.5 + obs.extent[2] / 2) < 0.02, obs
+    assert obs and abs(obs.position[2] + 1.5 + (obs.extent[2] - BOX_PAD) / BOX_SCALE / 2) < 0.005, obs.position
     # The 50 x 90 px mask at 1.5 m is 0.15 x 0.27 m, plus padding; as deep as it is wide.
-    assert abs(obs.extent[0] - 0.17) < 0.01 and abs(obs.extent[1] - 0.29) < 0.01, obs.extent
+    # A detector rectangle wider than the mask widens the box.
+    rect = box_mask((280, 195, 360, 285), mask.shape)
+    wide = observe("bottle", mask, depth, K, T, rect=rect)
+    assert abs(wide.extent[0] - 0.24 * BOX_SCALE - BOX_PAD) < 0.015, wide.extent
+    assert abs(obs.extent[0] - 0.15 * BOX_SCALE - BOX_PAD) < 0.01 and abs(obs.extent[1] - 0.27 * BOX_SCALE - BOX_PAD) < 0.015, obs.extent
     assert abs(obs.extent[2] - obs.extent[0]) < 1e-6, obs.extent
     tr = Tracker()
     tr.update([obs], depth, K, T, 0.0, False)

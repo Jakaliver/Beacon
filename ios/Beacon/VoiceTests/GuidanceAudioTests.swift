@@ -55,6 +55,14 @@ struct GuidanceAudioTests {
         precondition(abs(farther - 0.46) < 0.001, "Moving the phone changes proximity")
         let sideways = TargetProximity.distance(camera: camera(position: SIMD3(1, 0, -0.3), yaw: .pi), centre: centre, surface: surface)!
         precondition(sideways > 1, "Lateral phone movement changes proximity too")
+        // The box counts as the object: inside it the distance is zero, beside it the gap to its face.
+        let box = TargetProximity.Box(extent: SIMD3(0.4, 0.4, 0.4), yaw: 0.7)
+        precondition(TargetProximity.distance(camera: camera(position: centre + SIMD3(0.1, 0, 0), yaw: 0),
+                                              centre: centre, surface: [centre + SIMD3(0, 0, 0.5)], box: box) == 0,
+                     "Inside the target's box is on the object.")
+        let beside = TargetProximity.distance(camera: camera(position: centre + SIMD3(0, 0.5, 0), yaw: 0),
+                                              centre: centre, surface: [], box: box)!
+        precondition(abs(beside - 0.3) < 1e-5, "Above the box, the distance is the gap to its top face.")
         precondition(TargetProximity.distance(camera: matrix_identity_float4x4, centre: centre, surface: []) == 0.5,
                      "Missing surface data falls back to target position")
         precondition(TargetProximity.distance(camera: matrix_identity_float4x4, centre: centre,

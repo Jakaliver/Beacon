@@ -6,6 +6,7 @@ other times from the same source.
 """
 import math
 import os
+from collections import deque
 import threading
 import time
 from dataclasses import dataclass
@@ -18,7 +19,7 @@ from .geometry import forward, head_local, pose_matrix, to_world, unproject, wra
 from .mapping import UNCERTAIN, GridMap
 from .planner import line_clear, plan, ring_cells, walkable_grid
 from .speech import parse_command
-from .targets import IGNORED, Tracker, canonical, observe
+from .targets import IGNORED, Tracker, box_mask, canonical, observe
 from .surfaces import SurfaceMap, plane_snapshot
 
 # OpenCV's own thread pool, used from several threads next to PyTorch, deadlocked the vision thread.
@@ -126,6 +127,8 @@ class Engine:
         self.frame_meta = {"seq": None, "t": None}
         self.last_frame_processed = 0.0
         self._last_plan = (0.0, -1)
+        self._recent_xz: deque[tuple[float, np.ndarray]] = deque(maxlen=40)  # phone X–Z with normal tracking
+        self.obstacle_level: str | None = None
         self._cache_phone_pose()
 
     def say(self, text: str) -> None:
@@ -182,6 +185,7 @@ class Engine:
             self.pose = pose
             if msg["tracking"] == "normal":
                 self._tracking_bad_since = None
+                self._recent_xz.append((now, pose.T[[0, 2], 3].copy()))
             elif self._tracking_bad_since is None:
                 self._tracking_bad_since = now
             # Not in Probe mode: there the hand may reach over furniture the body cannot cross.
@@ -219,7 +223,7 @@ class Engine:
                 m = np.zeros(depth.shape, bool)
                 x0, y0, x1, y1 = (int(v) for v in d["bbox"])
                 m[y0:y1, x0:x1] = True
-                dets.append((d["label"], m))
+                dets.append((d["label"], m, m))
             run_detect = True
         else:
             k = upright_turns(T)
@@ -232,7 +236,9 @@ class Engine:
             dets = []
             if run_detect:
                 raw = self.perception.detect(upright)
-                dets = [(canonical(d.label), np.rot90(d.mask, -k)) for d in raw if d.label not in IGNORED]
+                # The detector's rectangle often encloses thin parts (a cap, a handle) the mask misses.
+                dets = [(canonical(d.label), np.rot90(d.mask, -k), np.rot90(box_mask(d.box, d.mask.shape), -k))
+                        for d in raw if d.label not in IGNORED]
                 self.stats["detect_ms"] = 1000 * (time.monotonic() - t1)
                 if DEBUG_DIR and header["seq"] % 20 == 0:
                     dbg = upright.copy()
@@ -259,7 +265,8 @@ class Engine:
             self.surfaces.integrate(depth_scaled, K, T, surface_start, bgr)
             self.stats["surface_ms"] = round(1000 * (time.monotonic() - surface_start), 1)
             if run_detect:
-                obs = [o for label, m in dets if (o := observe(label, m, depth_scaled, K, T, self.map.floor_y))]
+                obs = [o for label, m, rect in dets
+                       if (o := observe(label, m, depth_scaled, K, T, self.map.floor_y, rect))]
                 if DEBUG_DIR:
                     with open(f"{DEBUG_DIR}/observations.log", "a") as f:
                         for o in obs:
@@ -474,6 +481,7 @@ class Engine:
             elif self.mode != "stopped":
                 self.smoothed_interval = None
 
+            obstacle = self._obstacle_ahead(target)
             listener = self.body_position()
             return {
                 "type": "guidance", "mode": self.mode, "stop_reason": self.stop_reason,
@@ -481,11 +489,59 @@ class Engine:
                 "source": {"pose_seq": self.pose.seq, "pose_t": self.pose.t,
                            "frame_seq": self.frame_meta["seq"], "frame_t": self.frame_meta["t"]},
                 "target": self._target_json(target, now) if target else None,
-                "proximity": proximity, "waypoint": waypoint,
+                "proximity": proximity, "waypoint": waypoint, "obstacle": obstacle,
                 "listener": listener.round(3).tolist(),
                 "audio_yaw_offset": self.audio_yaw_offset or 0.0,
                 "navigation": self.navigation,
             }
+
+    def walking_velocity(self) -> np.ndarray:
+        """X–Z velocity of the phone over the last ~0.6 s; zero when there is too little history."""
+        recent = [(t, xz) for t, xz in self._recent_xz if self._recent_xz[-1][0] - t <= 0.6]
+        if len(recent) < 2 or recent[-1][0] - recent[0][0] < 0.3:
+            return np.zeros(2)
+        return (recent[-1][1] - recent[0][1]) / (recent[-1][0] - recent[0][0])
+
+    def _obstacle_ahead(self, target) -> dict | None:
+        """Warn about mapped obstacles in the lane the user is walking into.
+
+        Only while walking towards something: standing still or turning the phone never warns.
+        Not within reach (probe mode), and never about the target or what it rests on.
+        """
+        c = CONFIG
+        if self.mode not in {"searching", "hotcold", "walking"} or self.map.floor_y is None \
+                or self.pose.tracking != "normal":
+            self.obstacle_level = None
+            return None
+        velocity = self.walking_velocity()
+        speed = float(np.linalg.norm(velocity))
+        if speed < c.obstacle_min_speed:
+            self.obstacle_level = None
+            return None
+        exclude = None
+        if target is not None:
+            exclude = (target.position[[0, 2]], float(max(target.extent[0], target.extent[2])) / 2 + 0.3)
+        reach = c.obstacle_caution_m + c.obstacle_hysteresis_m
+        hit = self.map.nearest_ahead(self.walking_body()[[0, 2]], velocity / speed, c.obstacle_lane_half_width,
+                                     reach, exclude)
+        if hit is None:
+            self.obstacle_level = None
+            return None
+        gap, xz, top = hit
+        # Hysteresis: a level holds until the gap opens by obstacle_hysteresis_m, so it cannot flicker.
+        slack = c.obstacle_hysteresis_m
+        if gap < c.obstacle_stop_m or (self.obstacle_level == "stop" and gap < c.obstacle_stop_m + slack):
+            level = "stop"
+        elif gap < c.obstacle_caution_m or (self.obstacle_level == "caution" and gap < c.obstacle_caution_m + slack):
+            level = "caution"
+        else:
+            level = None
+        self.obstacle_level = level
+        if level is None:
+            return None
+        height = self.map.floor_y + min(top, 1.6) / 2  # sound from the obstacle's middle
+        return {"level": level, "distance": round(gap, 2), "position": [round(float(xz[0]), 3), round(height, 3),
+                                                                         round(float(xz[1]), 3)]}
 
     def _check_stops(self, now: float) -> None:
         if self.mode not in ACTIVE and self.mode not in {"searching", "choosing"}:
