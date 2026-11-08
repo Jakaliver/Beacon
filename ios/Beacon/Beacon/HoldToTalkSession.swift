@@ -11,6 +11,7 @@ final class HoldToTalkSession {
     private var permissionTask: Task<Void, Never>?
     private var held = false
     private var recording = false
+    var isActive: Bool { held }
 
     init(requestPermission: @escaping () async -> Bool,
          startRecording: @escaping () -> Bool,
@@ -32,13 +33,24 @@ final class HoldToTalkSession {
             let allowed = await requestPermission()
             guard !Task.isCancelled, held else { return }
             permissionTask = nil
-            if allowed { recording = startRecording() }
-            else { permissionDenied() }
+            if allowed {
+                recording = startRecording()
+                if !recording { held = false }
+            } else {
+                held = false
+                permissionDenied()
+            }
         }
     }
 
     func release() {
         end(send: true)
+    }
+
+    /// Shortcuts receives activations, not physical button-down/up events.
+    func toggle() {
+        if held { release() }
+        else { press() }
     }
 
     func cancel() {

@@ -486,7 +486,9 @@ export class RoomView {
           this.phoneForward.normalize();
           this.phoneUp.copy(this.worldUp);
           if (up?.length === 3 && up.every(Number.isFinite)) {
-            this.phoneUp.fromArray(up);
+            // `up` is the camera's +Y. ARKit camera axes follow the sensor's landscape orientation:
+            // +X runs from the handset's top to its bottom, so the model's top (+Y) is up × forward.
+            this.phoneUp.fromArray(up).cross(this.phoneForward);
             if (this.phoneUp.lengthSq() < 1e-6) this.phoneUp.copy(this.worldUp);
             else this.phoneUp.normalize();
           }
@@ -568,16 +570,19 @@ export class RoomView {
       this.cloudKey = "";
     }
     const selected = recon.targets.find(t => t.selected && t.valid);
-    const cloudKey = [this.mapVersion, this.colourMode, floorY, knownFloor, selected?.id, selected?.position, selected?.extent].join("|");
+    const cloudKey = [this.mapVersion, this.colourMode, floorY, knownFloor, selected?.id, selected?.position, selected?.extent, selected?.yaw].join("|");
     if (!recon.points_fused || cloudKey !== this.cloudKey) {
       this.cloudKey = cloudKey;
       const count = this.pointCount = recon.points_fused ? this.decodedCount : this.scan.writeTo(this.positions);
+      const yawCos = Math.cos(selected?.yaw ?? 0), yawSin = Math.sin(selected?.yaw ?? 0);
       for (let j = 0; j < count * 3; j += 3) {
         const x = this.positions[j], y = this.positions[j + 1], z = this.positions[j + 2];
+        // The box is turned by yaw about +Y: test the point in the box's own axes.
+        const dx = x - (selected?.position[0] ?? 0), dz = z - (selected?.position[2] ?? 0);
         const inTarget = selected
-          && Math.abs(x - selected.position[0]) < selected.extent[0] / 2 + 0.025
+          && Math.abs(dx * yawCos - dz * yawSin) < selected.extent[0] / 2 + 0.025
           && Math.abs(y - selected.position[1]) < selected.extent[1] / 2 + 0.025
-          && Math.abs(z - selected.position[2]) < selected.extent[2] / 2 + 0.025;
+          && Math.abs(dx * yawSin + dz * yawCos) < selected.extent[2] / 2 + 0.025;
         const col = Math.floor((x - origin[0]) / res), row = Math.floor((z - origin[1]) / res);
         // Occupied columns come from the planner. Floor returns and the inflated
         // clearance margin are not physical obstacle points; targets retain red.
@@ -668,6 +673,7 @@ export class RoomView {
       }
       const color = RED;
       visual.group.position.fromArray(t.position);
+      visual.group.rotation.y = t.yaw ?? 0;
       const size = t.extent.map(v => Math.max(0.06, v));
       visual.box.scale.fromArray(size); visual.edges.scale.fromArray(size);
       visual.box.material.color.setHex(color); visual.edges.material.color.setHex(color);

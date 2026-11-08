@@ -33,6 +33,7 @@
 		B02D9E4798FC25AF2CDB704A /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E096F605D217BA39392D2D3A /* Settings.swift */; };
 		BE2D2F109089DCDCFD159923 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E096F605D217BA39392D2D3A /* Settings.swift */; };
 		C444D432D05EFB0BF6E806F2 /* GuidanceSounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 911134394AD16017F16B80F8 /* GuidanceSounds.swift */; };
+		C95166EDB78DD0B3DDF50F7C /* ProximityHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57467B1FCB4AF7F2D88AB2D /* ProximityHaptics.swift */; };
 		CA66D796BD7C39D91F600775 /* chest_loop.wav in Resources */ = {isa = PBXBuildFile; fileRef = C2214DDE6BEF4E527E1FBA04 /* chest_loop.wav */; };
 		D1478971A0D6BE224F00D3CB /* VoiceModeControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F64067B0098D507701616AA /* VoiceModeControls.swift */; };
 		DB8E79C40D7B4A1AB07DDAF5 /* HoldToTalkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEC138AD0355A3F7A62A01FE /* HoldToTalkSession.swift */; };
@@ -70,6 +71,7 @@
 		E096F605D217BA39392D2D3A /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
 		E936ADA0D67CA72E5065C983 /* VoiceCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCommand.swift; sourceTree = "<group>"; };
 		F3F190BF934C72E1601D3F2B /* Beacon.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Beacon.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F57467B1FCB4AF7F2D88AB2D /* ProximityHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityHaptics.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -118,6 +120,7 @@
 				B088C0722EF75E8A074D62DC /* Info.plist */,
 				6C3BA97FBD03642FD11A6032 /* Model.swift */,
 				9A71C20AE0EA0A5DB6AFE438 /* PathfindingFeedback.swift */,
+				F57467B1FCB4AF7F2D88AB2D /* ProximityHaptics.swift */,
 				E096F605D217BA39392D2D3A /* Settings.swift */,
 				C3880797BCBD91896E9317E6 /* Speech.swift */,
 				19C02E3D48278CE3393AB86D /* TargetProximity.swift */,
@@ -263,6 +266,7 @@
 				DB8E79C40D7B4A1AB07DDAF5 /* HoldToTalkSession.swift in Sources */,
 				0A83CA648A799FCACD6FA311 /* Model.swift in Sources */,
 				7FBEFE6DA8E0CF9591494295 /* PathfindingFeedback.swift in Sources */,
+				C95166EDB78DD0B3DDF50F7C /* ProximityHaptics.swift in Sources */,
 				B02D9E4798FC25AF2CDB704A /* Settings.swift in Sources */,
 				0899EE9DA41BC2EFA3AFB9CF /* Speech.swift in Sources */,
 				962C471744F5AB2BB0C975D6 /* TargetProximity.swift in Sources */,

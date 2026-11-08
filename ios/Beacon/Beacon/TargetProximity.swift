@@ -2,6 +2,33 @@ import simd
 
 /// Proximity depends only on the phone's position, never its viewing direction.
 struct TargetProximity {
+    struct HapticPulse {
+        let intensity: Float
+        let sharpness: Float
+        let duration: Double
+        let interval: Double
+    }
+
+    /// A continuous distance gradient, strongest in the last 5 cm. It remains
+    /// useful inside the audio's wider close zone for precise final positioning.
+    static func hapticPulse(forDistance distance: Float) -> HapticPulse? {
+        guard distance.isFinite, distance >= 0, distance <= 1.5 else { return nil }
+        let closeness = min(1, max(0, (1.5 - distance) / 1.45))
+        return HapticPulse(intensity: 0.25 + 0.75 * closeness,
+                           sharpness: 0.3 + 0.4 * closeness,
+                           duration: 0.025 + 0.035 * Double(closeness),
+                           interval: 0.8 * pow(0.14 / 0.8, Double(closeness)))
+    }
+
+    /// Head alignment adds a gentle pulse at any range. Nearby, keep the stronger
+    /// distance pulse instead of stacking two patterns on the same haptic motor.
+    static func guidanceHapticPulse(distance: Float?, lookingAtTarget: Bool) -> HapticPulse? {
+        if let distance, let proximity = hapticPulse(forDistance: distance) { return proximity }
+        return lookingAtTarget
+            ? HapticPulse(intensity: 0.25, sharpness: 0.4, duration: 0.03, interval: 0.8)
+            : nil
+    }
+
     struct Output {
         let interval: Double
         let onObject: Bool
@@ -40,4 +67,33 @@ struct TargetProximity {
         let fraction = (min(max(Double(distance), 0.15), 3) - 0.15) / (3 - 0.15)
         return 0.22 * pow(1 / 0.22, fraction)
     }
+}
+
+/// Vibration follows left/right head direction, ignoring height and head tilt.
+/// Dwell and a wider exit angle keep small movements from flickering the cue.
+struct TargetAlignment {
+    private(set) var aligned = false
+    private var enteredAt: Double?
+
+    mutating func update(origin: SIMD3<Float>, forward: SIMD3<Float>, target: SIMD3<Float>, at time: Double) -> Bool {
+        let delta = target - origin
+        let heading = SIMD2(forward.x, forward.z)
+        let bearing = SIMD2(delta.x, delta.z)
+        func finite(_ p: SIMD3<Float>) -> Bool { p.x.isFinite && p.y.isFinite && p.z.isFinite }
+        guard finite(origin), finite(forward), finite(target), time.isFinite,
+              simd_length_squared(heading) > 0.0001, simd_length_squared(bearing) > 0.0004 else {
+            reset()
+            return false
+        }
+        let cosine = simd_dot(simd_normalize(heading), simd_normalize(bearing))
+        let limit = cos(Float(aligned ? 12 : 8) * .pi / 180)
+        guard cosine >= limit else { reset(); return false }
+        if !aligned {
+            if enteredAt == nil { enteredAt = time }
+            aligned = time - enteredAt! >= 0.12
+        }
+        return aligned
+    }
+
+    mutating func reset() { aligned = false; enteredAt = nil }
 }

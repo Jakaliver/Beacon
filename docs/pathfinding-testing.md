@@ -39,10 +39,17 @@ saved host and sound preferences are retained.
 - Existing commands remain available, including **find**, **calibrate**, **pause**,
   **resume**, **start over**, **found it**, and **loot mode on/off**.
 - The only new command actions are **pathfinding on** and **pathfinding off**.
-- With pathfinding off, the selected object's existing Chest/Beeps behavior remains.
-- With pathfinding on, walking uses a distinct spatial waypoint cue for either sound
-  preference. The target's chest loop must not draw the user straight across a detour.
-  Close approach returns to the object's selected sound style.
+- With pathfinding off, the selected object's existing Chest/Beeps behavior remains,
+  including horizontal head-alignment pulses and stronger proximity haptics inside 1.5 m.
+- Sound always comes from the selected object, including while following a detour.
+  With pathfinding on, a gentle vibration indicates that your head faces the next
+  clear route waypoint. This is a direction cue, not a measurement of walking velocity.
+  It uses fresh compatible headphone head tracking, ignores head tilt, and stops when
+  you turn away. There is no waypoint sound or spoken turn instruction.
+- During route walking, object proximity does not produce vibration or close-confirmation
+  beeps: a target across furniture must not feel like arrival. At the reachable approach
+  point, the usual target-facing and proximity feedback returns. Both sound styles follow
+  this same contract.
 - Caution and stop feedback use short haptics; a stop also has a distinct audio cue.
   There are no spoken turn-by-turn directions or repeating obstacle explanations.
 - Stale or unobserved space pauses movement guidance. Repeated unchanged warnings must
@@ -60,21 +67,27 @@ a 0.7 m radius before additional movement margin, so ordinary narrow doorways ma
 be refused. Reaching the phone over furniture may also pause guidance; do not treat
 approach mode as permission to reach through an obstacle.
 
-For every spoken action below, use the same push-to-talk button.
+For every spoken action below, use the same push-to-talk button. Wear headphones that
+provide live head tracking, face where the phone points, and calibrate before testing
+directional vibration. Target sound indicates the object's location; only the route
+alignment vibration indicates the planned direction of travel.
 
 | Check | Procedure | Required result |
 |---|---|---|
 | One-control screen | Open the app and inspect its accessible controls. | Only push-to-talk is interactive; no hidden choice, Stop or settings button. |
 | Configuration | Change Mac host in iPhone Settings and return. | App connects to the chosen laptop; stored sound preferences remain. |
-| Default behavior | On a fresh install, check pathfinding starts off; explicitly switch it off before finding a supported object. | Existing direct object guidance works without route cues. Later launches retain the chosen pathfinding preference. |
+| Default behavior | On a fresh install, check pathfinding starts off; explicitly switch it off before finding a supported object. | Sound comes from the target. Facing it horizontally produces the existing gentle vibration; near-object haptics still strengthen with distance. Later launches retain the chosen pathfinding preference. |
 | Toggle while searching | Start finding an object, then enable pathfinding. | The current search/target is retained; state reflects the acknowledged setting. |
-| Open route | Scan the floor and surrounding body-height space, then select an object across a clear area. | Fresh observed space permits a waypoint cue; no spoken turn sequence. |
-| Detour | Place a chair/box between the user and target; observe an adequately wide route around it. | Cue follows the observed detour and never directs through the obstacle. If coverage is inadequate, pause rather than invent a route. |
-| Both sound styles | Repeat the detour with loot mode on and off. | Both use route cues during walking; no competing target chest loop. The object sound returns only for approach. |
+| Open route | Scan the floor and surrounding body-height space, then select an object across a clear area. Face the next waypoint, then turn away. | Sound remains at the object; a gentle vibration occurs only while facing the waypoint with fresh clearance. No spoken turn sequence. |
+| Detour | Place a chair/box between the user and target; observe an adequately wide route around it. Alternate facing the target and the next waypoint shown in the viewer. | Sound stays at the target. Vibration follows the detour waypoint, not the direct line to the object. Inadequate coverage pauses all guidance. |
+| Both sound styles | Repeat the detour with loot mode on and off. | Chest and beeps both stay at the object throughout walking and approach; neither becomes a waypoint sound. Route-alignment vibration is unchanged. |
+| Close but inaccessible | While stationary beside a detour, bring the phone near the target across an obstacle without reaching the route endpoint. | No target-proximity vibration or close-confirmation beep during walking. Route alignment remains the only positive walking vibration. |
+| Head alignment | Face the waypoint, tilt the head up/down, then turn horizontally away. Repeat with pathfinding off while facing the object. | Head tilt does not change alignment; horizontal turns control the gentle pulse. Pathfinding off uses the object instead of the waypoint. |
+| Head tracking unavailable | Interrupt headphone head tracking while keeping the camera and connection healthy. | Alignment vibration stops instead of using a frozen heading; target sound retains its existing behaviour. |
 | Low obstacle | While stationary, observe a low box and then look above it. | Looking above it must not erase its occupied space or authorize a path through it. |
-| New obstacle | Have the second person place an obstacle in the next route segment. | Route sound is suppressed and stop feedback occurs before any further movement is suggested. |
+| New obstacle | Have the second person place an obstacle in the next route segment. | Target sound and route-alignment vibration stop; distinct stop feedback occurs before any further movement is suggested. |
 | Unseen corridor | Turn the camera away from the next segment and wait for evidence to expire. | Movement cues stop; the state explains that observations are missing or stale. |
-| Phone-only rotation | Rotate the phone without moving the torso. | No newly walked/free cells or false arrival are inferred from the rotation. |
+| Phone-only rotation | Rotate the phone without turning the head or moving the torso. | No newly walked/free cells or false arrival are inferred; alignment does not follow phone rotation. |
 | Resume | Clear a blockage, observe the corridor again, then say resume. | Resume is refused until evidence supports it; restoring tracking alone must not restart movement. |
 | Explicit pause | Say pause; toggle pathfinding and loot mode; wait. | No movement or target sound restarts until an explicit resume or new search. |
 | Pause during search | Enable pathfinding, begin finding an object that is not yet visible, pause, then resume. | Searching resumes without requiring a route to a nonexistent target; movement remains gated when a target is found. |
@@ -83,11 +96,12 @@ For every spoken action below, use the same push-to-talk button.
 | Warning during speech input | Hold push-to-talk while the second person obstructs a previously usable corridor. | Stop feedback remains available while recording; the older route cannot restart on release. |
 | Link/tracking loss | Disconnect the backend, cover the camera, then leave/lock the app in separate trials. | Guidance stops promptly and does not replay on recovery. |
 | World reset | Say start over, then resume. | Old geometry, target, route and feedback do not reappear. A new find is required. |
-| Approach | Approach a target on an accessible surface, then try a target separated by a barrier while remaining stationary. | The route endpoint must be accessible; proximity across a barrier cannot count as arrival or permission to reach. |
+| Approach | Approach a target on an accessible surface, then try a target separated by a barrier while remaining stationary. | At the reachable route endpoint, vibration switches to target alignment/proximity and close-confirmation beeps become available. Across a barrier, proximity cannot count as arrival or permission to reach. |
 
 Haptics must be distinguishable on the actual phone and must not cause repeated camera
 tracking loss. Listen with the intended headphones for spatial direction, overlap and
-headroom. A stop must interrupt a route cue even if another sound is already playing.
+headroom. A stop must interrupt target audio and alignment vibration even if a sound or
+haptic pulse is already playing.
 
 ## Record before merging
 

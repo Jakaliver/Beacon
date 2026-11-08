@@ -47,12 +47,14 @@ private struct Incoming: Decodable {
 
 @MainActor
 final class AppModel: ObservableObject {
+    static let shared = AppModel()
     @Published private(set) var controlUp = false
     @Published private(set) var sensorUp = false
     @Published private(set) var tracking = "not_available"
     @Published private(set) var mode = "idle"
     @Published private(set) var stopReason: String?
     @Published private(set) var recording = false
+    @Published private(set) var recordingFromActionButton = false
     @Published private(set) var transcribing = false
     @Published private(set) var choices: [Choice] = []
     @Published private(set) var headTracking = false
@@ -63,15 +65,20 @@ final class AppModel: ObservableObject {
     private let sensor = Connection(path: "/ws/sensor")
     private let ar = ARSensor()
     private let audio = AudioGuide()
+    private let haptics = ProximityHaptics()
     let voice = VoiceSession(allowsHandsFree: false)
     private var transcription: Task<Void, Never>?
     private var transcriptionGeneration = 0
+    private var actionButtonRequest: Task<Void, Never>?
     private lazy var buttonHold = HoldToTalkSession(
         requestPermission: { await AVAudioApplication.requestRecordPermission() },
         startRecording: { [weak self] in self?.startTalking() ?? false },
         sendRecording: { [weak self] in self?.stopTalking() },
         discardRecording: { [weak self] in self?.discardRecording() },
-        permissionDenied: { [weak self] in self?.voice.say("Allow microphone access in Settings.") }
+        permissionDenied: { [weak self] in
+            self?.recordingFromActionButton = false
+            self?.voice.say("Allow microphone access in Settings.")
+        }
     )
     // A reset remains authoritative until a new search. Network latency must never
     // let old guidance, choices or speech restart a cancelled session.
@@ -87,16 +94,18 @@ final class AppModel: ObservableObject {
     private var navigationRequestedAt = -TimeInterval.infinity
     private var pathfindingFeedback = PathfindingFeedback()
     private var audioChannel = PathfindingFeedback.Channel.silent
+    private var alignmentChannel = PathfindingFeedback.Alignment.none
+    private var alignmentSuppressedUntil = -TimeInterval.infinity
     private var interrupted = false
     private var foreground = true
     private var connectedHost: String?
     private var started = false
+    private var audioOutputSignature = ""
     private var ticker: Timer?
 
     private var proximity = TargetProximity()
     private var wasConfirming = false
     private var lastPulse = Date.distantPast
-    private var lastBeacon = Date.distantPast
 
     private static let reasonText = [
         "connection": "Connection lost.",
@@ -176,9 +185,9 @@ final class AppModel: ObservableObject {
 
     func refreshGuidanceSound() {
         audio.silence()
+        haptics.stop()
         resetProbe()
         lastPulse = .distantPast
-        lastBeacon = .distantPast
         tick()
     }
 
@@ -256,8 +265,9 @@ final class AppModel: ObservableObject {
         pathfindingFeedback.reset()
         audio.silence()
         audioChannel = .silent
+        haptics.stop()
+        audio.updateGuidanceAlignment(at: nil)
         resetProbe()
-        lastBeacon = .distantPast
         sendPathfindingConfiguration()
         // Changing preference never releases an existing user/safety pause.
         voice.say(enabled ? "Pathfinding on." : "Pathfinding off.")
@@ -268,6 +278,7 @@ final class AppModel: ObservableObject {
         cancelTranscription()
         voice.hush()
         audio.silence()
+        haptics.stop()
         resetProbe()
         guidance = nil
         guidanceReceivedAt = nil
@@ -354,6 +365,7 @@ final class AppModel: ObservableObject {
             choices = []
             mode = "searching"
             audio.silence()
+            haptics.stop()
             resetProbe()
             audio.start()
             _ = alignAudioForward()
@@ -372,10 +384,13 @@ final class AppModel: ObservableObject {
     }
 
     private func startTalking() -> Bool {
+        defer { if !recording { recordingFromActionButton = false } }
         guard foreground, !interrupted, controlUp, sensorUp, !recording, !transcribing else { return false }
         voice.hush()
         // A just-fired safety cue already silenced motion audio; starting PTT must not cut it short.
         if !pathfindingFeedback.requiresResume { audio.silence() }
+        haptics.stop()
+        audio.updateGuidanceAlignment(at: nil)
         resetProbe()
         recording = talk.start()
         if !recording {
@@ -390,7 +405,43 @@ final class AppModel: ObservableObject {
         guard foreground, !interrupted, !recording else { return }
         if transcribing { cancelTranscription() }
         guard controlUp && sensorUp else { return voice.say("Not connected to the Mac.") }
+        actionButtonRequest?.cancel()
+        actionButtonRequest = nil
+        recordingFromActionButton = false
         buttonHold.press()
+    }
+
+    func actionButtonPushToTalk() {
+        if buttonHold.isActive { buttonHold.toggle(); return }
+        guard !transcribing else { return }
+        if let pending = actionButtonRequest {
+            pending.cancel()
+            actionButtonRequest = nil
+            return
+        }
+        actionButtonRequest = Task { [weak self] in
+            guard let self else { return }
+            defer { if !Task.isCancelled { self.actionButtonRequest = nil } }
+            let deadline = ProcessInfo.processInfo.systemUptime + 8
+            // The shortcut can arrive before the screen on a cold launch.
+            while UIApplication.shared.applicationState != .active {
+                guard !Task.isCancelled, ProcessInfo.processInfo.systemUptime < deadline else { return }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            guard !Task.isCancelled else { return }
+            self.start()
+            while !(self.controlUp && self.sensorUp) {
+                guard !Task.isCancelled, self.foreground else { return }
+                guard ProcessInfo.processInfo.systemUptime < deadline else {
+                    self.voice.say("Not connected to the Mac.")
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            guard !Task.isCancelled, self.foreground, !self.interrupted, !self.transcribing else { return }
+            self.recordingFromActionButton = true
+            self.buttonHold.toggle()
+        }
     }
 
     func endTalking() { buttonHold.release() }
@@ -399,6 +450,7 @@ final class AppModel: ObservableObject {
 
     private func stopTalking() {
         guard recording else { return }
+        recordingFromActionButton = false
         recording = false
         let wav = talk.stop()
         transcriptionGeneration += 1
@@ -429,6 +481,9 @@ final class AppModel: ObservableObject {
     }
 
     private func cancelTranscription() {
+        actionButtonRequest?.cancel()
+        actionButtonRequest = nil
+        recordingFromActionButton = false
         buttonHold.cancel()
         transcriptionGeneration += 1
         transcription?.cancel()
@@ -449,6 +504,7 @@ final class AppModel: ObservableObject {
         voice.cancelPendingCommand()
         cancelTranscription()
         audio.silence()
+        haptics.stop()
         resetProbe()
         stopReason = reason
         voice.say(Self.reasonText[reason].map { "Stopped. \($0)" } ?? "Paused", urgent: true)
@@ -477,6 +533,7 @@ final class AppModel: ObservableObject {
 
     func enteredBackground() {
         foreground = false
+        haptics.stop()
         cancelTranscription()
         if stopReason == nil {
             if pathfindingEnabled { stopPathfindingForSystem("interrupted") }
@@ -499,7 +556,15 @@ final class AppModel: ObservableObject {
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetoothA2DP, .defaultToSpeaker])
         try? session.setAllowHapticsAndSystemSoundsDuringRecording(true)
+        // Give the renderer room to run alongside camera capture and incoming scans.
+        try? session.setPreferredIOBufferDuration(0.02)
         try? session.setActive(true)
+        audioOutputSignature = Self.outputSignature(session)
+    }
+
+    private static func outputSignature(_ session: AVAudioSession) -> String {
+        let ports = session.currentRoute.outputs.map { "\($0.uid):\($0.portType.rawValue)" }.joined(separator: ",")
+        return "\(ports)|\(session.sampleRate)|\(session.outputNumberOfChannels)"
     }
 
     private func observeAudioSession() {
@@ -510,6 +575,10 @@ final class AppModel: ObservableObject {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 if reason == .oldDeviceUnavailable { self.autoStop("audio") }
+                let signature = Self.outputSignature(AVAudioSession.sharedInstance())
+                guard signature != self.audioOutputSignature else { return }
+                self.audioOutputSignature = signature
+                NSLog("Beacon audio: output changed; reason=%lu", reason.rawValue)
                 if !self.interrupted { self.audio.restart() }
             }
         }
@@ -565,7 +634,7 @@ final class AppModel: ObservableObject {
             guidanceReceivedAt = ProcessInfo.processInfo.systemUptime
             if g.mode != mode { mode = g.mode }
             if g.mode != "choosing" && !choices.isEmpty { choices = [] }
-            if let l = g.listener, l.count == 3, l.allSatisfy({ $0.isFinite }), pose?.epoch == g.epoch { audio.setListener(SIMD3(l[0], l[1], l[2])) }
+            // Audio follows local AR tracking, preserving the target's world position.
         case "say":
             if !searchCleared, stopReason == nil, let text = message.text { voice.say(text) }
         case "choices":
@@ -580,10 +649,24 @@ final class AppModel: ObservableObject {
         }
     }
 
+    private var limitedTrackingSince: Date?
+    private static let probeLimitedTracking: TimeInterval = 10  // matches the Mac's probe_limited_tracking_s
+
     private func update(pose sample: PoseSample) {
         pose = sample
+        if sample.tracking == "normal" { audio.setPhonePose(sample.transform, epoch: sample.epoch) }
         if sample.tracking != tracking { tracking = sample.tracking }
-        if sample.tracking != "normal" { autoStop("tracking_lost") }
+        if sample.tracking == "normal" {
+            limitedTrackingSince = nil
+        } else if mode == "probe", sample.tracking == "limited" {
+            // Touching the target covers the camera and ARKit limits tracking. Within reach that is
+            // arrival, not a fault: the sound pauses (tick needs normal tracking) unless it lasts.
+            let since = limitedTrackingSince ?? Date()
+            limitedTrackingSince = since
+            if Date().timeIntervalSince(since) > Self.probeLimitedTracking { autoStop("tracking_lost") }
+        } else {
+            autoStop("tracking_lost")
+        }
     }
 
     private func configurationMatches(_ guidance: Guidance) -> Bool {
@@ -614,6 +697,8 @@ final class AppModel: ObservableObject {
         voice.hush()
         audio.silence()
         audioChannel = .silent
+        haptics.stop()
+        audio.updateGuidanceAlignment(at: nil)
         resetProbe()
         stopReason = reason
         control.sendJSON(["type": "stop", "reason": reason])
@@ -630,8 +715,13 @@ final class AppModel: ObservableObject {
         guard foreground else { return }
         switch signal {
         case .none: break
-        case .caution: UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        case .caution:
+            haptics.stop()
+            alignmentSuppressedUntil = ProcessInfo.processInfo.systemUptime + 0.6
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
         case .stop:
+            haptics.stop()
+            audio.updateGuidanceAlignment(at: nil)
             voice.hush()
             if !interrupted { audio.pathfindingStop() }
             else { audio.silence() }
@@ -697,6 +787,7 @@ final class AppModel: ObservableObject {
 
     private func tick() {
         let now = Date()
+        audio.updateSpatialAudio()
         if audio.headTrackingLive != headTracking { headTracking = audio.headTrackingLive }
         let fresh = now.timeIntervalSince(guidanceAt) < 1
         // Safety runs before PTT/transcription gates and uses source capture age, not packet age.
@@ -707,42 +798,55 @@ final class AppModel: ObservableObject {
         guard !recording, !transcribing, foreground, !searchCleared, stopReason == nil, fresh,
               permitted, tracking == "normal", let g = guidance, configurationMatches(g), pose?.epoch == g.epoch else {
             audio.stopTargetLoop()
+            audio.updateGuidanceAlignment(at: nil)
+            haptics.stop()
             return resetProbe()
         }
         let waypoint = validWaypoint(g)
-        let channel = PathfindingFeedback.channel(navigation: pathfindingEnabled && g.navigation == true,
+        let navigating = pathfindingEnabled && g.navigation == true
+        let channel = PathfindingFeedback.channel(navigation: navigating,
             mode: g.mode, permitted: permitted, hasWaypoint: waypoint != nil)
         if channel != audioChannel {
             audio.silence()
             audioChannel = channel
-            lastBeacon = .distantPast
             lastPulse = .distantPast
             resetProbe()
         }
-        switch channel {
-        case .route:
+        guard channel == .target, let target = g.target, target.valid,
+              let p = target.position, p.count == 3, p.allSatisfy({ $0.isFinite }) else {
             audio.stopTargetLoop()
-            if let waypoint, now.timeIntervalSince(lastBeacon) >= 0.6, audio.routePing(at: waypoint) {
-                lastBeacon = now
-            }
-        case .target:
-            if Settings.guidanceSoundStyle == .chest {
-                resetProbe()
-                if let target = g.target, target.valid, let p = target.position,
-                   p.count == 3, p.allSatisfy({ $0.isFinite }) {
-                    audio.startOrUpdateTargetLoop(at: SIMD3(p[0], p[1], p[2]))
-                } else { audio.stopTargetLoop() }
-            } else {
-                audio.stopTargetLoop()
-                probeTick(g, now: now)
-            }
-        case .silent:
-            audio.stopTargetLoop()
+            audio.updateGuidanceAlignment(at: nil)
+            haptics.stop()
+            return resetProbe()
+        }
+        let targetPosition = SIMD3(p[0], p[1], p[2])
+        audio.updateTargetPosition(targetPosition)
+
+        let alignment = PathfindingFeedback.alignment(navigation: navigating,
+            mode: g.mode, permitted: permitted, hasWaypoint: waypoint != nil)
+        if alignment != alignmentChannel {
+            haptics.stop()
+            audio.updateGuidanceAlignment(at: nil)
+            alignmentChannel = alignment
+        }
+        // The object remains the audio anchor through a detour. Only the tactile
+        // alignment cue points down the next clear route leg, using live head heading.
+        let alignmentPosition = alignment == .route ? waypoint : targetPosition
+        let aligned = audio.updateGuidanceAlignment(at: alignmentPosition)
+        if monotonicNow >= alignmentSuppressedUntil {
+            haptics.update(distance: alignment == .route ? nil : phoneDistance(g), lookingAtTarget: aligned)
+        } else { haptics.stop() }
+
+        if Settings.guidanceSoundStyle == .chest {
             resetProbe()
+            audio.startOrUpdateTargetLoop(at: targetPosition)
+        } else {
+            audio.stopTargetLoop()
+            probeTick(g, now: now, allowsConfirmation: alignment != .route)
         }
     }
 
-    private func probeTick(_ g: Guidance, now: Date) {
+    private func probeTick(_ g: Guidance, now: Date, allowsConfirmation: Bool) {
         let interval: Double?
         let confirming: Bool
         if let distance = phoneDistance(g),
@@ -756,7 +860,8 @@ final class AppModel: ObservableObject {
         }
 
         let source = g.target?.position.flatMap { $0.count == 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
-        if confirming {
+        // Nearness across furniture is not arrival: finish the route before confirming.
+        if confirming && allowsConfirmation {
             if (!wasConfirming || now.timeIntervalSince(lastPulse) >= 0.8), audio.confirm(at: source) {
                 lastPulse = now
                 wasConfirming = true

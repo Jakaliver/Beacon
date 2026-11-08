@@ -106,24 +106,48 @@ struct PathfindingFeedbackTests {
         precondition(searchResume.update(blocked, now: 4.01, active: true).mustStop,
                      "Explicit/system stop overrides a pending search resume immediately")
 
-        // Route selection has no object-sound-style parameter: both Chest and Beeps take this branch.
-        precondition(PathfindingFeedback.channel(navigation: true, mode: "walking", permitted: true, hasWaypoint: true) == .route)
+        // Sound stays on the object for both Chest and Beeps. Only the alignment
+        // vibration follows the waypoint while taking a detour.
+        precondition(PathfindingFeedback.channel(navigation: true, mode: "walking", permitted: true, hasWaypoint: true) == .target,
+                     "Walking must keep sound at the target, not move it to a waypoint")
+        precondition(PathfindingFeedback.alignment(navigation: true, mode: "walking", permitted: true, hasWaypoint: true) == .route,
+                     "Walking vibration must follow the route even while sound follows the target")
         precondition(PathfindingFeedback.channel(navigation: true, mode: "walking", permitted: false, hasWaypoint: true) == .silent)
         precondition(PathfindingFeedback.channel(navigation: true, mode: "walking", permitted: true, hasWaypoint: false) == .silent)
         precondition(PathfindingFeedback.channel(navigation: false, mode: "walking", permitted: true, hasWaypoint: true) == .silent)
+        precondition(PathfindingFeedback.alignment(navigation: true, mode: "walking", permitted: true, hasWaypoint: false) == .none,
+                     "Missing route geometry cannot authorize an alignment vibration")
+        precondition(PathfindingFeedback.alignment(navigation: false, mode: "walking", permitted: true, hasWaypoint: true) == .none,
+                     "A leftover walking packet cannot guide after pathfinding is disabled")
         for mode in ["probe", "hotcold"] {
-            precondition(PathfindingFeedback.channel(navigation: true, mode: mode, permitted: true, hasWaypoint: true) == .target)
+            for navigation in [false, true] {
+                for hasWaypoint in [false, true] {
+                    precondition(PathfindingFeedback.channel(navigation: navigation, mode: mode, permitted: true, hasWaypoint: hasWaypoint) == .target)
+                    precondition(PathfindingFeedback.alignment(navigation: navigation, mode: mode, permitted: true, hasWaypoint: hasWaypoint) == .target,
+                                 "Direct finding and close approach retain target-facing vibration without needing a route")
+                }
+            }
         }
-        for mode in ["stopped", "idle", "searching"] {
-            precondition(PathfindingFeedback.channel(navigation: true, mode: mode, permitted: true, hasWaypoint: true) == .silent)
+        for mode in ["walking", "probe", "hotcold"] {
+            for navigation in [false, true] {
+                precondition(PathfindingFeedback.channel(navigation: navigation, mode: mode, permitted: false, hasWaypoint: true) == .silent,
+                             "A safety stop mutes even the target's guidance sound")
+                precondition(PathfindingFeedback.alignment(navigation: navigation, mode: mode, permitted: false, hasWaypoint: true) == .none,
+                             "A safety stop cannot emit reassuring alignment vibration")
+            }
         }
-        for samples in [PathfindingSounds.waypoint, PathfindingSounds.stop] {
-            precondition(samples.first == 0 && samples.last == 0)
-            precondition(samples.allSatisfy { $0.isFinite && abs($0) <= 0.221 })
-            precondition(samples.reduce(0) { $0 + $1 * $1 } > 0.1)
-            precondition(Double(samples.count) / PathfindingSounds.sampleRate < 0.3)
+        for mode in ["stopped", "idle", "searching", "choosing", "unknown"] {
+            for navigation in [false, true] {
+                precondition(PathfindingFeedback.channel(navigation: navigation, mode: mode, permitted: true, hasWaypoint: true) == .silent)
+                precondition(PathfindingFeedback.alignment(navigation: navigation, mode: mode, permitted: true, hasWaypoint: true) == .none,
+                             "Inactive or unknown modes cannot retain an old route or target alignment")
+            }
         }
-        precondition(PathfindingSounds.waypoint != GuidanceSounds.pulse, "Route cue must be distinct from object cue")
+        let stopSamples = PathfindingSounds.stop
+        precondition(stopSamples.first == 0 && stopSamples.last == 0)
+        precondition(stopSamples.allSatisfy { $0.isFinite && abs($0) <= 0.221 })
+        precondition(stopSamples.reduce(0) { $0 + $1 * $1 } > 0.1)
+        precondition(Double(stopSamples.count) / PathfindingSounds.sampleRate < 0.3)
         precondition(PathfindingSounds.stop != GuidanceSounds.onObject, "Stop must not sound like close confirmation")
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -131,6 +155,6 @@ struct PathfindingFeedbackTests {
             {"state":"clear","reason":null,"capture_t":9.7,"frame_seq":7,"age_ms":300,"valid_for_ms":1500,"distance":null}
             """.utf8))
         precondition(decoded.captureT == 9.7 && decoded.frameSeq == 7 && decoded.validForMs == 1500)
-        print("Pathfinding: capture age/identity, stale packets, stop latch/resume, haptic debounce, route/target separation and sound headroom passed")
+        print("Pathfinding: capture age/identity, stale packets, stop latch/resume, target audio, route/target alignment and stop sound headroom passed")
     }
 }

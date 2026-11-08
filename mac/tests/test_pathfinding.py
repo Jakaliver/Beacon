@@ -191,7 +191,7 @@ class EngineSafetyTests(unittest.TestCase):
 
     def target(self, position=(0., .8, -1.5)):
         p = np.array(position)
-        t = SimpleNamespace(id='target', position=p, extent=np.array([.1, .1, .1]), label='bottle',
+        t = SimpleNamespace(id='target', position=p, extent=np.array([.1, .1, .1]), yaw=0.0, label='bottle',
                             surface=p[None], last_seen=self.now, locked=True, misses=0, observed_now=True,
                             injected=True, sigma_at=lambda _: .01, valid_at=lambda _: True)
         self.engine.tracker.tracks[t.id] = t; self.engine.selected = t.id
@@ -250,6 +250,20 @@ class EngineSafetyTests(unittest.TestCase):
         g = self.engine.step()
         self.assertFalse(g['navigation']); self.assertEqual(g['mode'], 'hotcold')
         self.assertIsNotNone(g['proximity'])
+
+    def test_pathfinding_probe_still_stops_during_short_tracking_occlusion(self):
+        self.target()
+        self.engine.set_navigation(True)
+        self.engine.mode = 'probe'
+        self.engine.listener_anchor = self.engine.walking_body()
+        self.engine.pose.tracking = 'limited'
+        self.engine._tracking_bad_since = self.now
+        g = self.engine.step()
+        self.assertEqual((g['mode'], g['safety']['state'], g['safety']['reason']),
+                         ('stopped', 'unknown', 'sensor_unavailable'))
+        self.assertIsNone(g['proximity'])
+        self.assertIsNone(g['waypoint'])
+        self.assertFalse(any(m['type'] == 'say' for m in self.engine.drain()))
 
     def test_clearance_recovery_does_not_resume_until_explicit_resume(self):
         self.target(); self.engine.map = populated_room(now=96)

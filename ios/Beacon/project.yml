@@ -36,7 +36,7 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiredDeviceCapabilities: [arkit]
         NSCameraUsageDescription: Beacon uses the camera to map the room and find objects for you.
-        NSMicrophoneUsageDescription: Beacon records a spoken request only while you hold Talk to Beacon.
+        NSMicrophoneUsageDescription: Beacon records a request when you hold Talk to Beacon or activate its Action button shortcut.
         NSMotionUsageDescription: Beacon uses headphone motion to keep guidance sounds fixed in the room.
         NSLocalNetworkUsageDescription: Beacon sends camera frames to your Mac on the local network and receives guidance.
         NSAppTransportSecurity:

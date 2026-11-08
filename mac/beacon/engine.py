@@ -109,6 +109,7 @@ class Engine:
         self.stats = {"vision_fps": 0.0, "frame_age_ms": None, "pose_hz": 0.0, "dropped_frames": 0,
                       "depth_ms": 0.0, "detect_ms": 0.0}
         self._last_pose_rx = 0.0
+        self._tracking_bad_since: float | None = None
         self._last_frame_done = 0.0
 
     # World state ---------------------------------------------------------
@@ -192,6 +193,10 @@ class Engine:
                 speed = np.linalg.norm(self._phone_velocity)
                 self._phone_speed = max(float(speed), self._phone_speed * 0.9)
             self.pose = pose
+            if msg["tracking"] == "normal":
+                self._tracking_bad_since = None
+            elif self._tracking_bad_since is None:
+                self._tracking_bad_since = now
             if msg.get("floor_y") is not None:
                 if self.map.arkit_floor is None and self.mode in {"idle", "searching"}:
                     # Geometry integrated before the metric floor was known used an unchecked depth scale.
@@ -569,12 +574,17 @@ class Engine:
             self.stop("connection", "Stopped. Connection lost.")
         elif self.clock_offset is not None and now - (self.pose.t + self.clock_offset) > CONFIG.max_pose_latency_s:
             self.stop("stale", "Stopped. Updates late.")
-        elif self.pose.tracking != "normal":
+        elif self.pose.tracking != "normal" and not self._probe_tracking_pause(now):
             self.stop("tracking_lost", "Stopped. Tracking lost.")
         elif not self.audio_ok:
             self.stop("audio", "Stopped. No audio.")
         elif self.interrupted:
             self.stop("interrupted", "Stopped. Interrupted.")
+
+    def _probe_tracking_pause(self, now: float) -> bool:
+        """Within reach, briefly limited tracking (camera covered by the target) pauses guidance."""
+        return (self.mode == "probe" and self.pose.tracking == "limited" and self._tracking_bad_since is not None
+                and now - self._tracking_bad_since < CONFIG.probe_limited_tracking_s)
 
     def _update_target_state(self, now: float) -> None:
         if self.mode == "searching" and self.want_label:
@@ -617,7 +627,7 @@ class Engine:
             # No speech on entering or leaving: the switch between beeps and the torch tone is the cue.
             self.path, self.waypoint = [], None
             self._last_plan = (0.0, -1)
-        elif self.mode == "probe":
+        elif self.mode == "probe" and self.pose.tracking == "normal":  # a limited pose may jump
             drift = math.hypot(phone[0] - self.listener_anchor[0], phone[2] - self.listener_anchor[2])
             if drift > CONFIG.probe_leave and dh > CONFIG.probe_enter:
                 self.mode = "walking" if self.navigation else "hotcold"
@@ -775,7 +785,7 @@ class Engine:
     @staticmethod
     def _target_json(t, now: float) -> dict:
         return {"id": t.id, "label": t.label, "position": t.position.round(3).tolist(),
-                "extent": t.extent.round(3).tolist(), "surface": t.surface.round(3).tolist(),
+                "extent": t.extent.round(3).tolist(), "yaw": round(t.yaw, 3), "surface": t.surface.round(3).tolist(),
                 "sigma": round(t.sigma_at(now), 3), "age": round(now - t.last_seen, 2),
                 "valid": t.valid_at(now), "observed_now": t.observed_now, "locked": t.locked, "injected": t.injected}
 
@@ -831,7 +841,8 @@ class Engine:
                 "phone": self._phone_fields(),
                 "listener": self.body_position().round(3).tolist() if self.pose is not None else None,
                 "targets": [{"id": t.id, "label": t.label, "position": t.position.round(3).tolist(),
-                             "extent": t.extent.round(3).tolist(), "sigma": round(t.sigma_at(now), 3),
+                             "extent": t.extent.round(3).tolist(), "yaw": round(t.yaw, 3),
+                             "sigma": round(t.sigma_at(now), 3),
                              "age": round(now - t.last_seen, 1), "valid": t.valid_at(now),
                              "selected": t.id == self.selected, "injected": t.injected, "locked": t.locked}
                             for t in self.tracker.tracks.values() if t.valid_at(now) or t.id == self.selected],

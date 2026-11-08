@@ -2,7 +2,8 @@
 
 Beacon has only **Talk to Beacon** on the main screen. Hold to record,
 speak and release to send. The Mac transcribes the recording.
-There is no wake-word listening or Action button activation in the main app. Use a
+The Action button shortcut also supports activate-to-start, activate-again-to-send.
+There is no wake-word listening in the main app. Use a
 physical iPhone for microphone, spatial audio and AR tracking checks.
 
 ## Get the app and install
@@ -69,13 +70,59 @@ Exercise that dialogue in the separate Voice Lab below.
 For the **Beeps** sound, move the phone towards a found object: the clean beeps should
 speed up and turn into a short, rising double beep when close (normally within 20 cm of the observed surface).
 Rotate the phone while keeping its position fixed; this must not change the proximity
-cue. The sound stays anchored to the object, with a small-room reverb tail. Small position
+cue. The sound stays anchored to the object, with a short diffuse reverb tail. Small position
 wobbles near the threshold should not alternate rapidly between single and double beeps.
 
 Check the beeps very close to the object as well as farther away. They use fixed PCM
 headroom, no automatic loudness boost, and distance gain capped at unity. New notes wait
-for the preceding cue to finish; guidance also waits while the app speaks. The room
+for the preceding cue to finish; guidance also waits while the app speaks. The
 reverb remains enabled. Listen for crackle during quick approach/close transitions.
+Live listener-position and target-position updates are smoothed, and output-route notifications only restart
+audio when the actual output or format changes. Compare stationary test beeps with live
+guidance while moving the phone; both should remain clean.
+
+PHASE uses head-tracked binaural rendering with a clear direct path and the same
+quiet late-reverb send for all guidance cues, including Chest. Early reflections
+are disabled, and there are no simulated walls, ceilings, floors or occluders.
+A small-room reverb preset supplies a short diffuse tail without a room geometry
+model. Check that turning your head gives one clear source direction without
+secondary reflected directions or muffling at an imaginary room boundary.
+The beep retains its 988 Hz fundamental and short rising pair; brief, softly fading
+upper harmonics give the renderer more directional detail without a low thud.
+The listener follows local AR translation in every guidance mode,
+including the final approach, instead of the backend's stationary probe anchor.
+Calibrate with the phone held at chest height and your head facing the same direction.
+Walk sideways and towards a stationary target, then turn your head: the source should
+stay at the object while its direction and level change. Rotating only the phone must
+not move the listener. Source corrections ease into place without restarting playback.
+Route waypoints still provide walking instructions when a path is active.
+
+Head position remains an estimate (30 cm behind and 45 cm above the phone in the
+calibrated direction); AirPods supply rotation, not absolute head translation. Keep
+the phone near that calibrated holding position for the most accurate placement.
+The reverb is an effect, not a measurement of the current room. Judge placement and realism with AirPods;
+build checks and PCM headroom tests cannot establish the perceptual result.
+
+With either Beeps or Chest selected, proximity vibrations begin within 1.5 m during
+walking and close guidance. They grow stronger, longer and faster as the phone approaches, reaching
+full intensity within 5 cm. Rotate the phone without moving it: pulse strength should
+remain unchanged. Recording, Stop, lost tracking and leaving the app must stop vibrations.
+
+Facing the selected target with **your head through AirPods** adds a gentle repeated
+vibration at any distance, including beyond 1.5 m. There is no pitch change.
+The cue uses left/right heading only: it enters within 8° after a 120 ms dwell and
+exits beyond 12° to avoid flicker. Target height and up/down head tilt are ignored.
+Test left/right turns and looking up/down, then rotate only the phone: head-facing
+feedback follows the AirPods, while close-range feedback still depends only on phone
+position. Stronger proximity pulses take precedence near the object without stacking
+vibrations. No live head tracking, invalid/stale guidance, Stop, recording or backgrounding
+must clear the head-facing cue. Pitch, reverb and volume remain consistent.
+
+For the Action button, choose Settings → Action Button → Shortcut → Beacon →
+**Talk to Beacon**. iOS activates it with a press-and-hold: the first activation starts
+recording and the next sends, with no silence timeout. Test a cold launch and an already
+open app. Test activating twice during connection/permission setup: no delayed recording
+should start after cancellation. The on-screen control remains hold-to-talk.
 
 ## Speaking voice
 

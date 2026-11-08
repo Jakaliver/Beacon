@@ -37,7 +37,8 @@ struct PathfindingFeedback {
         static func unknown(_ reason: String) -> Self { Self(state: .unknown, reason: reason) }
     }
     enum Signal: Equatable { case none, caution, stop }
-    enum Channel: Equatable { case silent, route, target }
+    enum Channel: Equatable { case silent, target }
+    enum Alignment: Equatable { case none, route, target }
     struct Decision {
         let signal: Signal
         let mustStop: Bool
@@ -150,16 +151,20 @@ struct PathfindingFeedback {
 
     static func channel(navigation: Bool, mode: String, permitted: Bool, hasWaypoint: Bool) -> Channel {
         guard permitted else { return .silent }
-        if mode == "walking" { return navigation && hasWaypoint ? .route : .silent }
+        if mode == "walking" { return navigation && hasWaypoint ? .target : .silent }
         return ["probe", "hotcold"].contains(mode) ? .target : .silent
+    }
+
+    /// Sound always locates the object. During walking only the vibration follows the route.
+    static func alignment(navigation: Bool, mode: String, permitted: Bool, hasWaypoint: Bool) -> Alignment {
+        guard channel(navigation: navigation, mode: mode, permitted: permitted, hasWaypoint: hasWaypoint) == .target else { return .none }
+        return navigation && mode == "walking" ? .route : .target
     }
 }
 
-/// Route and stop sounds remain short and use the same conservative headroom as object cues.
-/// A higher single chime means a waypoint; a descending pair means stop, not object proximity.
+/// A descending pair means stop, distinct from object proximity.
 enum PathfindingSounds {
     static let sampleRate = 44_100.0
-    static let waypoint = chime(1568)
     static let stop = chime(1568) + Array(repeating: Float(0), count: Int(sampleRate * 0.045)) + chime(784)
 
     private static func chime(_ frequency: Double) -> [Float] {

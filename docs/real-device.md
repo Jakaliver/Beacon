@@ -127,7 +127,9 @@ permission prompt interrupts your first hold, allow access, then hold the button
 Leaving the app cancels recording and pending requests. A new hold replaces a pending
 transcription. The main screen has no other controls.
 The microphone stays closed between requests; the main app does not request Speech
-Recognition access or offer an Action button shortcut.
+Recognition access. To use the Action button, choose Settings → Action Button → Shortcut
+→ Beacon → **Talk to Beacon**. Press and hold to activate: once to start recording,
+again to stop and send. The on-screen control remains hold-to-talk.
 
 `bash scripts/test-hold-to-talk.sh` checks release, cancellation and delayed microphone permissions.
 On the phone, hold for more than six seconds with a pause between words: **Listening…**
@@ -175,9 +177,16 @@ All speech and spatial guidance play on the iPhone. The browser never opens an a
 microphone session and cannot change the phone's guidance state.
 Guidance defaults to **Beeps**: clean beeps accelerate as the phone approaches the object,
 then become a short, rising double beep inside the close-distance threshold (normally 20 cm).
-Phone rotation does not change proximity feedback. Sounds retain distance attenuation
+Phone rotation does not change proximity feedback. With pathfinding off, vibrations
+become stronger and faster inside 1.5 m, reaching full strength in the last 5 cm with
+either sound style. Facing the object horizontally also gives a gentle pulse at any
+range when headphone head tracking is available. Sounds retain distance attenuation
 and audible small-room reverb. iPhone Settings → Apps → Beacon → **Object sound** also offers **Chest**, a
 continuous sound at the object that lowers while the app speaks.
+With pathfinding on, sound still comes from the target, while walking vibration follows
+head alignment with the next route waypoint. The usual target-facing and proximity
+vibrations return at the reachable approach point. See the
+[pathfinding test guide](pathfinding-testing.md) for the branch's physical checks.
 For voice controls and audio acceptance checks, use the
 [voice and audio test guide](voice-audio-testing.md).
 With AirPods on, face where the phone points and say **calibrate** through push-to-talk so head turns keep

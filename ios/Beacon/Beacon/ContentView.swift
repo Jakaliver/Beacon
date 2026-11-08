@@ -60,7 +60,7 @@ struct ContentView: View {
             VStack(spacing: 6) {
                 Text(model.recording ? "Listening…" : model.transcribing ? "Sending request…" : "Talk to Beacon")
                     .font(.title2.weight(.semibold))
-                Text(model.recording ? "Release to send" : model.transcribing ? "Hold to replace request" : "Hold to speak · release to send")
+                Text(model.recording ? (model.recordingFromActionButton ? "Press Action button again to send" : "Release to send") : model.transcribing ? "Hold to replace request" : "Hold to speak · release to send")
                     .font(.subheadline)
                     .opacity(0.7)
             }
@@ -74,7 +74,7 @@ struct ContentView: View {
         .overlay {
             HoldToTalkControl(
                 enabled: connected,
-                label: model.recording ? "Listening. Release to send" : model.transcribing ? "Sending request. Hold to replace" : "Talk to Beacon",
+                label: model.recording ? (model.recordingFromActionButton ? "Listening. Press Action button again to send" : "Listening. Release to send") : model.transcribing ? "Sending request. Hold to replace" : "Talk to Beacon",
                 onPress: model.beginTalking,
                 onRelease: model.endTalking,
                 onCancel: model.cancelTalking
@@ -88,14 +88,16 @@ struct ContentView: View {
         if !connected { return "Connect to your Mac" }
         if model.tracking != "normal" { return "Hold the phone steady" }
         if !model.choices.isEmpty { return "Choose your object" }
-        if guiding { return "Follow the sound" }
+        if guiding { return model.pathfindingEnabled && model.mode == "walking" ? "Follow the route vibration" : "Find the sound" }
         if model.mode == "searching" { return "Looking for your object" }
         if model.stopReason != nil || model.mode == "stopped" { return "Paused" }
         return "Ready"
     }
 
     private var statusDetail: String {
-        if model.recording { return "Keep holding while you speak. Release to send your request." }
+        if model.recording {
+            return model.recordingFromActionButton ? "Speak, then press the Action button again to send your request." : "Keep holding while you speak. Release to send your request."
+        }
         if model.transcribing { return "Hold again to replace this request." }
         if !connected { return "Use the same Wi-Fi as your Mac. Set its address in the iPhone Settings app under Apps → Beacon." }
         if model.tracking != "normal" { return "Point the camera at the room and move slowly while tracking settles." }
@@ -103,7 +105,11 @@ struct ContentView: View {
             let options = model.choices.map(\.description).joined(separator: "\n")
             return options + "\nHold below and say which object you want."
         }
-        if guiding { return "Follow the guidance sounds. Hold below and say “stop” to pause." }
+        if guiding {
+            return model.pathfindingEnabled && model.mode == "walking"
+                ? "Sound locates the object. With head tracking, vibration means you’re facing along the path. Hold below and say “stop” to pause."
+                : "Sound locates the object. Vibration helps you face it and gets stronger as the phone gets closer. Hold below and say “stop” to pause."
+        }
         if model.mode == "searching" { return "Slowly scan the room with the camera. Hold below and say “stop” to pause." }
         if model.stopReason != nil || model.mode == "stopped" { return "Hold below and say “resume”, or ask for a different object." }
         return "Hold below and say “calibrate”, then ask for the object you want to find."

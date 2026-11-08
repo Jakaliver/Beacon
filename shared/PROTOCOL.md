@@ -146,7 +146,7 @@ protocol compatibility; the current room visualization does not send control mes
   "perception": "real" | "injected",
   "target": null | {
     "id": "bottle-1", "label": "bottle",
-    "position": [x, y, z], "extent": [ex, ey, ez],
+    "position": [x, y, z], "extent": [across, up, along], "yaw": 0.4,
     "surface": [[x, y, z], ...],
     "sigma": 0.12, "age": 0.4, "valid": true, "observed_now": true
   },
@@ -202,9 +202,10 @@ and latch a pause. Fresh evidence may update while stopped, but an explicit exis
 the route on resume; the phone also requires stable usable evidence. Unchanged latched
 warnings do not queue or repeat periodically.
 
-Walking uses the waypoint sound regardless of the selected Chest/Beeps preference.
-The target chest loop is suppressed during a detour and remains anchored to the
-actual target when used for approach. Caution and stop signals use haptics; stop also
+Walking keeps the selected Chest/Beeps sound at the target. Route direction uses
+horizontal head-alignment vibration towards the current waypoint, without target
+proximity vibration or arrival confirmation until approach. Approach and pathfinding
+off retain target-facing and proximity vibration. Caution and stop signals use haptics; stop also
 interrupts current audio with a distinct short cue. These checks precede the phone's
 recording/transcription audio gates. `waypoint.instruction` is diagnostic text retained
 for protocol compatibility, not a request for spoken turn-by-turn output.
@@ -251,7 +252,8 @@ the server does not queue intermediate phone positions for later playback.
 
 `phone.position` is the camera centre in world metres, `forward` is its world-space
 −Z axis, and `up` is its world-space +Y axis. Forward and up together preserve phone
-tilt and roll. Vectors are null before a pose arrives or if their values are not finite;
+tilt and roll. ARKit camera axes follow the sensor's landscape orientation, so `up`
+points along the handset's side; the handset's top is `up × forward` (camera −X). Vectors are null before a pose arrives or if their values are not finite;
 `tracking`, `seq`, and `t` are null before the first pose. `floor_y` remains null until
 the existing floor estimator has a measured floor; it is never replaced with zero.
 Height above the floor is `phone.position[1] - floor_y` only when both are known.
@@ -274,7 +276,7 @@ WebSocket publisher. Point-cloud payloads remain limited to changed versions at 
   "points_fused": true, "points_version": 1,
   "phone": {"position": [..], "forward": [..], "up": [..], "tracking": "normal", "seq": 901, "t": 1234.600},
   "listener": [..], "mode": "probe",
-  "targets": [{"id", "label", "position", "extent", "sigma", "age", "selected"}],
+  "targets": [{"id", "label", "position", "extent", "yaw", "sigma", "age", "selected"}],
   "path": [[x, z], ...], "waypoint": [x, z] | null,
   "proximity": {...} | null,
   "stats": {"vision_fps": 7.9, "frame_age_ms": 120, "pose_hz": 30, "rss_mb": 2100, "mps_mb": 900, "budget_mb": 16384, "dropped_frames": 12}
@@ -316,3 +318,8 @@ for older snapshots. Display geometry never feeds navigation.
 Fresh sightings refine position, extent and target surface, with greater weight for
 closer views. Larger corrections require three agreeing sightings. `age` and
 `observed_now` describe how recently the target was actually seen.
+
+A target's box is `extent` = [across, up, along] metres, turned by `yaw` radians about +Y
+(three.js `rotation.y`; local +Z is the direction it was viewed from). `position` is the box
+centre. The camera sees only an object's front, so the box extends behind it as deep as it
+is wide (at most 0.6 m); doors, windows, light switches, power outlets and TVs stay flat.
