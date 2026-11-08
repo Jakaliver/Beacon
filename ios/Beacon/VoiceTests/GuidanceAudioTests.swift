@@ -65,7 +65,7 @@ struct GuidanceAudioTests {
         let sounds = [("approach", GuidanceSounds.pulse), ("on-object", GuidanceSounds.onObject),
                       ("waypoint", GuidanceSounds.waypoint), ("stop", GuidanceSounds.stop), ("rescan", GuidanceSounds.rescan)]
         for (name, samples) in sounds {
-            precondition(samples.allSatisfy { $0.isFinite && abs($0) <= 0.61 }, "\(name) must retain sample headroom")
+            precondition(samples.allSatisfy { $0.isFinite && abs($0) <= 0.241 }, "\(name) must retain at least 12 dB of sample headroom")
             precondition(samples.first == 0 && samples.last == 0, "\(name) must have clean boundaries")
             precondition(energy(samples[...]) > 0.1, "\(name) must be audible")
             precondition(abs(samples.reduce(0, +) / Float(samples.count)) < 0.003, "\(name) must have negligible DC offset")
@@ -84,7 +84,27 @@ struct GuidanceAudioTests {
         precondition(GuidanceSounds.waypoint == GuidanceSounds.pulse, "Walking and approaching must use the same clean sound")
         precondition(Double(GuidanceSounds.pulse.count) / GuidanceSounds.sampleRate < TargetProximity.interval(forDistance: 0),
                      "Approach taps must fit within the fastest repeat interval")
-        print("Guidance audio: position-only proximity, rotation invariance, hysteresis, waveform headroom, no thuds and two-note cue passed")
+
+        let roomSend = 1 + GuidanceSounds.earlyReflections + GuidanceSounds.lateReverb
+        let peak = sounds.flatMap { $0.1 }.map { abs($0) }.max()!
+        precondition(Double(peak) * roomSend * 2 < 0.75,
+                     "Two coincident dry/reflected peaks should still retain mixing headroom")
+        let curve = GuidanceSounds.distanceGains
+        for point in curve { precondition((0...1).contains(point.y), "Distance attenuation must never amplify") }
+        for (before, after) in zip(curve, curve.dropFirst()) {
+            precondition(after.x > before.x && after.y <= before.y, "Distance gain must decline continuously")
+        }
+        var timing = GuidanceCueTiming()
+        let beepLength = Double(GuidanceSounds.pulse.count) / GuidanceSounds.sampleRate
+        let pairLength = Double(GuidanceSounds.onObject.count) / GuidanceSounds.sampleRate
+        precondition(timing.start(at: 0, duration: beepLength))
+        precondition(!timing.start(at: 0.02, duration: pairLength), "Entering the close zone cannot stack notes")
+        precondition(timing.start(at: 0.09, duration: pairLength), "Retry the close cue when the previous note has finished")
+        precondition(!timing.start(at: 0.20, duration: beepLength), "A mode change cannot interrupt the two-note cue")
+        precondition(timing.start(at: 0.27, duration: beepLength))
+        timing.reset()
+        precondition(timing.start(at: 0.28, duration: beepLength), "Stop/reset must release the timing gate")
+        print("Guidance audio: position-only proximity, two-note cue, headroom, bounded gain and overlap prevention passed")
 
         if CommandLine.arguments.count > 1 {
             let directory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)

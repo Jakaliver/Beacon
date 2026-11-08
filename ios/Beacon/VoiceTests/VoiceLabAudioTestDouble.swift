@@ -15,7 +15,8 @@ final class AudioGuide {
     func silence() { silenceCount += 1; loopPosition = nil }
     func setListener(_ position: SIMD3<Float>) { listener = position }
     func setForward(_ direction: SIMD3<Float>) { forward = direction }
-    func pulse(at position: SIMD3<Float>?) { pulses.append(position) }
+    @discardableResult
+    func pulse(at position: SIMD3<Float>?) -> Bool { pulses.append(position); return true }
     func startOrUpdateTargetLoop(at position: SIMD3<Float>) {
         loopStartCount += 1
         loopPosition = position

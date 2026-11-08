@@ -516,8 +516,8 @@ final class AppModel: ObservableObject {
         switch g.mode {
         case "walking":
             resetProbe()
-            if let p = g.waypoint?.position, p.count == 3, now.timeIntervalSince(lastBeacon) >= 0.6 {
-                audio.beaconPing(at: SIMD3(p[0], p[1], p[2]))
+            if let p = g.waypoint?.position, p.count == 3, now.timeIntervalSince(lastBeacon) >= 0.6,
+               audio.beaconPing(at: SIMD3(p[0], p[1], p[2])) {
                 lastBeacon = now
             }
         case "probe", "hotcold":
@@ -542,15 +542,16 @@ final class AppModel: ObservableObject {
 
         let source = g.target?.position.flatMap { $0.count == 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
         if confirming {
-            if !wasConfirming || now.timeIntervalSince(lastPulse) >= 0.8 {
-                audio.confirm(at: source)
+            if (!wasConfirming || now.timeIntervalSince(lastPulse) >= 0.8), audio.confirm(at: source) {
+                lastPulse = now
+                wasConfirming = true
+            }
+        } else {
+            if let interval, now.timeIntervalSince(lastPulse) >= interval, audio.pulse(at: source) {
                 lastPulse = now
             }
-        } else if let interval, now.timeIntervalSince(lastPulse) >= interval {
-            audio.pulse(at: source)
-            lastPulse = now
+            wasConfirming = false
         }
-        wasConfirming = confirming
     }
 
     private func resetProbe() {

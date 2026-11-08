@@ -48,6 +48,8 @@ final class AudioGuide {
     private static let targetLoopGain = "chest-loop-gain"
     var onDiagnostic: ((String) -> Void)?
     private var mixerIDs: [String: String] = [:]
+    private var clipDurations: [String: Double] = [:]
+    private var cueTiming = GuidanceCueTiming()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
 
     private let headMotion = CMHeadphoneMotionManager()
@@ -83,7 +85,7 @@ final class AudioGuide {
             listener.automaticHeadTrackingFlags = .orientation
         }
         register("pulse", GuidanceSounds.pulse)
-        register("confirm", GuidanceSounds.onObject, level: -2)
+        register("confirm", GuidanceSounds.onObject, gain: 0.8)
         register("beacon", GuidanceSounds.waypoint)
         register("stop", GuidanceSounds.stop)
         register("rescan", GuidanceSounds.rescan)
@@ -92,28 +94,34 @@ final class AudioGuide {
     }
 
     /// One PHASE sound event per sound: sampler → spatial mixer with direct path, early reflections and late reverb.
-    private func register(_ name: String, _ samples: [Float], level: Double = 0) {
+    private func register(_ name: String, _ samples: [Float], gain: Double = 1) {
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
         do {
             _ = try engine.assetRegistry.registerSoundAsset(data: data, identifier: name, format: format,
-                                                            normalizationMode: .dynamic)
+                                                            normalizationMode: .none)
             guard let pipeline = PHASESpatialPipeline(flags: [.directPathTransmission, .earlyReflections, .lateReverb])
             else { return }
             // Use one room response for every cue so approaching and close feedback
             // do not sound as though they switch between wet and dry modes.
             pipeline.entries[PHASESpatialCategory.directPathTransmission]?.sendLevel = 1.0
-            pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = 0.30
-            pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = 0.16
+            pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = GuidanceSounds.earlyReflections
+            pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = GuidanceSounds.lateReverb
             let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "\(name)-mixer")
-            let distance = PHASEGeometricSpreadingDistanceModelParameters()
-            distance.rolloffFactor = Self.rolloff
+            let points = GuidanceSounds.distanceGains
+            guard let envelope = PHASEEnvelope(startPoint: points[0], segments: points.dropFirst().map {
+                PHASEEnvelopeSegment(endPoint: $0, curveType: .linear)
+            }) else { return }
+            let distance = PHASEEnvelopeDistanceModelParameters(envelope: envelope)
             distance.fadeOutParameters = PHASEDistanceModelFadeOutParameters(cullDistance: 20)
             mixer.distanceModelParameters = distance
             let sampler = PHASESamplerNodeDefinition(soundAssetIdentifier: name, mixerDefinition: mixer)
             sampler.playbackMode = .oneShot
-            sampler.setCalibrationMode(calibrationMode: .relativeSpl, level: level)
+            // The generated PCM is already peak-normalized with headroom. Keep linear
+            // gain so loudness normalization/calibration cannot boost it back up.
+            sampler.setCalibrationMode(calibrationMode: .none, level: gain)
             _ = try engine.assetRegistry.registerSoundEventAsset(rootNode: sampler, identifier: "\(name)-event")
             mixerIDs[name] = mixer.identifier
+            clipDurations[name] = Double(samples.count) / GuidanceSounds.sampleRate
         } catch { diagnostic("register \(name) failed: \(error)") }
     }
 
@@ -275,6 +283,7 @@ final class AudioGuide {
 
     func silence() {
         playbackCheckGeneration += 1
+        cueTiming.reset()
         stopTargetLoop()
         let active = Array(playing.values)
         playing.removeAll()
@@ -290,12 +299,13 @@ final class AudioGuide {
     /// No target or camera inference is needed, and Stop cancels the remaining sounds.
     func runPlaybackCheck() {
         let check = playbackCheckGeneration
-        diagnostic("playback check: five clean beeps, then five close double-beeps")
+        diagnostic("playback check: five beeps, then five double-beeps at 10 cm; peak=\(GuidanceSounds.peak), normalization=off")
         for index in 0..<10 {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.4) { [weak self] in
                 guard let self, check == self.playbackCheckGeneration else { return }
-                if index < 5 { self.pulse(at: nil) }
-                else { self.confirm(at: nil) }
+                let near = self.headLock.withLock { self.listenerPosition + simd_normalize(self.listenerForward) * 0.1 }
+                if index < 5 { self.pulse(at: near) }
+                else { self.confirm(at: near) }
             }
         }
     }
@@ -363,12 +373,15 @@ final class AudioGuide {
         }
     }
 
-    func beaconPing(at position: SIMD3<Float>) { play("beacon", from: beaconSource, at: position) }
+    @discardableResult
+    func beaconPing(at position: SIMD3<Float>) -> Bool { play("beacon", from: beaconSource, at: position) }
 
     /// Hot/cold pulses come from the estimated target position, so the user hears where it is.
     /// Without a position they come from just in front of the listener.
-    func pulse(at position: SIMD3<Float>?) { play("pulse", from: targetSource, at: position) }
-    func confirm(at position: SIMD3<Float>?) { play("confirm", from: targetSource, at: position) }
+    @discardableResult
+    func pulse(at position: SIMD3<Float>?) -> Bool { play("pulse", from: targetSource, at: position) }
+    @discardableResult
+    func confirm(at position: SIMD3<Float>?) -> Bool { play("confirm", from: targetSource, at: position) }
 
     func cue(_ name: String) {
         switch name {
@@ -378,8 +391,12 @@ final class AudioGuide {
         }
     }
 
-    private func play(_ name: String, from source: PHASESource, at position: SIMD3<Float>?) {
-        guard ensureRunning() else { return }
+    @discardableResult
+    private func play(_ name: String, from source: PHASESource, at position: SIMD3<Float>?) -> Bool {
+        // Speech has its own output path. Avoid adding new guidance notes over it.
+        if guidanceDucked, ["pulse", "confirm", "beacon"].contains(name) { return false }
+        guard ensureRunning(), let duration = clipDurations[name],
+              cueTiming.start(at: ProcessInfo.processInfo.systemUptime, duration: duration) else { return false }
         let p = position ?? headLock.withLock { listenerPosition + simd_normalize(listenerForward) * 0.6 }
         var transform = matrix_identity_float4x4
         transform.columns.3 = SIMD4(p, 1)
@@ -391,7 +408,7 @@ final class AudioGuide {
         } else {
             next = makeEvent(name)
         }
-        guard let (id, event) = next else { return }
+        guard let (id, event) = next else { return false }
         playing[id] = event
         let currentGeneration = generation
         event.start { [weak self] reason in
@@ -412,6 +429,7 @@ final class AudioGuide {
             }
         }
         replenish(name)
+        return true
     }
 
     private func source(for name: String) -> PHASESource {
