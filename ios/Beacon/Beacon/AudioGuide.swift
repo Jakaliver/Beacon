@@ -1,11 +1,10 @@
 import AVFoundation
 import CoreMotion
-import ModelIO
 import PHASE
 import simd
 
 /// Spatial guidance sounds, rendered with PHASE (Apple's Physical Audio Spatialization Engine): each sound
-/// has a direct path and a short room-preset reverb tail, plus geometric distance
+/// has a direct path and a short diffuse reverb tail, plus geometric distance
 /// spreading. Positions are ARKit world coordinates; ARKit and PHASE are both right-handed, +Y up, −Z forward.
 ///
 /// Head tracking: Apple's automatic head tracking needs the Head Pose capability, which personal (free)
@@ -76,8 +75,6 @@ final class AudioGuide {
     private var waypointPosition: SIMD3<Float>?
     private var targetMotion = GuidanceListenerMotion()
     private var waypointMotion = GuidanceListenerMotion()
-    private var roomEpoch: Int?
-    private var roomSurfaces: [PHASEOccluder] = []
     private var listenerForward = SIMD3<Float>(0, 0, -1)
     private var listenerUp = SIMD3<Float>(0, 1, 0)
 
@@ -85,7 +82,7 @@ final class AudioGuide {
         // Explicitly use PHASE's externalizing renderer, including on headphones
         // whose route might otherwise be treated as a conventional stereo output.
         engine.outputSpatializationMode = .alwaysUseBinaural
-        engine.defaultReverbPreset = .mediumRoom
+        engine.defaultReverbPreset = .smallRoom
         listener = PHASEListener(engine: engine)
         targetSource = PHASESource(engine: engine)
         targetLoopSource = PHASESource(engine: engine)
@@ -107,19 +104,22 @@ final class AudioGuide {
         headLock.withLock { updateListener() }
     }
 
-    /// One PHASE sound event per sound: sampler → spatial mixer with direct path, early reflections and late reverb.
+    /// Keep the target's direct direction clear, with only a quiet diffuse tail.
+    /// No early-reflection paths or occluders compete with the actual source.
+    private func guidancePipeline() -> PHASESpatialPipeline? {
+        guard let pipeline = PHASESpatialPipeline(flags: [.directPathTransmission, .lateReverb]) else { return nil }
+        pipeline.entries[PHASESpatialCategory.directPathTransmission]?.sendLevel = 1.0
+        pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = GuidanceSounds.lateReverb
+        return pipeline
+    }
+
+    /// One PHASE event per sound: sampler → spatial mixer with direct sound and reverb.
     private func register(_ name: String, _ samples: [Float], gain: Double = 1) {
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
         do {
             _ = try engine.assetRegistry.registerSoundAsset(data: data, identifier: name, format: format,
                                                             normalizationMode: .none)
-            guard let pipeline = PHASESpatialPipeline(flags: [.directPathTransmission, .earlyReflections, .lateReverb])
-            else { return }
-            // Use one room response for every cue so approaching and close feedback
-            // do not sound as though they switch between wet and dry modes.
-            pipeline.entries[PHASESpatialCategory.directPathTransmission]?.sendLevel = 1.0
-            pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = GuidanceSounds.earlyReflections
-            pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = GuidanceSounds.lateReverb
+            guard let pipeline = guidancePipeline() else { return }
             let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "\(name)-mixer")
             let points = GuidanceSounds.distanceGains
             guard let envelope = PHASEEnvelope(startPoint: points[0], segments: points.dropFirst().map {
@@ -149,15 +149,11 @@ final class AudioGuide {
             _ = try engine.assetRegistry.registerSoundAsset(url: url, identifier: Self.targetLoopAsset,
                                                             assetType: .resident, channelLayout: nil,
                                                             normalizationMode: .dynamic)
-            guard let pipeline = PHASESpatialPipeline(flags: [.directPathTransmission, .earlyReflections, .lateReverb])
-            else {
+            guard let pipeline = guidancePipeline() else {
                 targetLoopAssetIssue = "chest loop unavailable: spatial pipeline creation failed"
                 diagnostic(targetLoopAssetIssue!)
                 return
             }
-            pipeline.entries[PHASESpatialCategory.directPathTransmission]?.sendLevel = 1.0
-            pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = GuidanceSounds.earlyReflections
-            pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = GuidanceSounds.lateReverb
             let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "chest-loop-mixer")
             let distance = PHASEGeometricSpreadingDistanceModelParameters()
             distance.rolloffFactor = Self.rolloff
@@ -308,7 +304,7 @@ final class AudioGuide {
     }
 
     func reportStatus() {
-        diagnostic("state=\(engine.renderingState.rawValue); spatializer=binaural; listener=\(headLock.withLock { phonePose == nil ? "preview" : "local AR" }); headTracking=\(headTrackingLive); roomSurfaces=\(roomSurfaces.count); assets=\(mixerIDs.count); prepared=\(prepared.values.reduce(0) { $0 + $1.count }); active=\(playing.count); chestRegistered=\(targetLoopMixerID != nil); chestEvent=\(targetLoopEvent != nil); ducked=\(guidanceDucked)")
+        diagnostic("state=\(engine.renderingState.rawValue); spatializer=binaural; effects=direct+reverb; listener=\(headLock.withLock { phonePose == nil ? "preview" : "local AR" }); headTracking=\(headTrackingLive); assets=\(mixerIDs.count); prepared=\(prepared.values.reduce(0) { $0 + $1.count }); active=\(playing.count); chestRegistered=\(targetLoopMixerID != nil); chestEvent=\(targetLoopEvent != nil); ducked=\(guidanceDucked)")
     }
 
     #if DEBUG
@@ -385,7 +381,6 @@ final class AudioGuide {
             listenerTarget = position + SIMD3<Float>(0, 0.45 - adjust, 0)
             updateListener()
         }
-        configureRoomIfNeeded(epoch: .min)
     }
 
     /// Use local AR translation in every guidance mode, including the final
@@ -398,33 +393,6 @@ final class AudioGuide {
             updatePhoneListener()
             updateListener()
         }
-        configureRoomIfNeeded(epoch: epoch)
-    }
-
-    /// A fixed 7 x 9 x 3 m room, as requested. Six simple slabs provide directional
-    /// early reflections immediately, without waiting for a scan or rebuilding
-    /// geometry during guidance. Material presets are estimates, not measurements.
-    private func configureRoomIfNeeded(epoch: Int) {
-        guard roomEpoch != epoch else { return }
-        let position = headLock.withLock { listenerTarget ?? listenerPosition }
-        let surfaces = GuidanceRoomAcoustics.surfaces(around: position)
-        guard surfaces.count == 6 else { return }
-        for old in roomSurfaces { engine.rootObject.removeChild(old) }
-        roomSurfaces.removeAll()
-        roomEpoch = epoch
-        for surface in surfaces {
-            let mesh = MDLMesh(boxWithExtent: surface.size, segments: SIMD3<UInt32>(repeating: 1),
-                               inwardNormals: false, geometryType: .triangles, allocator: nil)
-            let material = PHASEMaterial(engine: engine, preset: surface.kind == .floor ? .wood : .drywall)
-            let shape = PHASEShape(engine: engine, mesh: mesh, materials: [material])
-            let object = PHASEOccluder(engine: engine, shapes: [shape])
-            object.transform = surface.transform
-            do {
-                try engine.rootObject.addChild(object)
-                roomSurfaces.append(object)
-            } catch { diagnostic("room surface failed: \(error)") }
-        }
-        diagnostic("room acoustics: \(roomSurfaces.count) fixed boundaries; assumed room 7 x 9 x 3 m")
     }
 
     /// Call with headLock held. Head turns affect orientation, never this offset.

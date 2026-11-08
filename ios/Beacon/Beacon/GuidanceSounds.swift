@@ -2,13 +2,12 @@ import Foundation
 import simd
 
 /// One clean beep timbre throughout; the close cue pairs two short, rising notes.
-/// PHASE supplies the room reflections and spatial position during playback.
+/// PHASE supplies directional placement and a short diffuse reverb tail.
 enum GuidanceSounds {
     static let sampleRate = 44_100.0
     // Leave more than 12 dB of sample headroom before spatialization and room tails.
     static let peak: Float = 0.24
-    static let earlyReflections = 0.32
-    static let lateReverb = 0.22
+    static let lateReverb = 0.18
     // Softened inverse-distance spreading, capped at unity beside the listener.
     // Avoid a flat close-range plateau so small movements still change loudness.
     static let distanceGains: [SIMD2<Double>] = [
@@ -43,63 +42,6 @@ enum GuidanceSounds {
 
     private static func silence(_ seconds: Double) -> [Float] {
         Array(repeating: 0, count: Int(seconds * sampleRate))
-    }
-}
-
-/// A thin acoustic slab. Its local X/Z axes span the surface and +Y is its
-/// inward-facing normal; thickness extends away from the room interior.
-struct GuidanceAcousticSurface {
-    enum Kind { case wall, floor, ceiling }
-    let kind: Kind
-    let transform: simd_float4x4
-    let size: SIMD3<Float>
-
-    init?(kind: Kind, anchor: simd_float4x4, centre: SIMD3<Float>,
-          extent: SIMD2<Float>, rotation: Float) {
-        let values = [anchor.columns.0, anchor.columns.1, anchor.columns.2, anchor.columns.3,
-                      SIMD4(centre, rotation), SIMD4(extent.x, extent.y, 0, 0)]
-        guard values.allSatisfy({ $0.x.isFinite && $0.y.isFinite && $0.z.isFinite && $0.w.isFinite }),
-              extent.x >= 0.4, extent.y >= 0.4, extent.x * extent.y >= 0.75,
-              extent.x <= 20, extent.y <= 20 else { return nil }
-        self.kind = kind
-        size = SIMD3((extent.x * 5).rounded() / 5, 0.02, (extent.y * 5).rounded() / 5)
-        var local = simd_float4x4(simd_quatf(angle: rotation, axis: SIMD3(0, 1, 0)))
-        // Put the slab behind its face rather than inside the room.
-        local.columns.3 = SIMD4(centre - SIMD3(0, 0.01, 0), 1)
-        transform = anchor * local
-    }
-}
-
-/// An intentionally assumed, moderately large room. Anchor it once per AR world,
-/// so the reflections stay put when the listener moves or recalibrates heading.
-enum GuidanceRoomAcoustics {
-    static let dimensions = SIMD3<Float>(7, 3, 9)
-
-    static func surfaces(around listener: SIMD3<Float>) -> [GuidanceAcousticSurface] {
-        guard listener.x.isFinite, listener.y.isFinite, listener.z.isFinite else { return [] }
-        let floor = listener.y - 1.6
-        let centre = SIMD3(listener.x, floor + dimensions.y / 2, listener.z)
-        func slab(_ kind: GuidanceAcousticSurface.Kind, at position: SIMD3<Float>,
-                  axis: SIMD3<Float>, angle: Float, extent: SIMD2<Float>) -> GuidanceAcousticSurface? {
-            var anchor = simd_float4x4(simd_quatf(angle: angle, axis: axis))
-            anchor.columns.3 = SIMD4(position, 1)
-            return GuidanceAcousticSurface(kind: kind, anchor: anchor,
-                                            centre: .zero, extent: extent, rotation: 0)
-        }
-        return [
-            slab(.floor, at: SIMD3(centre.x, floor, centre.z), axis: SIMD3(1, 0, 0), angle: 0,
-                 extent: SIMD2(dimensions.x, dimensions.z)),
-            slab(.ceiling, at: SIMD3(centre.x, floor + dimensions.y, centre.z), axis: SIMD3(1, 0, 0), angle: .pi,
-                 extent: SIMD2(dimensions.x, dimensions.z)),
-            slab(.wall, at: centre + SIMD3(-dimensions.x / 2, 0, 0), axis: SIMD3(0, 0, 1), angle: -.pi / 2,
-                 extent: SIMD2(dimensions.y, dimensions.z)),
-            slab(.wall, at: centre + SIMD3(dimensions.x / 2, 0, 0), axis: SIMD3(0, 0, 1), angle: .pi / 2,
-                 extent: SIMD2(dimensions.y, dimensions.z)),
-            slab(.wall, at: centre + SIMD3(0, 0, -dimensions.z / 2), axis: SIMD3(1, 0, 0), angle: .pi / 2,
-                 extent: SIMD2(dimensions.x, dimensions.y)),
-            slab(.wall, at: centre + SIMD3(0, 0, dimensions.z / 2), axis: SIMD3(1, 0, 0), angle: -.pi / 2,
-                 extent: SIMD2(dimensions.x, dimensions.y)),
-        ].compactMap { $0 }
     }
 }
 

@@ -99,10 +99,10 @@ struct GuidanceAudioTests {
         precondition(Double(GuidanceSounds.pulse.count) / GuidanceSounds.sampleRate < TargetProximity.interval(forDistance: 0),
                      "Approach taps must fit within the fastest repeat interval")
 
-        let roomSend = 1 + GuidanceSounds.earlyReflections + GuidanceSounds.lateReverb
+        let totalSend = 1 + GuidanceSounds.lateReverb
         let peak = sounds.flatMap { $0.1 }.map { abs($0) }.max()!
-        precondition(Double(peak) * roomSend * 2 < 0.75,
-                     "Two coincident dry/reflected peaks should still retain mixing headroom")
+        precondition(Double(peak) * totalSend * 2 < 0.75,
+                     "Two coincident direct/reverb peaks should still retain mixing headroom")
         let curve = GuidanceSounds.distanceGains
         for point in curve { precondition((0...1).contains(point.y), "Distance attenuation must never amplify") }
         for (before, after) in zip(curve, curve.dropFirst()) {
@@ -151,30 +151,6 @@ struct GuidanceAudioTests {
         precondition(GuidanceListenerGeometry.position(camera: matrix_identity_float4x4,
                          calibratedForward: .zero, soundHeight: 0) == nil)
 
-        let ears = SIMD3<Float>(2, 1.6, -3)
-        let room = GuidanceRoomAcoustics.surfaces(around: ears)
-        precondition(room.count == 6, "An assumed room must be available before any scan")
-        var boundaryDistances: [Float] = []
-        for surface in room {
-            let normal = SIMD3(surface.transform.columns.1.x, surface.transform.columns.1.y, surface.transform.columns.1.z)
-            let centre = SIMD3(surface.transform.columns.3.x, surface.transform.columns.3.y, surface.transform.columns.3.z)
-            let face = centre + normal * surface.size.y / 2
-            let distance = simd_dot(ears - face, normal)
-            precondition(distance > 1 && abs(simd_length(normal) - 1) < 0.0001,
-                         "All room faces must point inward and keep the listener inside")
-            boundaryDistances.append(distance)
-            precondition(surface.size.x > 0 && surface.size.y == 0.02 && surface.size.z > 0)
-        }
-        for (actual, expected) in zip(boundaryDistances.sorted(), [Float(1.4), 1.6, 3.5, 3.5, 4.5, 4.5]) {
-            precondition(abs(actual - expected) < 0.001, "Room dimensions and ear height must remain physically consistent")
-        }
-        let translatedRoom = GuidanceRoomAcoustics.surfaces(around: ears + movement)
-        for (original, moved) in zip(room, translatedRoom) {
-            precondition(simd_distance(moved.transform.columns.3 - original.transform.columns.3, SIMD4(movement, 0)) < 0.001,
-                         "A new AR world must position the room in the same frame as its listener")
-        }
-        precondition(GuidanceRoomAcoustics.surfaces(around: SIMD3(.nan, 0, 0)).isEmpty)
-
         let distances: [Float] = [1.5, 1.3, 1.2, 0.8, 0.4, 0.2, 0.1, 0.05]
         let haptics = distances.map { TargetProximity.hapticPulse(forDistance: $0)! }
         for (far, near) in zip(haptics, haptics.dropFirst()) {
@@ -188,7 +164,7 @@ struct GuidanceAudioTests {
         precondition(TargetProximity.hapticPulse(forDistance: 1.51) == nil)
         precondition(TargetProximity.hapticPulse(forDistance: -0.1) == nil)
         precondition(TargetProximity.hapticPulse(forDistance: .nan) == nil)
-        print("Guidance: proximity, audio headroom/timbre, room geometry, live positioning and progressive haptics passed")
+        print("Guidance: proximity, audio headroom/timbre, live positioning and progressive haptics passed")
 
         if CommandLine.arguments.count > 1 {
             let directory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
