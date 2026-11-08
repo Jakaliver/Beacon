@@ -25,7 +25,7 @@ struct TargetProximity {
     static func guidanceHapticPulse(distance: Float?, lookingAtTarget: Bool) -> HapticPulse? {
         if let distance, let proximity = hapticPulse(forDistance: distance) { return proximity }
         return lookingAtTarget
-            ? HapticPulse(intensity: 0.18, sharpness: 0.4, duration: 0.02, interval: 0.85)
+            ? HapticPulse(intensity: 0.25, sharpness: 0.4, duration: 0.03, interval: 0.8)
             : nil
     }
 
@@ -69,21 +69,23 @@ struct TargetProximity {
     }
 }
 
-/// Head-facing feedback is separate from distance/arrival feedback. A brief dwell
-/// and wider exit cone keep small head movements from flickering the cue.
+/// Vibration follows left/right head direction, ignoring height and head tilt.
+/// Dwell and a wider exit angle keep small movements from flickering the cue.
 struct TargetAlignment {
     private(set) var aligned = false
     private var enteredAt: Double?
 
     mutating func update(origin: SIMD3<Float>, forward: SIMD3<Float>, target: SIMD3<Float>, at time: Double) -> Bool {
         let delta = target - origin
+        let heading = SIMD2(forward.x, forward.z)
+        let bearing = SIMD2(delta.x, delta.z)
         func finite(_ p: SIMD3<Float>) -> Bool { p.x.isFinite && p.y.isFinite && p.z.isFinite }
         guard finite(origin), finite(forward), finite(target), time.isFinite,
-              simd_length_squared(forward) > 0.0001, simd_length_squared(delta) > 0.0004 else {
+              simd_length_squared(heading) > 0.0001, simd_length_squared(bearing) > 0.0004 else {
             reset()
             return false
         }
-        let cosine = simd_dot(simd_normalize(forward), simd_normalize(delta))
+        let cosine = simd_dot(simd_normalize(heading), simd_normalize(bearing))
         let limit = cos(Float(aligned ? 12 : 8) * .pi / 180)
         guard cosine >= limit else { reset(); return false }
         if !aligned {

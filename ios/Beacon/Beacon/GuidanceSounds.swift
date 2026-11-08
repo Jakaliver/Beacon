@@ -8,8 +8,6 @@ enum GuidanceSounds {
     // Leave more than 12 dB of sample headroom before spatialization and room tails.
     static let peak: Float = 0.24
     static let lateReverb = 0.18
-    // One semitone: a small lift in pitch, with no increase in gain.
-    static let alignedPitchRatio = pow(2.0, 1.0 / 12.0)
     // Softened inverse-distance spreading, capped at unity beside the listener.
     // Avoid a flat close-range plateau so small movements still change loudness.
     static let distanceGains: [SIMD2<Double>] = [

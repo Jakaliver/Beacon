@@ -46,11 +46,7 @@ final class AudioGuide {
     private var guidanceDucked = false
     private static let targetLoopAsset = "chest_loop"
     private static let targetLoopGain = "chest-loop-gain"
-    private static let guidancePitch = "guidance-pitch"
-    private let pitchDefinition = PHASENumberMetaParameterDefinition(value: 1,
-        minimum: 1, maximum: GuidanceSounds.alignedPitchRatio, identifier: AudioGuide.guidancePitch)
     private var alignment = TargetAlignment()
-    private var lookingAtTarget = false
     var onDiagnostic: ((String) -> Void)?
     private var mixerIDs: [String: String] = [:]
     private var clipDurations: [String: Double] = [:]
@@ -81,6 +77,7 @@ final class AudioGuide {
     private var targetMotion = GuidanceListenerMotion()
     private var waypointMotion = GuidanceListenerMotion()
     private var listenerForward = SIMD3<Float>(0, 0, -1)
+    private var listenerHeading = SIMD3<Float>(0, 0, -1)
     private var listenerUp = SIMD3<Float>(0, 1, 0)
 
     init() {
@@ -134,7 +131,6 @@ final class AudioGuide {
             distance.fadeOutParameters = PHASEDistanceModelFadeOutParameters(cullDistance: 20)
             mixer.distanceModelParameters = distance
             let sampler = PHASESamplerNodeDefinition(soundAssetIdentifier: name, mixerDefinition: mixer)
-            if ["pulse", "confirm", "beacon"].contains(name) { sampler.rateMetaParameterDefinition = pitchDefinition }
             sampler.playbackMode = .oneShot
             // The generated PCM is already peak-normalized with headroom. Keep linear
             // gain so loudness normalization/calibration cannot boost it back up.
@@ -168,7 +164,6 @@ final class AudioGuide {
             mixer.gainMetaParameterDefinition = PHASENumberMetaParameterDefinition(value: 0.30,
                 minimum: 0, maximum: 1, identifier: Self.targetLoopGain)
             let sampler = PHASESamplerNodeDefinition(soundAssetIdentifier: Self.targetLoopAsset, mixerDefinition: mixer)
-            sampler.rateMetaParameterDefinition = pitchDefinition
             sampler.playbackMode = .looping
             // An out-of-range target may return; preserve its timeline instead of terminating the event.
             sampler.cullOption = .sleepWakeAtRealtimeOffset
@@ -211,7 +206,6 @@ final class AudioGuide {
             let currentGeneration = targetLoopGeneration
             targetLoopEvent = event
             applyTargetLoopGain(animated: false)
-            applyPitch(to: event, animated: false)
             event.prepare { [weak self, weak event] reason in
                 DispatchQueue.main.async {
                     guard let event else { return }
@@ -226,7 +220,6 @@ final class AudioGuide {
                         return
                     }
                     self.applyTargetLoopGain(animated: false)
-                    self.applyPitch(to: event, animated: false)
                     event.start { [weak self, weak event] reason in
                         DispatchQueue.main.async {
                             guard let self, let event, self.targetLoopGeneration == currentGeneration,
@@ -267,34 +260,21 @@ final class AudioGuide {
         }
     }
 
-    /// Uses live AirPods orientation and the same listener position as the spatial
-    /// renderer. No phone-angle fallback: an unavailable head pose clears the cue.
+    /// Vibration uses live AirPods heading before pitch is applied. Head tilt still
+    /// positions spatial audio normally, but never controls this tactile cue.
     @discardableResult
     func updateTargetAlignment(at target: SIMD3<Float>?) -> Bool {
         let now = ProcessInfo.processInfo.systemUptime
         let head = headLock.withLock { () -> (SIMD3<Float>, SIMD3<Float>)? in
             guard now - lastHeadSample < 1 else { return nil }
-            return (listenerPosition, listenerForward)
+            return (listenerPosition, listenerHeading)
         }
-        let aligned: Bool
         if let target, let head {
-            aligned = alignment.update(origin: head.0, forward: head.1, target: target, at: now)
+            return alignment.update(origin: head.0, forward: head.1, target: target, at: now)
         } else {
             alignment.reset()
-            aligned = false
+            return false
         }
-        if lookingAtTarget != aligned {
-            lookingAtTarget = aligned
-            if let event = targetLoopEvent { applyPitch(to: event, animated: true) }
-        }
-        return aligned
-    }
-
-    private func applyPitch(to event: PHASESoundEvent, animated: Bool) {
-        guard let pitch = event.metaParameters[Self.guidancePitch] as? PHASENumberMetaParameter else { return }
-        let rate = lookingAtTarget ? GuidanceSounds.alignedPitchRatio : 1
-        if animated { pitch.fade(value: rate, duration: 0.12) }
-        else { pitch.value = NSNumber(value: rate) }
     }
 
     func start() {
@@ -331,7 +311,6 @@ final class AudioGuide {
 
     func silence() {
         alignment.reset()
-        lookingAtTarget = false
         playbackCheckGeneration += 1
         cueTiming.reset()
         stopTargetLoop()
@@ -391,6 +370,7 @@ final class AudioGuide {
         // Turn: rotation about +Y; a positive yaw (turn left) swings forward towards −X.
         let c = cos(yaw), s = sin(yaw)
         let flat = SIMD3<Float>(baseForward.x * c + baseForward.z * s, 0, -baseForward.x * s + baseForward.z * c)
+        listenerHeading = flat
         // Tilt: a positive pitch (look up) lifts forward towards +Y and tips "up" backwards.
         let worldUp = SIMD3<Float>(0, 1, 0)
         listenerForward = flat * cos(pitch) + worldUp * sin(pitch)
@@ -529,8 +509,6 @@ final class AudioGuide {
             next = makeEvent(name)
         }
         guard let (id, event) = next else { return false }
-        // Set a beep's pitch before it starts; never retune a sounding note.
-        applyPitch(to: event, animated: false)
         playing[id] = event
         let currentGeneration = generation
         event.start { [weak self] reason in

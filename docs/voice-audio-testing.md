@@ -107,15 +107,15 @@ walking and close guidance. They grow stronger, longer and faster as the phone a
 full intensity within 5 cm. Rotate the phone without moving it: pulse strength should
 remain unchanged. Recording, Stop, lost tracking and leaving the app must stop vibrations.
 
-Facing the selected target with **your head through AirPods** adds a small one-semitone
-pitch lift and a gentle repeated vibration at any distance, including beyond 1.5 m.
-The cue enters within 8° after a 120 ms dwell and exits beyond 12° to avoid flicker.
+Facing the selected target with **your head through AirPods** adds a gentle repeated
+vibration at any distance, including beyond 1.5 m. There is no pitch change.
+The cue uses left/right heading only: it enters within 8° after a 120 ms dwell and
+exits beyond 12° to avoid flicker. Target height and up/down head tilt are ignored.
 Test left/right turns and looking up/down, then rotate only the phone: head-facing
 feedback follows the AirPods, while close-range feedback still depends only on phone
 position. Stronger proximity pulses take precedence near the object without stacking
 vibrations. No live head tracking, invalid/stale guidance, Stop, recording or backgrounding
-must clear the head-facing cue. Beeps change pitch on their next note; Chest eases to
-the new pitch without restarting the loop. Reverb and volume remain consistent.
+must clear the head-facing cue. Pitch, reverb and volume remain consistent.
 
 For the Action button, choose Settings → Action Button → Shortcut → Beacon →
 **Talk to Beacon**. iOS activates it with a press-and-hold: the first activation starts

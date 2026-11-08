@@ -89,18 +89,25 @@ struct GuidanceAudioTests {
                      "Entering requires the tighter cone")
         precondition(!aim.update(origin: .zero, forward: SIMD3(0, 0, 1), target: distantTarget, at: 2),
                      "An object behind the head must never count as aligned")
-        let above = SIMD3<Float>(0, 2, -5)
-        precondition(!aim.update(origin: .zero, forward: headForward(degrees: 0), target: above, at: 3),
-                     "Head elevation matters as well as left/right direction")
-        precondition(!aim.update(origin: .zero, forward: simd_normalize(above), target: above, at: 4))
-        precondition(aim.update(origin: .zero, forward: simd_normalize(above), target: above, at: 4.13))
-        precondition(!aim.update(origin: .zero, forward: simd_normalize(above), target: SIMD3(.nan, 0, 0), at: 5),
-                     "Invalid targets clear a previously active aiming cue")
-        precondition(!aim.update(origin: .zero, forward: .zero, target: above, at: 6))
-        precondition(!aim.update(origin: .zero, forward: headForward(degrees: 0), target: .zero, at: 7))
+        for height: Float in [-5, 2, 10] {
+            for tilt: Float in [-4, 0, 4] {
+                var horizontalAim = TargetAlignment()
+                let target = SIMD3<Float>(0, height, -5)
+                let forward = simd_normalize(SIMD3<Float>(0, tilt, -1))
+                precondition(!horizontalAim.update(origin: .zero, forward: forward, target: target, at: 0))
+                precondition(horizontalAim.update(origin: .zero, forward: forward, target: target, at: 0.13),
+                             "Height and up/down head tilt must not change the horizontal vibration cue")
+                precondition(!horizontalAim.update(origin: .zero, forward: headForward(degrees: 20), target: target, at: 0.2),
+                             "Turning away left/right must stop alignment at every target height")
+            }
+        }
+        precondition(!aim.update(origin: .zero, forward: headForward(degrees: 0), target: SIMD3(.nan, 0, 0), at: 5))
+        precondition(!aim.update(origin: .zero, forward: .zero, target: distantTarget, at: 6))
+        precondition(!aim.update(origin: .zero, forward: headForward(degrees: 0), target: SIMD3(0, 5, 0), at: 7),
+                     "A target without a horizontal bearing must not produce a false alignment")
 
         let aimHaptic = TargetProximity.guidanceHapticPulse(distance: 5, lookingAtTarget: true)!
-        precondition(aimHaptic.intensity < 0.25 && aimHaptic.duration < 0.04 && aimHaptic.interval >= 0.75,
+        precondition((0.2...0.3).contains(aimHaptic.intensity) && aimHaptic.duration < 0.04 && aimHaptic.interval >= 0.75,
                      "Facing the target gets a subtle repeated vibration beyond the proximity range")
         precondition(TargetProximity.guidanceHapticPulse(distance: 5, lookingAtTarget: false) == nil)
         precondition(TargetProximity.guidanceHapticPulse(distance: nil, lookingAtTarget: false) == nil)
@@ -130,8 +137,6 @@ struct GuidanceAudioTests {
         }
         precondition(attacks == 2, "The close cue must contain two distinct short beeps")
         precondition(Double(tick.count) / GuidanceSounds.sampleRate < 0.2, "The double cue should remain compact")
-        precondition(GuidanceSounds.alignedPitchRatio > 1 && GuidanceSounds.alignedPitchRatio < 1.07,
-                     "Head alignment should give only a small upward pitch shift")
         precondition(GuidanceSounds.waypoint == GuidanceSounds.pulse, "Walking and approaching must use the same clean sound")
         let fundamental = tonalEnergy(GuidanceSounds.pulse, hz: 988)
         let harmonics = (2...6).reduce(0.0) { $0 + tonalEnergy(GuidanceSounds.pulse, hz: 988 * Double($1)) }
