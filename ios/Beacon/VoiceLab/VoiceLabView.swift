@@ -4,8 +4,6 @@ struct VoiceLabView: View {
     @ObservedObject var model: VoiceLabModel
     @State private var command = ""
     @FocusState private var commandFocused: Bool
-    @State private var showSettings = false
-    @AppStorage(Settings.guidanceSoundStyleKey) private var soundStyle = GuidanceSoundStyle.beeps.rawValue
 
     var body: some View {
         NavigationStack {
@@ -56,18 +54,6 @@ struct VoiceLabView: View {
                 .padding(20)
             }
             .navigationTitle("Beacon Voice Lab")
-            .toolbar {
-                Button { showSettings = true } label: { Image(systemName: "gearshape") }
-                    .accessibilityLabel("Settings")
-            }
-            .sheet(isPresented: $showSettings) {
-                NavigationStack {
-                    Form { GuidanceSoundSettings() }
-                        .navigationTitle("Settings")
-                        .toolbar { Button("Done") { showSettings = false } }
-                }
-            }
-            .onChange(of: soundStyle) { _, _ in model.refreshGuidanceSound() }
         }
     }
 

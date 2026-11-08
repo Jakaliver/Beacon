@@ -40,16 +40,14 @@ For each spoken request below, hold **Talk to Beacon**, speak and release to sen
 
 1. Open Beacon, hold **Talk to Beacon**, say **"calibrate"** and release with the phone pointing ahead. With compatible
    AirPods, face the same direction. Allow Microphone access when first recording.
-2. Send **"loot mode on"**, then **"find the bottle"**. Check the **Heard:** text under
-   Settings → Speaking voice and that the Mac starts a search. A single continuous
-   chest sound should start only after a valid target is acquired.
-3. Turn your head and move slowly while tracking stays normal. Listen for 45 seconds
-   across two loop boundaries, checking for gaps, clicks or doubled sounds.
-4. Send **"status"** or **"help"**. Guidance pauses while recording; the chest lowers
-   while the reply speaks. Old replies must not queue up after a newer request.
-5. Switch **Chest → Beeps → Chest** in Settings. Also test **"loot mode off/on"** and
-   **"turn off/on loot mode"**. The object stays selected and one sound style plays.
-   Check that this preference survives relaunch and does not resume a paused search.
+2. Send **"find the bottle"**. Check the **Heard:** text under Settings → Speaking voice
+   and that the Mac starts a search. Beeps should start only after a valid target is acquired.
+3. Turn your head and move slowly while tracking stays normal. Listen for 45 seconds,
+   checking for consistent direction and clean beeps without crackle or doubled sounds.
+4. Send **"status"** or **"help"**. Guidance pauses while recording and while the reply
+   speaks. Old replies must not queue up after a newer request.
+5. On an existing installation that previously used another sound, find an object and
+   confirm beeps still play. There is no Object sound selector or continuous audio loop.
 6. Test **Stop**, then send **"resume"**. Stop must cancel a recording or pending request.
    A delayed transcript must not restart guidance. Test the same with **"pause"**.
 7. Send **"start over"**, then **"resume"**: the old search must stay cleared. Find a new
@@ -66,7 +64,7 @@ Exercise that dialogue in the separate Voice Lab below.
 
 ## Proximity sounds
 
-For the **Beeps** sound, move the phone towards a found object: the clean beeps should
+Move the phone towards a found object: the clean beeps should
 speed up and turn into a short, rising double beep when close (normally within 20 cm of the observed surface).
 Rotate the phone while keeping its position fixed; this must not change the proximity
 cue. The damped sound stays anchored to the object, without a room tail. Small position
@@ -80,8 +78,8 @@ Live listener-position and target-position updates are smoothed, and output-rout
 audio when the actual output or format changes. Compare stationary test beeps with live
 guidance while moving the phone; both should remain clean.
 
-PHASE uses only the direct head-tracked binaural path for all guidance cues, including
-Chest. Both early reflections and late reverb are absent from the pipeline, and the
+PHASE uses only the direct head-tracked binaural path for all guidance cues.
+Both early reflections and late reverb are absent from the pipeline, and the
 engine's reverb preset is None. There are no simulated walls, ceilings, floors or
 occluders. Check that turning your head gives one clear source direction without
 secondary reflected directions or a lingering room tail.
@@ -102,7 +100,7 @@ the phone near that calibrated holding position for the most accurate placement.
 Judge placement and realism with AirPods;
 build checks and PCM headroom tests cannot establish the perceptual result.
 
-With either Beeps or Chest selected, proximity vibrations begin within 1.5 m during
+Proximity vibrations begin within 1.5 m during
 walking and close guidance. They grow stronger, longer and faster as the phone approaches, reaching
 full intensity within 5 cm. Rotate the phone without moving it: pulse strength should
 remain unchanged. Recording, Stop, lost tracking and leaving the app must stop vibrations.
@@ -146,24 +144,23 @@ Returning to the app refreshes availability without replacing your manual choice
 
 Scheme **BeaconVoiceLab** installs a separate app and needs no Mac backend or camera.
 Set its signing team and unique bundle identifier as well. It retains hands-free recognition for testing and shares the command coordinator,
-voice selection and PHASE chest playback with Beacon,
+voice selection and synthesized PHASE beeps with Beacon,
 with sample targets instead of live detections.
 
-Start voice mode, say **"loot mode on"**, then **"find a bottle"**. When offered two matches, say **"left"**
-or **"the one on the right"**. A chest loop should play from the selected sample
-position. Test pause/resume, start over, found it, speech ducking and the gear menu's
-Chest/Beeps setting. Voice Lab cannot validate AR tracking, real object detection,
-network behavior or world alignment in the full app.
+Start voice mode and say **"find a bottle"**. When offered two matches, say **"left"**
+or **"the one on the right"**. Beeps should play from the selected sample position.
+Test pause/resume, start over, found it and speech suppression. Voice Lab cannot validate
+AR tracking, real object detection, network behavior or world alignment in the full app.
 
 ## Validation and feedback
 
 Build both **Beacon** and **BeaconVoiceLab** with Xcode, then run these focused checks
 after changes:
 
-- `scripts/test-voice-directions.sh`: directional choices, loot commands and rejected phrases.
+- `scripts/test-voice-directions.sh`: directional choices and rejected phrases.
 - `scripts/test-voice-session.sh`: speech coordination, button-only capture policy, revised commands and cancellation.
 - `scripts/test-voice-lab-directional.sh`: object-selection dialogue.
-- `scripts/test-voice-lab-sound.sh`: sound switching, saved loot preferences and audio lifecycle
+- `scripts/test-voice-lab-sound.sh`: beep placement, legacy-preference handling and audio lifecycle
   checks using a fake audio output.
 - `scripts/test-guidance-audio.sh`: position-only proximity, rotation independence, close-distance
   hysteresis, waveform/mix headroom, bounded distance gain, note overlap prevention and
@@ -175,6 +172,5 @@ playback; a successful build or unit test does not cover those behaviors.
 
 For feedback, include `git rev-parse --short HEAD`, iPhone/iOS version, headphone model,
 the command spoken, the displayed **Heard:** text, and expected versus actual behavior.
-For audio issues, say whether Chest or Beeps was selected and whether the app was
-speaking at the time. The bundled chest sound's source and processing are recorded in
-[chest sound source](chest-sound-source.md).
+For audio issues, say whether the app was speaking at the time and whether the beeps
+were stationary or playing during live guidance.

@@ -11,8 +11,6 @@ protocol VoiceLabAudioOutput: AnyObject {
     func setListener(_ position: SIMD3<Float>)
     func setForward(_ forward: SIMD3<Float>)
     @discardableResult func pulse(at position: SIMD3<Float>?) -> Bool
-    func startOrUpdateTargetLoop(at position: SIMD3<Float>)
-    func stopTargetLoop()
     func setGuidanceDucked(_ ducked: Bool)
 }
 
@@ -34,16 +32,13 @@ final class VoiceLabModel: ObservableObject {
     private var generation = 0
     private var stateBeforePause: State = .ready
     private let audio: any VoiceLabAudioOutput
-    private let soundStyle: () -> GuidanceSoundStyle
     private var soundWork: Task<Void, Never>?
     private var soundGeneration = 0
     private var audioInterrupted = false
     private var interruptionObserver: NSObjectProtocol?
 
-    init(audio: any VoiceLabAudioOutput = AudioGuide(),
-         soundStyle: @escaping () -> GuidanceSoundStyle = { Settings.guidanceSoundStyle }) {
+    init(audio: any VoiceLabAudioOutput = AudioGuide()) {
         self.audio = audio
-        self.soundStyle = soundStyle
         audio.setListener(.zero)
         audio.setForward(SIMD3<Float>(0, 0, -1))
         voice.onCommand = { [weak self] in self?.handle($0) }
@@ -139,12 +134,8 @@ final class VoiceLabModel: ObservableObject {
             state = .guiding
             refreshGuidanceSound()
             voice.say("Okay, the \(selectedSide) one. It's about one and a half metres away. Say found it when you're done.")
-        case .lootMode(let enabled):
-            Settings.guidanceSoundStyle = enabled ? .chest : .beeps
-            refreshGuidanceSound()
-            voice.say(enabled ? "Loot mode on." : "Loot mode off. Back to beeps.")
         case .help:
-            voice.say(helpReply + " Say loot mode on for chest sounds, or loot mode off for beeps.")
+            voice.say(helpReply)
         case .status, .inspect:
             voice.say(summary)
         case .repeatLast:
@@ -164,27 +155,22 @@ final class VoiceLabModel: ObservableObject {
         voice.enteredBackground()
     }
 
-    /// Settings changes replace the current sound without changing the selected object.
+    /// Start guidance at the selected sample object, cancelling any previous timer.
     func refreshGuidanceSound() {
         stopGuidanceSound()
         guard state == .guiding, !audioInterrupted, let selected else { return }
         let anchor = SIMD3<Float>(selected == 1 ? -0.8 : 0.8, 0, -1.3)
         audio.setListener(.zero)
         audio.start()
-        switch soundStyle() {
-        case .chest:
-            audio.startOrUpdateTargetLoop(at: anchor)
-        case .beeps:
-            audio.pulse(at: anchor)
-            let ticket = soundGeneration
-            soundWork = Task { [weak self] in
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .milliseconds(800))
-                    guard !Task.isCancelled, let self,
-                          self.soundGeneration == ticket, self.state == .guiding,
-                          !self.audioInterrupted else { return }
-                    self.audio.pulse(at: anchor)
-                }
+        audio.pulse(at: anchor)
+        let ticket = soundGeneration
+        soundWork = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(800))
+                guard !Task.isCancelled, let self,
+                      self.soundGeneration == ticket, self.state == .guiding,
+                      !self.audioInterrupted else { return }
+                self.audio.pulse(at: anchor)
             }
         }
     }
@@ -208,7 +194,6 @@ final class VoiceLabModel: ObservableObject {
         soundGeneration += 1
         soundWork?.cancel()
         soundWork = nil
-        audio.stopTargetLoop()
         audio.silence()
     }
 

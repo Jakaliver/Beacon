@@ -78,24 +78,18 @@ final class VoiceSessionSuite {
         return session
     }
 
-    func lootModeConversation() async {
+    func removedSoundCommandsStayInactive() async {
         let session = await ready()
         var commands: [VoiceCommand] = []
         session.onCommand = { commands.append($0) }
-        for text in ["loot", "loot mode", "turn loot mode", "don't turn loot mode on"] {
+        for text in ["loot", "loot mode", "loot mode on", "loot mode off", "turn on loot mode"] {
             session.listener.emit(text, final: true)
+            session.submit(text)
         }
-        expect(commands.isEmpty, "unfinished or negated loot commands cannot become object requests")
-        expect(session.awaitingObject, "unfinished loot commands preserve the object prompt")
-        session.listener.emit("loot mode on", final: false)
-        expect(commands.isEmpty, "loot mode waits for the final on/off choice")
-        session.listener.emit("loot mode off", final: true)
-        expect(commands == [.lootMode(false)], "the revised off command replaces the partial on command")
-        expect(session.awaitingObject, "changing sound does not consume the object prompt")
-        session.submit("turn on loot mode")
-        expect(commands == [.lootMode(false), .lootMode(true)], "submitted commands use the same loot mode action")
-        session.submit("find the loot mode switch")
-        expect(commands.last == .find("the loot mode switch"), "an explicit find preserves the full object description")
+        expect(commands.isEmpty, "removed sound commands cannot start guidance or become object requests")
+        expect(session.awaitingObject, "unsupported commands preserve the object prompt")
+        session.submit("find the bottle")
+        expect(commands == [.find("the bottle")], "normal object requests still work after an unsupported command")
         session.disable()
     }
 
@@ -256,8 +250,8 @@ final class VoiceSessionSuite {
         expect(commands.isEmpty, "ambient wake commands cannot start a search")
         session.submit("find the bottle")
         expect(commands == [.find("the bottle")], "a completed screen recording still starts the search")
-        session.submit("loot mode on")
-        expect(commands.last == .lootMode(true), "screen requests retain loot mode commands")
+        session.submit("calibrate")
+        expect(commands.last == .calibrate, "screen requests retain calibration commands")
         session.enteredBackground()
         session.becameActive()
         await wait(.milliseconds(50))
@@ -295,14 +289,14 @@ final class VoiceSessionSuite {
         expect(!session.awaitingObject, "finishing does not expose ambient conversation as another request")
         session.submit("find my wallet")
         expect(commands.last == .find("my wallet"), "the screen button can submit without a wake word")
-        session.listener.emit("loot mode on", final: true)
-        expect(commands.last == .find("my wallet"), "ambient loot commands also require Beacon")
-        session.listener.emit("Beacon, loot mode on", final: true)
-        expect(commands.last == .lootMode(true), "Beacon can enable loot mode hands free")
-        session.listener.emit("Hey Beacon, loot mode off", final: true)
-        expect(commands.last == .lootMode(false), "Beacon can disable loot mode hands free")
-        session.submit("loot mode on")
-        expect(commands.last == .lootMode(true), "button requests can change loot mode without a wake word")
+        session.listener.emit("calibrate", final: true)
+        expect(commands.last == .find("my wallet"), "ambient calibration also requires Beacon")
+        session.listener.emit("Beacon, calibrate", final: true)
+        expect(commands.last == .calibrate, "Beacon can calibrate hands free in Voice Lab")
+        session.listener.emit("Hey Beacon, status", final: true)
+        expect(commands.last == .status, "addressed status commands work")
+        session.submit("help")
+        expect(commands.last == .help, "button requests work without a wake word")
         let count = commands.count
         session.listener.emit("Beacon, find a phone", final: false)
         session.listener.emit("I said find a phone", final: true)
@@ -371,7 +365,7 @@ struct VoiceSessionTests {
     @MainActor
     static func main() async {
         let suite = VoiceSessionSuite()
-        await suite.lootModeConversation()
+        await suite.removedSoundCommandsStayInactive()
         await suite.objectConversation()
         await suite.revisedUtterances()
         await suite.externalStopCancelsPendingInput()

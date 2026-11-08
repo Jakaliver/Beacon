@@ -24,9 +24,6 @@ final class AudioGuide {
     private let engine = PHASEEngine(updateMode: .automatic)
     private let listener: PHASEListener
     private let targetSource: PHASESource
-    private let targetLoopSource: PHASESource
-    // Natural spreading for the continuous source: about 6 dB per distance doubling.
-    private static let rolloff = 1.0
     private let beaconSource: PHASESource
     private let cueSource: PHASESource
     // Events are asynchronous: .stopped also describes an event still preparing.
@@ -37,15 +34,7 @@ final class AudioGuide {
     private var generation = 0
     private var completedSounds = 0
     private var playbackCheckGeneration = 0
-    // Continuous guidance has one event, including while it prepares. It never enters the one-shot pools.
-    private var targetLoopEvent: PHASESoundEvent?
-    private var targetLoopGeneration = 0
-    private var targetLoopMixerID: String?
-    private var targetLoopAssetIssue: String?
-    private var reportedTargetLoopAssetIssue = false
     private var guidanceDucked = false
-    private static let targetLoopAsset = "chest_loop"
-    private static let targetLoopGain = "chest-loop-gain"
     private var alignment = TargetAlignment()
     var onDiagnostic: ((String) -> Void)?
     private var mixerIDs: [String: String] = [:]
@@ -88,10 +77,9 @@ final class AudioGuide {
         engine.defaultReverbPreset = .none
         listener = PHASEListener(engine: engine)
         targetSource = PHASESource(engine: engine)
-        targetLoopSource = PHASESource(engine: engine)
         beaconSource = PHASESource(engine: engine)
         cueSource = PHASESource(engine: engine)
-        for object in [listener, targetSource, targetLoopSource, beaconSource, cueSource] as [PHASEObject] {
+        for object in [listener, targetSource, beaconSource, cueSource] as [PHASEObject] {
             do { try engine.rootObject.addChild(object) }
             catch { diagnostic("scene setup failed: \(error)") }
         }
@@ -103,11 +91,10 @@ final class AudioGuide {
         register("beacon", GuidanceSounds.waypoint)
         register("stop", GuidanceSounds.stop)
         register("rescan", GuidanceSounds.rescan)
-        registerTargetLoop()
         headLock.withLock { updateListener() }
     }
 
-    /// One direct path for every cue, including Chest. No room-effect layers.
+    /// One direct path for every cue. No room-effect layers.
     private func guidancePipeline() -> PHASESpatialPipeline? {
         guard let pipeline = PHASESpatialPipeline(flags: .directPathTransmission) else { return nil }
         pipeline.entries[PHASESpatialCategory.directPathTransmission]?.sendLevel = 1.0
@@ -140,124 +127,8 @@ final class AudioGuide {
         } catch { diagnostic("register \(name) failed: \(error)") }
     }
 
-    private func registerTargetLoop() {
-        guard let url = Bundle.main.url(forResource: Self.targetLoopAsset, withExtension: "wav") else {
-            targetLoopAssetIssue = "chest loop unavailable: bundled chest_loop.wav is missing"
-            diagnostic(targetLoopAssetIssue!)
-            return
-        }
-        do {
-            _ = try engine.assetRegistry.registerSoundAsset(url: url, identifier: Self.targetLoopAsset,
-                                                            assetType: .resident, channelLayout: nil,
-                                                            normalizationMode: .dynamic)
-            guard let pipeline = guidancePipeline() else {
-                targetLoopAssetIssue = "chest loop unavailable: spatial pipeline creation failed"
-                diagnostic(targetLoopAssetIssue!)
-                return
-            }
-            let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "chest-loop-mixer")
-            let distance = PHASEGeometricSpreadingDistanceModelParameters()
-            distance.rolloffFactor = Self.rolloff
-            distance.fadeOutParameters = PHASEDistanceModelFadeOutParameters(cullDistance: 20)
-            mixer.distanceModelParameters = distance
-            mixer.gainMetaParameterDefinition = PHASENumberMetaParameterDefinition(value: 0.30,
-                minimum: 0, maximum: 1, identifier: Self.targetLoopGain)
-            let sampler = PHASESamplerNodeDefinition(soundAssetIdentifier: Self.targetLoopAsset, mixerDefinition: mixer)
-            sampler.playbackMode = .looping
-            // An out-of-range target may return; preserve its timeline instead of terminating the event.
-            sampler.cullOption = .sleepWakeAtRealtimeOffset
-            sampler.setCalibrationMode(calibrationMode: .relativeSpl, level: 0)
-            _ = try engine.assetRegistry.registerSoundEventAsset(rootNode: sampler, identifier: "chest-loop-event")
-            targetLoopMixerID = mixer.identifier
-        } catch {
-            targetLoopAssetIssue = "chest loop unavailable: asset registration failed: \(error)"
-            diagnostic(targetLoopAssetIssue!)
-        }
-    }
-
-    /// Keep one continuous sound at the target's world position. Call lifecycle methods on the main thread.
-    /// Updating the position while preparation or playback is in progress does not restart the sound.
-    func startOrUpdateTargetLoop(at position: SIMD3<Float>) {
-        guard position.x.isFinite, position.y.isFinite, position.z.isFinite else {
-            stopTargetLoop()
-            diagnostic("chest loop stopped: target position is not finite")
-            return
-        }
-        guard let mixerID = targetLoopMixerID else {
-            if !reportedTargetLoopAssetIssue {
-                reportedTargetLoopAssetIssue = true
-                diagnostic(targetLoopAssetIssue ?? "chest loop unavailable: sound event was not registered")
-            }
-            return
-        }
-        updateTargetPosition(position)
-        updateSources()
-        guard ensureRunning() else {
-            stopTargetLoop()
-            return
-        }
-        guard targetLoopEvent == nil else { return }
-        let parameters = PHASEMixerParameters()
-        parameters.addSpatialMixerParameters(identifier: mixerID, source: targetLoopSource, listener: listener)
-        do {
-            let event = try PHASESoundEvent(engine: engine, assetIdentifier: "chest-loop-event", mixerParameters: parameters)
-            targetLoopGeneration += 1
-            let currentGeneration = targetLoopGeneration
-            targetLoopEvent = event
-            applyTargetLoopGain(animated: false)
-            event.prepare { [weak self, weak event] reason in
-                DispatchQueue.main.async {
-                    guard let event else { return }
-                    guard let self, self.targetLoopGeneration == currentGeneration,
-                          self.targetLoopEvent === event else {
-                        event.stopAndInvalidate()
-                        return
-                    }
-                    guard reason == .prepared else {
-                        self.stopTargetLoop()
-                        self.diagnostic("chest loop preparation failed: \(reason.rawValue)")
-                        return
-                    }
-                    self.applyTargetLoopGain(animated: false)
-                    event.start { [weak self, weak event] reason in
-                        DispatchQueue.main.async {
-                            guard let self, let event, self.targetLoopGeneration == currentGeneration,
-                                  self.targetLoopEvent === event else { return }
-                            self.stopTargetLoop()
-                            self.diagnostic("chest loop ended: \(reason.rawValue)")
-                        }
-                    }
-                }
-            }
-        } catch {
-            diagnostic("chest loop creation failed: \(error)")
-        }
-    }
-
-    /// Also cancels an event still preparing; late callbacks cannot bring a stopped target back.
-    func stopTargetLoop() {
-        targetLoopGeneration += 1
-        let event = targetLoopEvent
-        targetLoopEvent = nil
-        event?.stopAndInvalidate()
-    }
-
-    /// Lower the continuous sound beneath speech without restarting its playback or moving its anchor.
-    func setGuidanceDucked(_ ducked: Bool) {
-        guard guidanceDucked != ducked else { return }
-        guidanceDucked = ducked
-        applyTargetLoopGain(animated: true)
-    }
-
-    private func applyTargetLoopGain(animated: Bool) {
-        guard let gain = targetLoopEvent?.metaParameters[Self.targetLoopGain] as? PHASENumberMetaParameter else { return }
-        let value = guidanceDucked ? 0.08 : 0.30
-        if animated {
-            gain.fade(value: value, duration: guidanceDucked ? 0.08 : 0.25)
-        } else {
-            gain.value = NSNumber(value: value)
-        }
-    }
+    /// Suppress guidance notes while speech is playing.
+    func setGuidanceDucked(_ ducked: Bool) { guidanceDucked = ducked }
 
     /// Vibration uses live AirPods heading before pitch is applied. Head tilt still
     /// positions spatial audio normally, but never controls this tactile cue.
@@ -312,7 +183,6 @@ final class AudioGuide {
         alignment.reset()
         playbackCheckGeneration += 1
         cueTiming.reset()
-        stopTargetLoop()
         let active = Array(playing.values)
         playing.removeAll()
         active.forEach { $0.stopAndInvalidate() }
@@ -323,7 +193,7 @@ final class AudioGuide {
     }
 
     func reportStatus() {
-        diagnostic("state=\(engine.renderingState.rawValue); spatializer=binaural; effects=direct-only; reverb=off; reflections=off; listener=\(headLock.withLock { phonePose == nil ? "preview" : "local AR" }); headTracking=\(headTrackingLive); assets=\(mixerIDs.count); prepared=\(prepared.values.reduce(0) { $0 + $1.count }); active=\(playing.count); chestRegistered=\(targetLoopMixerID != nil); chestEvent=\(targetLoopEvent != nil); ducked=\(guidanceDucked)")
+        diagnostic("state=\(engine.renderingState.rawValue); spatializer=binaural; effects=direct-only; reverb=off; reflections=off; listener=\(headLock.withLock { phonePose == nil ? "preview" : "local AR" }); headTracking=\(headTrackingLive); assets=\(mixerIDs.count); prepared=\(prepared.values.reduce(0) { $0 + $1.count }); active=\(playing.count); ducked=\(guidanceDucked)")
     }
 
     #if DEBUG
@@ -448,7 +318,6 @@ final class AudioGuide {
             var transform = matrix_identity_float4x4
             transform.columns.3 = SIMD4(p, 1)
             targetSource.transform = transform
-            targetLoopSource.transform = transform
         }
         if let waypointPosition, let p = waypointMotion.update(towards: waypointPosition, at: now) {
             var transform = matrix_identity_float4x4

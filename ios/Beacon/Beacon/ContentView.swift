@@ -3,7 +3,6 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var model: AppModel
     @State private var showSettings = false
-    @AppStorage(Settings.guidanceSoundStyleKey) private var soundStyle = GuidanceSoundStyle.beeps.rawValue
 
     private var connected: Bool { model.controlUp && model.sensorUp }
     private var guiding: Bool { ["walking", "probe", "hotcold"].contains(model.mode) && model.stopReason == nil }
@@ -65,7 +64,6 @@ struct ContentView: View {
         }
         .background(Color(.systemBackground))
         .sheet(isPresented: $showSettings, onDismiss: model.applySettings) { SettingsView(voice: model.voice) }
-        .onChange(of: soundStyle) { _, _ in model.refreshGuidanceSound() }
         .onChange(of: model.recording) { _, recording in
             if recording { showSettings = false }
         }
@@ -232,7 +230,6 @@ private struct SettingsView: View {
                 Section("Speaking voice") {
                     VoiceModeControls(voice: voice, showsListeningControls: false)
                 }
-                GuidanceSoundSettings()
                 Section("Connection") {
                     TextField("Mac host", text: $host)
                         .textInputAutocapitalization(.never)

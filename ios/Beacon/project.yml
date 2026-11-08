@@ -48,11 +48,9 @@ targets:
       - Beacon/VoiceModeControls.swift
       - Beacon/Speech.swift
       - Beacon/Settings.swift
-      - Beacon/GuidanceSoundSettings.swift
       - Beacon/AudioGuide.swift
       - Beacon/TargetProximity.swift
       - Beacon/GuidanceSounds.swift
-      - Beacon/chest_loop.wav
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.trident.voicelab.m9ac3a7n78

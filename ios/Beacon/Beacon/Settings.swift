@@ -1,19 +1,6 @@
 import Foundation
 
-enum GuidanceSoundStyle: String, CaseIterable, Identifiable {
-    case chest, beeps
-    var id: String { rawValue }
-    var label: String { self == .chest ? "Chest" : "Beeps" }
-}
-
 enum Settings {
-    static let guidanceSoundStyleKey = "guidanceSoundStyle"
-    static var guidanceSoundStyle: GuidanceSoundStyle {
-        get {
-            GuidanceSoundStyle(rawValue: UserDefaults.standard.string(forKey: guidanceSoundStyleKey) ?? "") ?? .beeps
-        }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: guidanceSoundStyleKey) }
-    }
     static let hostKey = "host"
     static let frameRateKey = "frameRate"
     static let defaultHost = "Malins-Macbook-Pro-3.local"

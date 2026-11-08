@@ -16,7 +16,6 @@ enum VoiceCommand: Equatable {
     case help
     case status
     case inspect
-    case lootMode(Bool)
     case choose(Int)
     case chooseSide(VoiceSide)
     case disableVoice
@@ -76,10 +75,6 @@ enum VoiceCommand: Equatable {
         case "help", "what can i say", "what are the commands": return .help
         case "status", "what is my status", "what's my status", "what is the status", "what's the status": return .status
         case "inspect", "inspect target", "describe target", "describe the target": return .inspect
-        case "loot mode on", "turn on loot mode", "turn loot mode on", "enable loot mode":
-            return .lootMode(true)
-        case "loot mode off", "turn off loot mode", "turn loot mode off", "disable loot mode":
-            return .lootMode(false)
         case "turn off voice mode", "turn voice mode off", "disable voice mode", "voice mode off", "stop listening":
             return .disableVoice
         default:

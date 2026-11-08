@@ -226,12 +226,8 @@ final class AppModel: ObservableObject {
         case .repeatLast: voice.repeatResponse()
         case .status: voice.say(statusSummary)
         case .inspect: self.command("inspect")
-        case .lootMode(let enabled):
-            Settings.guidanceSoundStyle = enabled ? .chest : .beeps
-            refreshGuidanceSound()
-            voice.say(enabled ? "Loot mode on." : "Loot mode off.")
         case .help:
-            voice.say("Hold Talk to Beacon, say find, calibrate, pause, resume, found it, or loot mode on or off, then release.")
+            voice.say("Hold Talk to Beacon, say find, calibrate, pause, resume, or found it, then release.")
         case .disableVoice: voice.disable()
         }
     }
@@ -284,7 +280,7 @@ final class AppModel: ObservableObject {
         case .finish: resetSearch(resetTracking: false); return
         case .resume: resume(); return
         case .calibrate: calibrate(); return
-        case .repeatLast, .status, .help, .choose, .chooseSide, .disableVoice, .lootMode:
+        case .repeatLast, .status, .help, .choose, .chooseSide, .disableVoice:
             if let parsed { handleVoice(parsed) }
             return
         case .inspect where searchCleared || stopReason != nil:
@@ -592,7 +588,6 @@ final class AppModel: ObservableObject {
         let fresh = now.timeIntervalSince(guidanceAt) < 1
         if !fresh { autoStop("stale") }
         guard !recording, !transcribing, foreground, !searchCleared, stopReason == nil, fresh, tracking == "normal" || touchingTarget, let g = guidance else {
-            audio.stopTargetLoop()
             audio.updateTargetAlignment(at: nil)
             haptics.stop()
             return resetProbe()
@@ -612,16 +607,6 @@ final class AppModel: ObservableObject {
             audio.updateWaypointPosition(SIMD3(p[0], p[1], p[2]))
         }
 
-        if Settings.guidanceSoundStyle == .chest {
-            resetProbe()
-            if ["walking", "probe", "hotcold"].contains(g.mode),
-               let target = g.target, target.valid, let p = target.position,
-               p.count == 3, p.allSatisfy({ $0.isFinite }), pose?.epoch == g.epoch {
-                audio.startOrUpdateTargetLoop(at: SIMD3(p[0], p[1], p[2]))
-            } else { audio.stopTargetLoop() }
-            return
-        }
-        audio.stopTargetLoop()
 
         switch g.mode {
         case "walking":
