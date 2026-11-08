@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreMotion
+import ModelIO
 import PHASE
 import simd
 
@@ -75,6 +76,8 @@ final class AudioGuide {
     private var waypointPosition: SIMD3<Float>?
     private var targetMotion = GuidanceListenerMotion()
     private var waypointMotion = GuidanceListenerMotion()
+    private var roomEpoch: Int?
+    private var roomSurfaces: [PHASEOccluder] = []
     private var listenerForward = SIMD3<Float>(0, 0, -1)
     private var listenerUp = SIMD3<Float>(0, 1, 0)
 
@@ -82,7 +85,7 @@ final class AudioGuide {
         // Explicitly use PHASE's externalizing renderer, including on headphones
         // whose route might otherwise be treated as a conventional stereo output.
         engine.outputSpatializationMode = .alwaysUseBinaural
-        engine.defaultReverbPreset = .smallRoom
+        engine.defaultReverbPreset = .mediumRoom
         listener = PHASEListener(engine: engine)
         targetSource = PHASESource(engine: engine)
         targetLoopSource = PHASESource(engine: engine)
@@ -305,7 +308,7 @@ final class AudioGuide {
     }
 
     func reportStatus() {
-        diagnostic("state=\(engine.renderingState.rawValue); spatializer=binaural; listener=\(headLock.withLock { phonePose == nil ? "preview" : "local AR" }); headTracking=\(headTrackingLive); assets=\(mixerIDs.count); prepared=\(prepared.values.reduce(0) { $0 + $1.count }); active=\(playing.count); chestRegistered=\(targetLoopMixerID != nil); chestEvent=\(targetLoopEvent != nil); ducked=\(guidanceDucked)")
+        diagnostic("state=\(engine.renderingState.rawValue); spatializer=binaural; listener=\(headLock.withLock { phonePose == nil ? "preview" : "local AR" }); headTracking=\(headTrackingLive); roomSurfaces=\(roomSurfaces.count); assets=\(mixerIDs.count); prepared=\(prepared.values.reduce(0) { $0 + $1.count }); active=\(playing.count); chestRegistered=\(targetLoopMixerID != nil); chestEvent=\(targetLoopEvent != nil); ducked=\(guidanceDucked)")
     }
 
     #if DEBUG
@@ -382,6 +385,7 @@ final class AudioGuide {
             listenerTarget = position + SIMD3<Float>(0, 0.45 - adjust, 0)
             updateListener()
         }
+        configureRoomIfNeeded(epoch: .min)
     }
 
     /// Use local AR translation in every guidance mode, including the final
@@ -394,6 +398,33 @@ final class AudioGuide {
             updatePhoneListener()
             updateListener()
         }
+        configureRoomIfNeeded(epoch: epoch)
+    }
+
+    /// A fixed 7 x 9 x 3 m room, as requested. Six simple slabs provide directional
+    /// early reflections immediately, without waiting for a scan or rebuilding
+    /// geometry during guidance. Material presets are estimates, not measurements.
+    private func configureRoomIfNeeded(epoch: Int) {
+        guard roomEpoch != epoch else { return }
+        let position = headLock.withLock { listenerTarget ?? listenerPosition }
+        let surfaces = GuidanceRoomAcoustics.surfaces(around: position)
+        guard surfaces.count == 6 else { return }
+        for old in roomSurfaces { engine.rootObject.removeChild(old) }
+        roomSurfaces.removeAll()
+        roomEpoch = epoch
+        for surface in surfaces {
+            let mesh = MDLMesh(boxWithExtent: surface.size, segments: SIMD3<UInt32>(repeating: 1),
+                               inwardNormals: false, geometryType: .triangles, allocator: nil)
+            let material = PHASEMaterial(engine: engine, preset: surface.kind == .floor ? .wood : .drywall)
+            let shape = PHASEShape(engine: engine, mesh: mesh, materials: [material])
+            let object = PHASEOccluder(engine: engine, shapes: [shape])
+            object.transform = surface.transform
+            do {
+                try engine.rootObject.addChild(object)
+                roomSurfaces.append(object)
+            } catch { diagnostic("room surface failed: \(error)") }
+        }
+        diagnostic("room acoustics: \(roomSurfaces.count) fixed boundaries; assumed room 7 x 9 x 3 m")
     }
 
     /// Call with headLock held. Head turns affect orientation, never this offset.

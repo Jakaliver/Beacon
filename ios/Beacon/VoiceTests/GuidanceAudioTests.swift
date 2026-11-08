@@ -12,6 +12,16 @@ struct GuidanceAudioTests {
         samples.reduce(0) { $0 + Double($1 * $1) }
     }
 
+    static func tonalEnergy(_ samples: [Float], hz: Double) -> Double {
+        var real = 0.0, imaginary = 0.0
+        for (i, value) in samples.enumerated() {
+            let phase = 2 * Double.pi * hz * Double(i) / GuidanceSounds.sampleRate
+            real += Double(value) * cos(phase)
+            imaginary += Double(value) * sin(phase)
+        }
+        return real * real + imaginary * imaginary
+    }
+
     static func lowFrequencyFraction(_ samples: [Float]) -> Double {
         // Parseval's relation: measure the actual energy below 600 Hz, where the old
         // waypoint's low resonant body produced the unwanted thud.
@@ -82,6 +92,10 @@ struct GuidanceAudioTests {
         precondition(attacks == 2, "The close cue must contain two distinct short beeps")
         precondition(Double(tick.count) / GuidanceSounds.sampleRate < 0.2, "The double cue should remain compact")
         precondition(GuidanceSounds.waypoint == GuidanceSounds.pulse, "Walking and approaching must use the same clean sound")
+        let fundamental = tonalEnergy(GuidanceSounds.pulse, hz: 988)
+        let harmonics = (2...6).reduce(0.0) { $0 + tonalEnergy(GuidanceSounds.pulse, hz: 988 * Double($1)) }
+        precondition(harmonics / fundamental > 0.008 && harmonics / fundamental < 0.1,
+                     "Spatial cues need audible spectral detail while the lower fundamental stays dominant")
         precondition(Double(GuidanceSounds.pulse.count) / GuidanceSounds.sampleRate < TargetProximity.interval(forDistance: 0),
                      "Approach taps must fit within the fastest repeat interval")
 
@@ -137,6 +151,30 @@ struct GuidanceAudioTests {
         precondition(GuidanceListenerGeometry.position(camera: matrix_identity_float4x4,
                          calibratedForward: .zero, soundHeight: 0) == nil)
 
+        let ears = SIMD3<Float>(2, 1.6, -3)
+        let room = GuidanceRoomAcoustics.surfaces(around: ears)
+        precondition(room.count == 6, "An assumed room must be available before any scan")
+        var boundaryDistances: [Float] = []
+        for surface in room {
+            let normal = SIMD3(surface.transform.columns.1.x, surface.transform.columns.1.y, surface.transform.columns.1.z)
+            let centre = SIMD3(surface.transform.columns.3.x, surface.transform.columns.3.y, surface.transform.columns.3.z)
+            let face = centre + normal * surface.size.y / 2
+            let distance = simd_dot(ears - face, normal)
+            precondition(distance > 1 && abs(simd_length(normal) - 1) < 0.0001,
+                         "All room faces must point inward and keep the listener inside")
+            boundaryDistances.append(distance)
+            precondition(surface.size.x > 0 && surface.size.y == 0.02 && surface.size.z > 0)
+        }
+        for (actual, expected) in zip(boundaryDistances.sorted(), [Float(1.4), 1.6, 3.5, 3.5, 4.5, 4.5]) {
+            precondition(abs(actual - expected) < 0.001, "Room dimensions and ear height must remain physically consistent")
+        }
+        let translatedRoom = GuidanceRoomAcoustics.surfaces(around: ears + movement)
+        for (original, moved) in zip(room, translatedRoom) {
+            precondition(simd_distance(moved.transform.columns.3 - original.transform.columns.3, SIMD4(movement, 0)) < 0.001,
+                         "A new AR world must position the room in the same frame as its listener")
+        }
+        precondition(GuidanceRoomAcoustics.surfaces(around: SIMD3(.nan, 0, 0)).isEmpty)
+
         let distances: [Float] = [1.5, 1.3, 1.2, 0.8, 0.4, 0.2, 0.1, 0.05]
         let haptics = distances.map { TargetProximity.hapticPulse(forDistance: $0)! }
         for (far, near) in zip(haptics, haptics.dropFirst()) {
@@ -150,7 +188,7 @@ struct GuidanceAudioTests {
         precondition(TargetProximity.hapticPulse(forDistance: 1.51) == nil)
         precondition(TargetProximity.hapticPulse(forDistance: -0.1) == nil)
         precondition(TargetProximity.hapticPulse(forDistance: .nan) == nil)
-        print("Guidance: proximity, audio headroom/timing, live world positioning and earlier progressive haptics passed")
+        print("Guidance: proximity, audio headroom/timbre, room geometry, live positioning and progressive haptics passed")
 
         if CommandLine.arguments.count > 1 {
             let directory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)

@@ -69,7 +69,7 @@ Exercise that dialogue in the separate Voice Lab below.
 For the **Beeps** sound, move the phone towards a found object: the clean beeps should
 speed up and turn into a short, rising double beep when close (normally within 20 cm of the observed surface).
 Rotate the phone while keeping its position fixed; this must not change the proximity
-cue. The sound stays anchored to the object, with a small-room reverb tail. Small position
+cue. The sound stays anchored to the object, with room reflections and a reverb tail. Small position
 wobbles near the threshold should not alternate rapidly between single and double beeps.
 
 Check the beeps very close to the object as well as farther away. They use fixed PCM
@@ -80,8 +80,14 @@ Live listener-position and target-position updates are smoothed, and output-rout
 audio when the actual output or format changes. Compare stationary test beeps with live
 guidance while moving the phone; both should remain clean.
 
-PHASE uses binaural rendering with the same small-room reflection/reverb sends for
-all guidance cues. The listener follows local AR translation in every guidance mode,
+PHASE uses binaural rendering with the same reflection/reverb sends for all guidance
+cues. It assumes a 7 × 9 × 3 metre room, positioned once in each AR world with the
+listener initially 1.6 m above its floor. Six simple acoustic slabs and wood/drywall
+material presets supply directional reflections, with a medium-room late reverb.
+The room stays fixed when you move or recalibrate heading and needs no scanned walls.
+The beep retains its 988 Hz fundamental and short rising pair; brief, softly fading
+upper harmonics give the renderer more directional detail without a low thud.
+The listener follows local AR translation in every guidance mode,
 including the final approach, instead of the backend's stationary probe anchor.
 Calibrate with the phone held at chest height and your head facing the same direction.
 Walk sideways and towards a stationary target, then turn your head: the source should
@@ -92,7 +98,9 @@ Route waypoints still provide walking instructions when a path is active.
 Head position remains an estimate (30 cm behind and 45 cm above the phone in the
 calibrated direction); AirPods supply rotation, not absolute head translation. Keep
 the phone near that calibrated holding position for the most accurate placement.
-The small-room response is a preset, not a measurement of the current room.
+The room dimensions, materials and reverberation are an intentional approximation,
+not measurements of the current room. Judge placement and realism with AirPods;
+build checks and PCM headroom tests cannot establish the perceptual result.
 
 With either Beeps or Chest selected, proximity vibrations begin within 1.5 m during
 walking and close guidance. They grow stronger, longer and faster as the phone approaches, reaching
