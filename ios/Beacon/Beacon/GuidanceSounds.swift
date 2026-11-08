@@ -4,9 +4,9 @@ import Foundation
 /// PHASE supplies the room reflections and spatial position during playback.
 enum GuidanceSounds {
     static let sampleRate = 44_100.0
-    static let pulse = beep(hz: 1175)
+    static let pulse = beep(hz: 988)
     static let waypoint = pulse
-    static let onObject = pulse + silence(0.022) + beep(hz: 1568)
+    static let onObject = pulse + silence(0.022) + beep(hz: 1319)
     static let stop = pulse
     static let rescan = pulse
 
