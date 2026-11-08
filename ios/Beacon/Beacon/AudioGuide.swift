@@ -83,7 +83,7 @@ final class AudioGuide {
             listener.automaticHeadTrackingFlags = .orientation
         }
         register("pulse", GuidanceSounds.pulse)
-        register("confirm", GuidanceSounds.onObject, crisp: true, level: -2)
+        register("confirm", GuidanceSounds.onObject, level: -2)
         register("beacon", GuidanceSounds.waypoint)
         register("stop", GuidanceSounds.stop)
         register("rescan", GuidanceSounds.rescan)
@@ -92,18 +92,18 @@ final class AudioGuide {
     }
 
     /// One PHASE sound event per sound: sampler → spatial mixer with direct path, early reflections and late reverb.
-    private func register(_ name: String, _ samples: [Float], crisp: Bool = false, level: Double = 0) {
+    private func register(_ name: String, _ samples: [Float], level: Double = 0) {
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
         do {
             _ = try engine.assetRegistry.registerSoundAsset(data: data, identifier: name, format: format,
                                                             normalizationMode: .dynamic)
             guard let pipeline = PHASESpatialPipeline(flags: [.directPathTransmission, .earlyReflections, .lateReverb])
             else { return }
-            // Audible small-room reflections keep the sound in the scene. The tick
-            // has a slightly lighter tail, while retaining the same room character.
+            // Use one room response for every cue so approaching and close feedback
+            // do not sound as though they switch between wet and dry modes.
             pipeline.entries[PHASESpatialCategory.directPathTransmission]?.sendLevel = 1.0
-            pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = crisp ? 0.22 : 0.30
-            pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = crisp ? 0.11 : 0.16
+            pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = 0.30
+            pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = 0.16
             let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "\(name)-mixer")
             let distance = PHASEGeometricSpreadingDistanceModelParameters()
             distance.rolloffFactor = Self.rolloff
