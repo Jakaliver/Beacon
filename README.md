@@ -103,3 +103,20 @@ npm run build
 
 Backend checks: `cd mac && for m in geometry mapping targets planner; do uv run python -m beacon.$m; done`.
 See [limitations](docs/limitations.md) for the practical limits of estimated depth and guidance.
+
+## Licence
+
+Copyright (C) 2026 Beacon contributors.
+
+Beacon's original source code and documentation are licensed under the
+[GNU Affero General Public License, version 3 only](LICENSE)
+(`SPDX-License-Identifier: AGPL-3.0-only`). It is provided without warranty.
+
+When distributing covered software, provide its corresponding source under the same
+licence. If you run a modified version over a network, offer its corresponding source
+to users who interact with it, as required by the licence.
+
+Third-party libraries and downloaded models retain their own licences; this licence
+does not relicense them. In particular, the MobileCLIP model used during setup has
+separate research-only terms. See [models and licences](docs/models-and-licenses.md)
+before using or redistributing the complete model-based system.
