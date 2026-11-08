@@ -175,6 +175,19 @@ struct GuidanceAudioTests {
         }
         precondition(GuidanceRoomAcoustics.surfaces(around: SIMD3(.nan, 0, 0)).isEmpty)
 
+        let meetingRoom = GuidanceRoomAcoustics.surfaces(around: ears, room: .meeting)
+        precondition(meetingRoom.count == 6)
+        let meetingDistances = meetingRoom.map { surface -> Float in
+            let n = SIMD3(surface.transform.columns.1.x, surface.transform.columns.1.y, surface.transform.columns.1.z)
+            let centre = SIMD3(surface.transform.columns.3.x, surface.transform.columns.3.y, surface.transform.columns.3.z)
+            return simd_dot(ears - (centre + n * surface.size.y / 2), n)
+        }.sorted()
+        for (actual, expected) in zip(meetingDistances, [Float(1), 1.6, 1.6, 1.6, 2, 2]) {
+            precondition(abs(actual - expected) < 0.001, "The meeting room needs closer walls and a lower ceiling")
+        }
+        precondition(abs(room[0].transform.columns.3.y - meetingRoom[0].transform.columns.3.y) < 0.001,
+                     "Changing room size must preserve the floor and world origin")
+
         let distances: [Float] = [1.5, 1.3, 1.2, 0.8, 0.4, 0.2, 0.1, 0.05]
         let haptics = distances.map { TargetProximity.hapticPulse(forDistance: $0)! }
         for (far, near) in zip(haptics, haptics.dropFirst()) {

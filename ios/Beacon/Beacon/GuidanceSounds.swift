@@ -70,13 +70,12 @@ struct GuidanceAcousticSurface {
     }
 }
 
-/// An intentionally assumed, moderately large room. Anchor it once per AR world,
+/// An intentionally assumed room. Anchor it once per AR world,
 /// so the reflections stay put when the listener moves or recalibrates heading.
 enum GuidanceRoomAcoustics {
-    static let dimensions = SIMD3<Float>(7, 3, 9)
-
-    static func surfaces(around listener: SIMD3<Float>) -> [GuidanceAcousticSurface] {
+    static func surfaces(around listener: SIMD3<Float>, room: GuidanceRoomSize = .large) -> [GuidanceAcousticSurface] {
         guard listener.x.isFinite, listener.y.isFinite, listener.z.isFinite else { return [] }
+        let dimensions = room.dimensions
         let floor = listener.y - 1.6
         let centre = SIMD3(listener.x, floor + dimensions.y / 2, listener.z)
         func slab(_ kind: GuidanceAcousticSurface.Kind, at position: SIMD3<Float>,

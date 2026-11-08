@@ -6,7 +6,21 @@ enum GuidanceSoundStyle: String, CaseIterable, Identifiable {
     var label: String { self == .chest ? "Chest" : "Beeps" }
 }
 
+enum GuidanceRoomSize: String, CaseIterable, Identifiable {
+    case large, meeting
+    var id: String { rawValue }
+    var label: String { self == .large ? "Large room" : "Meeting room" }
+    // Width, ceiling height, depth in metres. Meeting room seats about four.
+    var dimensions: SIMD3<Float> {
+        self == .large ? SIMD3(7, 3, 9) : SIMD3(3.2, 2.6, 4)
+    }
+}
+
 enum Settings {
+    static let guidanceRoomSizeKey = "guidanceRoomSize"
+    static var guidanceRoomSize: GuidanceRoomSize {
+        GuidanceRoomSize(rawValue: UserDefaults.standard.string(forKey: guidanceRoomSizeKey) ?? "") ?? .large
+    }
     static let guidanceSoundStyleKey = "guidanceSoundStyle"
     static var guidanceSoundStyle: GuidanceSoundStyle {
         get {
