@@ -65,11 +65,11 @@ Exercise that dialogue in the separate Voice Lab below.
 
 ## Proximity sounds
 
-For the **Beeps** sound, move the phone towards a found object: the warm taps should
-speed up and turn into a tick when close (normally within 20 cm of the observed surface).
+For the **Beeps** sound, move the phone towards a found object: the clean beeps should
+speed up and turn into a short, rising double beep when close (normally within 20 cm of the observed surface).
 Rotate the phone while keeping its position fixed; this must not change the proximity
 cue. The sound stays anchored to the object, with a small-room reverb tail. Small position
-wobbles near the threshold should not alternate rapidly between taps and ticks.
+wobbles near the threshold should not alternate rapidly between single and double beeps.
 
 ## Speaking voice
 
@@ -110,7 +110,7 @@ after changes:
 - `scripts/test-voice-lab-sound.sh`: sound switching, saved loot preferences and audio lifecycle
   checks using a fake audio output.
 - `scripts/test-guidance-audio.sh`: position-only proximity, rotation independence, close-distance
-  hysteresis, and generated sound headroom/decay. An optional directory argument exports WAV previews.
+  hysteresis, and generated sound headroom, low-frequency content and two-note separation. An optional directory argument exports WAV previews.
 
 These checks do not exercise a real microphone, speech voice, PHASE playback or ARKit.
 Run the physical-device checks above to validate microphone recognition and spatial

@@ -9,8 +9,8 @@ Recording continues through pauses until you release. The Mac transcribes it loc
 Found objects play spatial beeps by default; choose **Beeps** or **Chest** in Settings.
 Hold and say **"loot mode on"** for the chest sound or **"loot mode off"** for
 Beeps. The choice is remembered and does not resume a paused search.
-Guidance uses warm, percussive taps that speed up as the phone approaches the object.
-Inside the close-distance threshold (normally 20 cm), they become a crisp tick with a
+Guidance uses one clean beep sound that speeds up as the phone approaches the object.
+Inside the close-distance threshold (normally 20 cm), they become a short, rising double beep with a
 small-room reverb tail. Only the phone's position matters; its pointing angle does not.
 Distance uses the nearest observed object surface, falling back to its centre.
 See the [voice and audio test guide](docs/voice-audio-testing.md)

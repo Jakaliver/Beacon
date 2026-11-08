@@ -172,8 +172,8 @@ Beacon keeps the iPhone screen awake while open. Manually locking it or leaving 
 pauses capture. The viewer keeps the last scan and labels it paused until fresh frames return.
 All speech and spatial guidance play on the iPhone. The browser never opens an audio or
 microphone session and cannot change the phone's guidance state.
-Guidance defaults to **Beeps**: warm taps accelerate as the phone approaches the object,
-then become a short tick inside the close-distance threshold (normally 20 cm).
+Guidance defaults to **Beeps**: clean beeps accelerate as the phone approaches the object,
+then become a short, rising double beep inside the close-distance threshold (normally 20 cm).
 Phone rotation does not change proximity feedback. Sounds retain distance attenuation
 and audible small-room reverb. Settings → **Object sound** also offers **Chest**, a
 continuous sound at the object that lowers while the app speaks.
@@ -204,7 +204,7 @@ xcrun devicectl device process launch --device YOUR_DEVICE_ID --terminate-existi
   --console YOUR_BUNDLE_ID -- --audio-self-test
 ```
 
-After five seconds, it plays five approach taps followed by five close ticks, evenly spaced.
+After five seconds, it plays five clean beeps followed by five close double-beeps, evenly spaced.
 **Stop** cancels the sequence.
 The console reports the active audio route, playback failures and completed sounds;
 confirm that the pulses are actually audible through the selected output. Launch the app

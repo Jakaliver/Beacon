@@ -290,7 +290,7 @@ final class AudioGuide {
     /// No target or camera inference is needed, and Stop cancels the remaining sounds.
     func runPlaybackCheck() {
         let check = playbackCheckGeneration
-        diagnostic("playback check: five approach taps, then five close ticks")
+        diagnostic("playback check: five clean beeps, then five close double-beeps")
         for index in 0..<10 {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.4) { [weak self] in
                 guard let self, check == self.playbackCheckGeneration else { return }

@@ -12,6 +12,24 @@ struct GuidanceAudioTests {
         samples.reduce(0) { $0 + Double($1 * $1) }
     }
 
+    static func lowFrequencyFraction(_ samples: [Float]) -> Double {
+        // Parseval's relation: measure the actual energy below 600 Hz, where the old
+        // waypoint's low resonant body produced the unwanted thud.
+        let total = energy(samples[...]) * Double(samples.count)
+        let topBin = Int(600 * Double(samples.count) / GuidanceSounds.sampleRate)
+        var low = 0.0
+        for bin in 0...topBin {
+            var real = 0.0, imaginary = 0.0
+            for (i, value) in samples.enumerated() {
+                let phase = 2 * Double.pi * Double(bin * i) / Double(samples.count)
+                real += Double(value) * cos(phase)
+                imaginary += Double(value) * sin(phase)
+            }
+            low += (real * real + imaginary * imaginary) * (bin == 0 ? 1 : 2)
+        }
+        return low / total
+    }
+
     static func main() throws {
         let centre = SIMD3<Float>(0, 0, -0.5)
         let surface = [centre + SIMD3(0, 0, 0.04), centre - SIMD3(0, 0, 0.04)]
@@ -51,13 +69,22 @@ struct GuidanceAudioTests {
             precondition(samples.first == 0 && samples.last == 0, "\(name) must have clean boundaries")
             precondition(energy(samples[...]) > 0.1, "\(name) must be audible")
             precondition(abs(samples.reduce(0, +) / Float(samples.count)) < 0.003, "\(name) must have negligible DC offset")
+            precondition(lowFrequencyFraction(samples) < 0.001, "\(name) must not contain a low thudding body")
         }
         let tick = GuidanceSounds.onObject
-        let after20ms = Int(0.020 * GuidanceSounds.sampleRate)
-        precondition(energy(tick[after20ms...]) / energy(tick[...]) < 0.001, "The tick must decay quickly without a ringing tail")
+        let window = Int(0.005 * GuidanceSounds.sampleRate)
+        var previousAudible = false, attacks = 0
+        for start in stride(from: 0, to: tick.count, by: window) {
+            let audible = energy(tick[start..<min(start + window, tick.count)]) > 0.005
+            if audible && !previousAudible { attacks += 1 }
+            previousAudible = audible
+        }
+        precondition(attacks == 2, "The close cue must contain two distinct short beeps")
+        precondition(Double(tick.count) / GuidanceSounds.sampleRate < 0.2, "The double cue should remain compact")
+        precondition(GuidanceSounds.waypoint == GuidanceSounds.pulse, "Walking and approaching must use the same clean sound")
         precondition(Double(GuidanceSounds.pulse.count) / GuidanceSounds.sampleRate < TargetProximity.interval(forDistance: 0),
                      "Approach taps must fit within the fastest repeat interval")
-        print("Guidance audio: position-only proximity, rotation invariance, hysteresis, invalid data, waveform headroom and decay passed")
+        print("Guidance audio: position-only proximity, rotation invariance, hysteresis, waveform headroom, no thuds and two-note cue passed")
 
         if CommandLine.arguments.count > 1 {
             let directory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)

@@ -542,7 +542,7 @@ final class AppModel: ObservableObject {
 
         let source = g.target?.position.flatMap { $0.count == 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
         if confirming {
-            if !wasConfirming || now.timeIntervalSince(lastPulse) >= 0.4 {
+            if !wasConfirming || now.timeIntervalSince(lastPulse) >= 0.8 {
                 audio.confirm(at: source)
                 lastPulse = now
             }
