@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { ScanCloud } from "./scan-cloud";
+import { readRoute, routeRibbon, routeChevrons, type RouteData } from "./route-geometry";
 import type { PhoneLocation } from "./phone-state";
 import type { Recon } from "./types";
 
@@ -82,8 +83,14 @@ export class RoomView {
     box: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>;
     edges: THREE.LineSegments<THREE.EdgesGeometry, THREE.LineBasicMaterial>;
   }>();
-  private route = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xb0b0b0, transparent: true, opacity: 0.65 }));
-  private waypoint = new THREE.Mesh(new THREE.OctahedronGeometry(0.085), new THREE.MeshBasicMaterial({ color: 0xd4d4d4 }));
+  private routeLive = false;
+  private routeData: RouteData | null = null;
+  private routeLayer = new THREE.Group();
+  private routeBorder = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0x073b31, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthTest: false, depthWrite: false }));
+  private route = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0x40ddb3, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthTest: false, depthWrite: false }));
+  private routeMarks = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0xecfff8, transparent: true, opacity: 0.96, side: THREE.DoubleSide, depthTest: false, depthWrite: false }));
+  private waypoint = new THREE.Group();
+  private approachEndpoint = new THREE.Group();
   private phone = new THREE.Group();
   private phoneModel = new THREE.Group();
   private phoneHeading = new THREE.Group();
@@ -201,8 +208,26 @@ export class RoomView {
     this.phoneFootprint.renderOrder = 4;
     this.phone.add(this.phoneModel, this.phoneHeading, this.phoneHeightLine, this.phoneFootprint);
     this.phoneHeightLine.visible = this.phoneFootprint.visible = false;
-    this.phone.visible = this.waypoint.visible = false;
-    this.scene.add(this.grid, this.floor, this.cloud, this.targets, this.route, this.waypoint, this.phone);
+    const waypointMaterial = new THREE.MeshBasicMaterial({ color: 0xf0fff9, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
+    const waypointRing = new THREE.Mesh(new THREE.RingGeometry(0.12, 0.155, 32), waypointMaterial);
+    waypointRing.rotation.x = -Math.PI / 2;
+    const waypointDiamond = new THREE.Mesh(new THREE.OctahedronGeometry(0.09), waypointMaterial);
+    waypointDiamond.position.y = 0.12;
+    this.waypoint.add(waypointRing, waypointDiamond);
+    const endpointMaterial = new THREE.MeshBasicMaterial({ color: 0x78f3ce, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
+    for (const [inner, outer] of [[0.18, 0.205], [0.12, 0.14]]) {
+      const ring = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 32), endpointMaterial);
+      ring.rotation.x = -Math.PI / 2;
+      this.approachEndpoint.add(ring);
+    }
+    this.routeBorder.renderOrder = 1;
+    this.route.renderOrder = 2;
+    this.routeMarks.renderOrder = 3;
+    this.waypoint.traverse(object => { object.renderOrder = 4; });
+    this.approachEndpoint.traverse(object => { object.renderOrder = 4; });
+    this.routeLayer.add(this.routeBorder, this.route, this.routeMarks, this.waypoint, this.approachEndpoint);
+    this.phone.visible = this.routeLayer.visible = false;
+    this.scene.add(this.grid, this.floor, this.cloud, this.targets, this.routeLayer, this.phone);
     this.resizeObserver = new ResizeObserver(() => this.resize(canvas));
     this.resizeObserver.observe(canvas);
     canvas.addEventListener("webglcontextlost", this.contextLost);
@@ -242,8 +267,7 @@ export class RoomView {
     this.grid.visible = !firstPerson;
     this.floor.visible = !firstPerson && this.hasFloor;
     this.phone.visible = !firstPerson && this.hasPhonePose;
-    this.route.visible = !firstPerson;
-    this.waypoint.visible = !firstPerson && !!this.recon?.waypoint;
+    this.updateRouteVisibility();
     if (firstPerson) {
       if (this.hasPhonePose) {
         this.firstPersonCamera.position.copy(this.phonePosition);
@@ -262,6 +286,56 @@ export class RoomView {
     this.controls.update(0);
     if (this.autoFit) this.fit();
     this.invalidate();
+  }
+
+  /** Freshness is owned by the feed: camera/pose loss must hide every route marker together. */
+  setRouteLive(live: boolean) {
+    if (live === this.routeLive) return;
+    this.routeLive = live;
+    this.updateRouteVisibility();
+    if (live && this.autoFit) this.fit();
+    this.invalidate();
+  }
+
+  private updateRouteVisibility() { this.routeLayer.visible = this.routeLive && this.routeData !== null; }
+
+  private clearRoute() {
+    this.routeData = null;
+    this.routeKey = "";
+    for (const mesh of [this.routeBorder, this.route, this.routeMarks]) {
+      mesh.geometry.dispose();
+      mesh.geometry = new THREE.BufferGeometry();
+    }
+    this.routeLayer.visible = this.waypoint.visible = this.approachEndpoint.visible = false;
+  }
+
+  private updateRoute(recon: Recon) {
+    const data = readRoute(recon);
+    if (!data) {
+      if (this.routeData) this.clearRoute();
+      return;
+    }
+    const key = `${data.floorY}|${data.points.join(";")}`;
+    if (key !== this.routeKey) {
+      this.routeKey = key;
+      const meshes = [this.routeBorder, this.route, this.routeMarks];
+      const vertices = [routeRibbon(data.points, data.floorY + 0.055, 0.23),
+        routeRibbon(data.points, data.floorY + 0.06, 0.16), routeChevrons(data.points, data.floorY + 0.067)];
+      for (let i = 0; i < meshes.length; i++) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.BufferAttribute(vertices[i], 3));
+        geometry.computeBoundingSphere();
+        meshes[i].geometry.dispose();
+        meshes[i].geometry = geometry;
+      }
+    }
+    this.routeData = data;
+    this.waypoint.visible = data.waypoint !== null;
+    if (data.waypoint) this.waypoint.position.set(data.waypoint[0], data.floorY + 0.075, data.waypoint[1]);
+    const end = data.points[data.points.length - 1];
+    this.approachEndpoint.position.set(end[0], data.floorY + 0.075, end[1]);
+    this.approachEndpoint.visible = true;
+    this.updateRouteVisibility();
   }
 
   setAutoFit(value: boolean) { this.autoFit = value; if (value) this.fit(); }
@@ -285,9 +359,10 @@ export class RoomView {
     this.mapVersion = undefined;
     this.cloudKey = this.gridCells = this.routeKey = "";
     this.cloudGeometry.setDrawRange(0, 0);
-    this.route.geometry.setDrawRange(0, 0);
+    this.routeLive = false;
+    this.clearRoute();
     this.hasFloor = false;
-    this.floor.visible = this.route.visible = this.waypoint.visible = false;
+    this.floor.visible = false;
     this.recon = null;
     this.label.hidden = true;
     this.needsFit = true;
@@ -347,6 +422,9 @@ export class RoomView {
     const count = this.pointCount;
     for (let i = 0; i < count; i++) box.expandByPoint(this.project.fromArray(this.positions, i * 3));
     for (const t of this.recon?.targets ?? []) if (t.selected) box.expandByPoint(this.project.fromArray(t.position));
+    if (this.routeLive && this.routeData) {
+      for (const [x, z] of this.routeData.points) box.expandByPoint(this.project.set(x, this.routeData.floorY, z));
+    }
     if (this.hasPhonePose) {
       box.expandByPoint(this.phonePosition);
       if (this.phoneHeight !== null && this.phoneFloorY !== null) {
@@ -534,15 +612,7 @@ export class RoomView {
     this.floor.position.set(origin[0] + w * res / 2, floorY - 0.025, origin[1] + h * res / 2);
     this.updateTargets(recon);
 
-    const routeKey = `${floorY}|${recon.path.join(";")}`;
-    if (routeKey !== this.routeKey) {
-      this.routeKey = routeKey;
-      this.route.geometry.dispose();
-      this.route.geometry = new THREE.BufferGeometry().setFromPoints(recon.path.map(([x, z]) => new THREE.Vector3(x, floorY + 0.06, z)));
-    }
-    this.route.visible = this.viewMode !== "first" && recon.path.length > 1;
-    this.waypoint.visible = this.viewMode !== "first" && !!recon.waypoint;
-    if (recon.waypoint) this.waypoint.position.set(recon.waypoint[0], floorY + 0.09, recon.waypoint[1]);
+    this.updateRoute(recon);
     const now = performance.now();
     if (this.viewMode !== "first" && this.pointCount && (this.needsFit || this.autoFit && now - this.lastFit > 2000)) {
       this.fit(); this.needsFit = false; this.lastFit = now;

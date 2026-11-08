@@ -1,10 +1,17 @@
 // Read-only room display. The iPhone owns commands, recording and guidance audio.
 import { RoomView, type RoomViewMode } from "./room-view";
 import { PhoneState } from "./phone-state";
+import { PathfindingDemo } from "./pathfinding-demo";
+import { routeStatus } from "./route-status";
 import type { PhonePose, Recon } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const params = new URLSearchParams(location.search);
+const demo = params.get("demo") === "pathfinding" ? new PathfindingDemo() : null;
+let demoElapsed = 0;
+let demoPlaying = false;
+let demoClock = performance.now();
+let demoTimer = 0;
 const endpoint = new URL(location.href);
 endpoint.port = params.get("backend") ?? "8787";
 const socketURL = `${location.protocol === "https:" ? "wss:" : "ws:"}//${endpoint.host}/ws/viewer`;
@@ -72,6 +79,7 @@ function clearScene() {
   $("mappedArea").textContent = "—";
   $("targetCard").hidden = true;
   $("noTarget").hidden = false;
+  $("routeLegend").hidden = true;
 }
 
 function displayPhone(snapshot: PhonePose) {
@@ -91,7 +99,7 @@ function displaySnapshot(snapshot: Recon) {
   pointCount = metric?.points ?? 0;
   $("pointCount").textContent = pointCount.toLocaleString();
   $("mappedArea").textContent = metric ? metric.area.toFixed(1) : "—";
-  $("injected").hidden = snapshot.perception !== "injected";
+  $("injected").hidden = !!demo || snapshot.perception !== "injected";
   const target = snapshot.targets.find(t => t.selected);
   $("targetCard").hidden = !target;
   $("noTarget").hidden = !!target;
@@ -112,13 +120,23 @@ function updateFreshness() {
   const frameAge = typeof age === "number" ? age + Number(recon?.stats.frame_age_ms ?? 0) + elapsed : Infinity;
   const live = connected && elapsed < 1500 && frameAge < 2500
     && phone.state === "live";
+  const route = routeStatus(recon, { connected, elapsedMs: elapsed, phoneLive: phone.state === "live" });
+  room?.setRouteLive(route.visible);
+  $("routeLegend").hidden = !recon?.navigation;
+  $("routeLegend").dataset.active = String(route.visible);
+  $("routeStatus").textContent = route.text;
+  $("routeKey").hidden = !route.visible;
   const injected = recon?.perception === "injected";
-  if (currentView === "first") $("interactionHint").textContent = phone.state === "live"
+  if (currentView === "first") $("interactionHint").textContent = demo
+    ? "Demo phone camera · Play the route to move"
+    : phone.state === "live"
     ? "Following iPhone · Move the phone to look around"
     : "Last iPhone view · Waiting for live tracking";
   $("connection").dataset.state = live ? "live" : recon ? "paused" : "waiting";
   $("connectionText").textContent = live ? injected ? "Debug feed" : "Live" : !connected ? "Connecting" : pointCount ? "Scan paused" : "Waiting for iPhone";
-  $("frameAge").textContent = !live && Number.isFinite(frameAge)
+  if (demo) $("connectionText").textContent = demoElapsed >= demo.durationSeconds
+    ? "Demo complete" : demoPlaying ? "Demo playing" : "Demo paused";
+  $("frameAge").textContent = !demo && !live && Number.isFinite(frameAge)
     ? frameAge < 60_000 ? `${(frameAge / 1000).toFixed(1)}s ago` : `${Math.floor(frameAge / 60_000)}m ago`
     : "";
   $("emptyHint").textContent = !connected
@@ -131,7 +149,7 @@ function updateFreshness() {
     const distance = phone.position ? Math.hypot(...target.position.map((v, i) => v - phone.position![i])) : null;
     $("targetDistance").textContent = distance === null ? "—" : `${distance.toFixed(1)} m`;
     const stale = !live || target.age + elapsed / 1000 > 1.5;
-    $("targetState").textContent = !target.valid ? "Unverified" : !live ? "" : stale ? "Last seen" : "Tracked";
+    $("targetState").textContent = demo ? "Demo target" : !target.valid ? "Unverified" : !live ? "" : stale ? "Last seen" : "Tracked";
   }
 }
 
@@ -155,11 +173,51 @@ function connect() {
   };
 }
 const freshnessTimer = window.setInterval(updateFreshness, 250);
-connect();
+if (demo) {
+  document.title = "Beacon · Pathfinding demo";
+  $("demoControls").hidden = false;
+  document.querySelector<HTMLElement>(".depth-note")!.textContent = "Synthetic geometry";
+  $("sceneScale").setAttribute("aria-label", "Scale: one metre, synthetic demo geometry");
+  connected = true;
+  displaySnapshot(demo.snapshot(0));
+  $("demoPlay").onclick = () => {
+    if (demoElapsed >= demo.durationSeconds) {
+      demoElapsed = 0;
+      phoneState.reset();
+      clearScene();
+    }
+    demoPlaying = !demoPlaying;
+    demoClock = performance.now();
+    $("demoPlay").textContent = demoPlaying ? "Pause" : "Play route";
+    displaySnapshot(demo.snapshot(demoElapsed));
+  };
+  $("demoReset").onclick = () => {
+    demoElapsed = 0;
+    demoPlaying = false;
+    demoClock = performance.now();
+    phoneState.reset();
+    clearScene();
+    $("demoPlay").textContent = "Play route";
+    displaySnapshot(demo.snapshot(0));
+  };
+  demoTimer = window.setInterval(() => {
+    const now = performance.now();
+    if (demoPlaying && !document.hidden) demoElapsed = Math.min(demo.durationSeconds, demoElapsed + (now - demoClock) / 1000);
+    demoClock = now;
+    if (demoElapsed >= demo.durationSeconds) {
+      demoPlaying = false;
+      $("demoPlay").textContent = "Replay";
+    }
+    displaySnapshot(demo.snapshot(demoElapsed));
+  }, 100);
+} else {
+  connect();
+}
 
 function dispose() {
   destroyed = true;
   clearInterval(freshnessTimer);
+  clearInterval(demoTimer);
   clearTimeout(retry);
   socket?.close();
   room?.dispose();

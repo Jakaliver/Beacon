@@ -20,12 +20,24 @@
   </header>
   <main aria-label="Room reconstruction">
     <canvas id="roomCanvas" tabindex="0" aria-label="Interactive room scan. Drag to orbit, right-drag to pan, scroll to zoom. Use Overhead for a floor plan."></canvas>
-    <div id="injected" class="notice" hidden>Debug observations · not live camera inference</div>
+    <div class="scene-notices">
+      <div id="injected" class="notice" hidden>Debug observations · not live camera inference</div>
+      <div id="demoControls" class="demo-controls" hidden>
+        <div><strong>Pathfinding demo</strong><span>Synthetic room · no camera connected</span></div>
+        <div class="demo-actions"><button id="demoPlay">Play route</button><button id="demoReset">Reset</button></div>
+      </div>
+    </div>
     <div id="emptyState" class="empty-state"><h2>No scan yet</h2><p id="emptyHint">Open Beacon on your iPhone and scan the room.</p></div>
     <div id="renderError" class="empty-state" hidden><h2>3D view unavailable</h2><p>Enable hardware acceleration or use a browser with WebGL 2 support.</p></div>
     <div id="targetLabel" class="target-label" hidden><span id="targetLabelText"></span></div>
     <div class="canvas-footer">
-      <p id="interactionHint">Drag to pause · Scroll to zoom · 3D to resume</p>
+      <div class="view-notes">
+        <div id="routeLegend" class="route-legend" hidden>
+          <strong id="routeStatus">Waiting for route</strong>
+          <span id="routeKey"><i class="route-swatch" aria-hidden="true"></i>Route <i class="waypoint-swatch" aria-hidden="true"></i>Next waypoint <i class="approach-swatch" aria-hidden="true"></i>Approach</span>
+        </div>
+        <p id="interactionHint">Drag to pause · Scroll to zoom · 3D to resume</p>
+      </div>
       <div id="sceneScale" class="scale" aria-label="Scale: one metre, estimated depth"><span id="scaleBar"></span><span>1 m</span><span class="depth-note">Estimated depth</span></div>
     </div>
   </main>
