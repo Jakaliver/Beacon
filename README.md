@@ -54,6 +54,8 @@ When pathfinding is active, a mint route with direction arrows shows the planned
 The white diamond marks the next waypoint and the double ring marks the approach point
 near the selected object. The route appears in 3D, Overhead and First person; it hides
 when routing is paused, disabled, or its camera/phone updates become stale.
+Known obstacle surfaces are amber, with a faint amber floor tint for the planner's
+clearance margin. The selected target stays red in both grey and camera-colour views.
 
 For a browser-only example, open
 <http://localhost:5173/reconstruction-viewer/?demo=pathfinding>. **Play route** moves a

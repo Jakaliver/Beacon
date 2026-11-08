@@ -80,6 +80,7 @@ function clearScene() {
   $("targetCard").hidden = true;
   $("noTarget").hidden = false;
   $("routeLegend").hidden = true;
+  $("obstacleKey").hidden = true;
 }
 
 function displayPhone(snapshot: PhonePose) {
@@ -115,6 +116,7 @@ function updateFreshness() {
   room?.updatePhone(phone);
   $<HTMLButtonElement>("viewFirst").disabled = !phone.position || !phone.forward;
   $("emptyState").hidden = !room || pointCount > 0 || !!phone.position;
+  $("obstacleKey").hidden = !room || !recon || !Number.isFinite(recon.floor_y) || pointCount === 0;
   const elapsed = lastSnapshot ? performance.now() - lastSnapshot : Infinity;
   const age = recon?.stats.observation_age_ms;
   const frameAge = typeof age === "number" ? age + Number(recon?.stats.frame_age_ms ?? 0) + elapsed : Infinity;

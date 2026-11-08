@@ -7,6 +7,7 @@ import type { Recon } from "./types";
 
 const MAX_POINTS = 60_000;
 const RED = 0xee5252;
+const OBSTACLE = new THREE.Color(0xf5b75d);
 const ORBIT_ELEVATION = Math.PI / 6;
 const decode = (base64: string) => {
   const binary = atob(base64);
@@ -14,7 +15,7 @@ const decode = (base64: string) => {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 };
-const PALETTE = [[0, 0, 0, 0], [48, 48, 48, 85], [108, 108, 108, 95], [52, 52, 52, 65], [38, 38, 38, 50]];
+const PALETTE = [[0, 0, 0, 0], [48, 48, 48, 85], [245, 183, 93, 190], [174, 122, 59, 65], [38, 38, 38, 50]];
 const roundedRectangle = (width: number, height: number, radius: number) => {
   const x = -width / 2, y = -height / 2;
   const shape = new THREE.Shape();
@@ -65,6 +66,8 @@ export class RoomView {
   // The point colours, floor texture and route are rebuilt only when their inputs change.
   private cloudKey = "";
   private gridCells = "";
+  private gridShape = "";
+  private occupancy = new Uint8Array(0);
   private routeKey = "";
   private pointCount = 0;
   private observedCells = 0;
@@ -357,7 +360,8 @@ export class RoomView {
     this.decodedCount = this.pointCount = this.observedCells = 0;
     this.imageColors = null;
     this.mapVersion = undefined;
-    this.cloudKey = this.gridCells = this.routeKey = "";
+    this.cloudKey = this.gridCells = this.gridShape = this.routeKey = "";
+    this.occupancy = new Uint8Array(0);
     this.cloudGeometry.setDrawRange(0, 0);
     this.routeLive = false;
     this.clearRoute();
@@ -537,6 +541,15 @@ export class RoomView {
     }
     this.recon = recon;
     const floorY = recon.floor_y ?? 0;
+    const knownFloor = typeof recon.floor_y === "number" && Number.isFinite(recon.floor_y);
+    const { w, h, res, origin } = recon.grid;
+    const gridShape = `${w}|${h}|${res}|${origin.join(",")}`;
+    const gridChanged = recon.grid.cells !== this.gridCells || gridShape !== this.gridShape;
+    if (gridChanged) {
+      this.occupancy = decode(recon.grid.cells);
+      // Navigation evidence can change while the fused display cloud stays the same.
+      this.cloudKey = "";
+    }
     this.grid.position.set(Math.round(recon.grid.origin[0] + recon.grid.w * recon.grid.res / 2), floorY - 0.04, Math.round(recon.grid.origin[1] + recon.grid.h * recon.grid.res / 2));
     const version = recon.points_version ?? recon.stats.map_version;
     // Light snapshots omit an unchanged point cloud; keep the one already decoded.
@@ -555,7 +568,7 @@ export class RoomView {
       this.cloudKey = "";
     }
     const selected = recon.targets.find(t => t.selected && t.valid);
-    const cloudKey = [this.mapVersion, this.colourMode, floorY, selected?.id, selected?.position, selected?.extent].join("|");
+    const cloudKey = [this.mapVersion, this.colourMode, floorY, knownFloor, selected?.id, selected?.position, selected?.extent].join("|");
     if (!recon.points_fused || cloudKey !== this.cloudKey) {
       this.cloudKey = cloudKey;
       const count = this.pointCount = recon.points_fused ? this.decodedCount : this.scan.writeTo(this.positions);
@@ -565,27 +578,39 @@ export class RoomView {
           && Math.abs(x - selected.position[0]) < selected.extent[0] / 2 + 0.025
           && Math.abs(y - selected.position[1]) < selected.extent[1] / 2 + 0.025
           && Math.abs(z - selected.position[2]) < selected.extent[2] / 2 + 0.025;
+        const col = Math.floor((x - origin[0]) / res), row = Math.floor((z - origin[1]) / res);
+        // Occupied columns come from the planner. Floor returns and the inflated
+        // clearance margin are not physical obstacle points; targets retain red.
+        const inObstacle = knownFloor && y - floorY > 0.06 && y - floorY < 2.1
+          && row >= 0 && row < h && col >= 0 && col < w
+          && this.occupancy[row * w + col] === 2;
         // Quiet floor returns; bright furniture and walls make height legible.
         const shade = THREE.MathUtils.clamp(0.20 + (y - floorY) * 0.40, 0.16, 0.9);
-        if (this.colourMode && this.imageColors && this.imageColors.length >= count * 3) {
+        if (inTarget) {
+          this.colors[j] = 1;
+          this.colors[j + 1] = 0.065;
+          this.colors[j + 2] = 0.08;
+        } else if (inObstacle) {
+          this.colors[j] = OBSTACLE.r;
+          this.colors[j + 1] = OBSTACLE.g;
+          this.colors[j + 2] = OBSTACLE.b;
+        } else if (this.colourMode && this.imageColors && this.imageColors.length >= count * 3) {
           this.rgb.setRGB(this.imageColors[j] / 255, this.imageColors[j + 1] / 255,
             this.imageColors[j + 2] / 255, THREE.SRGBColorSpace);
-          this.colors[j] = inTarget ? 1 : this.rgb.r;
-          this.colors[j + 1] = inTarget ? 0.065 : this.rgb.g;
-          this.colors[j + 2] = inTarget ? 0.08 : this.rgb.b;
+          this.colors[j] = this.rgb.r;
+          this.colors[j + 1] = this.rgb.g;
+          this.colors[j + 2] = this.rgb.b;
         } else {
-          this.colors[j] = inTarget ? 1 : shade;
-          this.colors[j + 1] = inTarget ? 0.065 : shade;
-          this.colors[j + 2] = inTarget ? 0.08 : shade;
+          this.colors[j] = this.colors[j + 1] = this.colors[j + 2] = shade;
         }
       }
       this.cloudGeometry.setDrawRange(0, count);
       this.cloudGeometry.attributes.position.needsUpdate = this.cloudGeometry.attributes.color.needsUpdate = true;
     }
 
-    const { w, h, res, origin } = recon.grid;
-    if (recon.grid.cells !== this.gridCells) {
+    if (gridChanged) {
       this.gridCells = recon.grid.cells;
+      this.gridShape = gridShape;
       if (!this.texture || this.texture.image.width !== w || this.texture.image.height !== h) {
         this.texture?.dispose();
         this.texture = new THREE.DataTexture(new Uint8Array(w * h * 4), w, h);
@@ -594,7 +619,7 @@ export class RoomView {
         this.floor.material.map = this.texture;
         this.floor.material.needsUpdate = true;
       }
-      const cells = decode(recon.grid.cells);
+      const cells = this.occupancy;
       const pixels = this.texture.image.data as Uint8Array;
       let observed = 0;
       for (let row = 0; row < h; row++) for (let col = 0; col < w; col++) {
@@ -605,8 +630,8 @@ export class RoomView {
       }
       this.texture.needsUpdate = true;
       this.observedCells = observed;
-      this.hasFloor = observed > 0;
     }
+    this.hasFloor = this.observedCells > 0 && knownFloor;
     this.floor.visible = this.viewMode !== "first" && this.hasFloor;
     this.floor.scale.set(w * res, h * res, 1);
     this.floor.position.set(origin[0] + w * res / 2, floorY - 0.025, origin[1] + h * res / 2);
