@@ -79,6 +79,7 @@ struct ContentView: View {
         .onChange(of: model.recording) { _, recording in
             if recording { showSettings = false }
         }
+        .onDisappear { model.cancelTalking() }
     }
 
     private var header: some View {
@@ -109,30 +110,32 @@ struct ContentView: View {
     }
 
     private var navigateButton: some View {
-        Button { model.talkToBeacon() } label: {
-            VStack(spacing: 16) {
-                Image(systemName: model.recording ? "waveform" : model.transcribing ? "ellipsis" : "mic.fill")
-                    .font(.system(size: 28, weight: .medium))
-                    .accessibilityHidden(true)
-                VStack(spacing: 6) {
-                    Text(model.recording ? "Listening…" : model.transcribing ? "Sending request…" : "Talk to Beacon")
-                        .font(.title2.weight(.semibold))
-                    Text(model.recording ? "Pause to send, or tap again" : model.transcribing ? "One moment" : "Tap, speak, then pause to send")
-                        .font(.subheadline)
-                        .opacity(0.7)
-                }
-                .multilineTextAlignment(.center)
+        VStack(spacing: 16) {
+            Image(systemName: model.recording ? "waveform" : model.transcribing ? "ellipsis" : "mic.fill")
+                .font(.system(size: 28, weight: .medium))
+            VStack(spacing: 6) {
+                Text(model.recording ? "Listening…" : model.transcribing ? "Sending request…" : "Talk to Beacon")
+                    .font(.title2.weight(.semibold))
+                Text(model.recording ? "Release to send" : model.transcribing ? "One moment" : "Hold to speak · release to send")
+                    .font(.subheadline)
+                    .opacity(0.7)
             }
-            .foregroundStyle(Color(.systemBackground))
-            .padding(24)
-            .frame(maxWidth: .infinity, minHeight: 190)
-            .background(Color.primary.opacity(connected ? 1 : 0.35), in: RoundedRectangle(cornerRadius: 22))
-            .contentShape(RoundedRectangle(cornerRadius: 22))
+            .multilineTextAlignment(.center)
         }
-        .buttonStyle(.plain)
-        .disabled(!connected || model.transcribing)
-        .accessibilityLabel(model.recording ? "Listening. Send request" : model.transcribing ? "Sending request" : "Talk to Beacon")
-        .accessibilityHint("Tap to speak. Pause to send automatically, or tap again to send now.")
+        .foregroundStyle(Color(.systemBackground))
+        .padding(24)
+        .frame(maxWidth: .infinity, minHeight: 190)
+        .background(Color.primary.opacity(connected ? (model.recording ? 0.8 : 1) : 0.35), in: RoundedRectangle(cornerRadius: 22))
+        .accessibilityHidden(true)
+        .overlay {
+            HoldToTalkControl(
+                enabled: connected && !model.transcribing,
+                label: model.recording ? "Listening. Release to send" : model.transcribing ? "Sending request" : "Talk to Beacon",
+                onPress: model.beginTalking,
+                onRelease: model.endTalking,
+                onCancel: model.cancelTalking
+            )
+        }
     }
 
     private var statusTitle: String {
@@ -148,15 +151,77 @@ struct ContentView: View {
     }
 
     private var statusDetail: String {
-        if model.recording { return "Say what to find. Your request sends when you pause." }
+        if model.recording { return "Keep holding while you speak. Release to send your request." }
         if model.transcribing { return "You can tap Stop to cancel." }
         if !connected { return "Connect to the same Wi-Fi and add your Mac’s address in Settings." }
         if model.tracking != "normal" { return "Point the camera at the room and move slowly while tracking settles." }
         if !model.choices.isEmpty { return "More than one match is in view." }
         if guiding { return "Follow the object’s sound. Tap Stop whenever you need to pause." }
         if model.mode == "searching" { return "Slowly scan the room with the camera." }
-        if model.stopReason != nil || model.mode == "stopped" { return "Tap below and say “resume”, or ask for a different object." }
-        return "Calibrate, then tap below and say what you want to find."
+        if model.stopReason != nil || model.mode == "stopped" { return "Hold below and say “resume”, or ask for a different object." }
+        return "Calibrate, then hold below and say what you want to find."
+    }
+}
+
+/// UIKit supplies distinct release and cancellation events, including when a scroll
+/// or system gesture takes over. A cancelled hold must never send a partial request.
+private struct HoldToTalkControl: UIViewRepresentable {
+    let enabled: Bool
+    let label: String
+    let onPress: () -> Void
+    let onRelease: () -> Void
+    let onCancel: () -> Void
+
+    func makeUIView(context: Context) -> Control { Control() }
+
+    func updateUIView(_ control: Control, context: Context) {
+        control.onPress = onPress
+        control.onRelease = onRelease
+        control.onCancel = onCancel
+        if !enabled { control.cancelTracking(with: nil) }
+        control.isEnabled = enabled
+        control.isAccessibilityElement = true
+        control.accessibilityTraits = enabled ? .button : [.button, .notEnabled]
+        control.accessibilityLabel = label
+        control.accessibilityHint = "Double-tap and hold to speak, then lift your finger to send."
+    }
+
+    static func dismantleUIView(_ control: Control, coordinator: ()) {
+        control.cancelTracking(with: nil)
+    }
+
+    final class Control: UIControl {
+        var onPress: (() -> Void)?
+        var onRelease: (() -> Void)?
+        var onCancel: (() -> Void)?
+        private var holding = false
+
+        override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
+            guard isEnabled, !holding else { return false }
+            holding = true
+            onPress?()
+            return true
+        }
+
+        override func continueTracking(_ touch: UITouch, with event: UIEvent?) -> Bool { true }
+
+        override func endTracking(_ touch: UITouch?, with event: UIEvent?) {
+            guard holding else { return }
+            holding = false
+            onRelease?()
+        }
+
+        override func cancelTracking(with event: UIEvent?) {
+            super.cancelTracking(with: event)
+            guard holding else { return }
+            holding = false
+            onCancel?()
+        }
+
+        override func accessibilityActivate() -> Bool {
+            UIAccessibility.post(notification: .announcement, argument: accessibilityHint)
+            return true
+        }
     }
 }
 

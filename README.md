@@ -4,10 +4,10 @@ Beacon uses an iPhone camera and local Mac models to locate objects and provide 
 audio guidance. The iPhone runs the app, captures ARKit poses and camera frames, accepts
 commands and plays guidance through headphones. The Mac runs depth estimation, object
 recognition, button-request speech recognition, mapping and target tracking locally.
-Voice requests start only when you tap **Talk to Beacon** on the screen. Speak, then
-pause to send, or tap again to send early. The Mac transcribes the recording locally.
+Hold **Talk to Beacon** on the screen while you speak, then release to send.
+Recording continues through pauses until you release. The Mac transcribes it locally.
 Found objects play spatial beeps by default; choose **Beeps** or **Chest** in Settings.
-Tap and say **"loot mode on"** for the chest sound or **"loot mode off"** for
+Hold and say **"loot mode on"** for the chest sound or **"loot mode off"** for
 Beeps. The choice is remembered and does not resume a paused search.
 Within reach (probe mode) the phone works like a torch: the beep's pitch rises from low
 to middle to high as the phone points nearer to the object, and it beeps faster as the
@@ -28,7 +28,7 @@ scripts/dev.sh     # backend on :8787, room view on :5173
 Open <http://localhost:5173>. Keep Beacon open on an iPhone connected to the same Wi-Fi.
 See [iPhone setup](docs/real-device.md) for signing, installation and connection settings.
 
-On the iPhone, tap **Calibrate**, then **Talk to Beacon**: speak, then pause to send.
+On the iPhone, tap **Calibrate**, then hold **Talk to Beacon**, speak and release to send.
 **Stop** appears during active requests or guidance. Connection settings live behind the gear.
 Use the iPhone app to find an object. Its selected target appears automatically in the room
 view. **3D** slowly circles the scan at 30° above horizontal, completing a turn in 90

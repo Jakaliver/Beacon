@@ -59,8 +59,13 @@ final class AppModel: ObservableObject {
     let voice = VoiceSession(allowsHandsFree: false)
     private var transcription: Task<Void, Never>?
     private var transcriptionGeneration = 0
-    private var buttonRequest: Task<Void, Never>?
-    private var buttonRecording: Task<Void, Never>?
+    private lazy var buttonHold = HoldToTalkSession(
+        requestPermission: { await AVAudioApplication.requestRecordPermission() },
+        startRecording: { [weak self] in self?.startTalking() ?? false },
+        sendRecording: { [weak self] in self?.stopTalking() },
+        discardRecording: { [weak self] in self?.discardRecording() },
+        permissionDenied: { [weak self] in self?.voice.say("Allow microphone access in Settings.") }
+    )
     // A reset remains authoritative until a new search. Network latency must never
     // let old guidance, choices or speech restart a cancelled session.
     private var searchCleared = false
@@ -220,7 +225,7 @@ final class AppModel: ObservableObject {
             refreshGuidanceSound()
             voice.say(enabled ? "Loot mode on." : "Loot mode off.")
         case .help:
-            voice.say("Tap Talk to Beacon, then say find, calibrate, pause, resume, found it, or loot mode on or off.")
+            voice.say("Hold Talk to Beacon, say find, calibrate, pause, resume, found it, or loot mode on or off, then release.")
         case .disableVoice: voice.disable()
         }
     }
@@ -310,61 +315,32 @@ final class AppModel: ObservableObject {
         voice.say("Okay.")
     }
 
-    private func startTalking() {
-        guard !recording, !transcribing else { return }
-        guard controlUp && sensorUp else { return voice.say("Not connected to the Mac.") }
-        cancelTranscription()
+    private func startTalking() -> Bool {
+        guard foreground, !interrupted, controlUp, sensorUp, !recording, !transcribing else { return false }
         voice.hush()
         audio.silence()
         resetProbe()
         recording = talk.start()
         if !recording {
             voice.say("Microphone not available.")
-        }
-    }
-
-    /// A screen tap starts one request. Tap again to send early, or pause to send.
-    func talkToBeacon() {
-        if recording { stopTalking(); return }
-        guard foreground, !transcribing else { return }
-        guard controlUp && sensorUp else { return voice.say("Not connected to the Mac.") }
-        if buttonRequest != nil {
-            cancelTranscription()
-            return
-        }
-        buttonRequest = Task { [weak self] in
-            guard let self else { return }
-            defer { if !Task.isCancelled { self.buttonRequest = nil } }
-            let allowed = await AVAudioApplication.requestRecordPermission()
-            guard !Task.isCancelled, self.foreground else { return }
-            self.buttonRequest = nil
-            guard allowed else {
-                self.voice.say("Allow microphone access in Settings.")
-                return
-            }
-            self.startTalking()
-            guard self.recording else { return }
+        } else {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            self.buttonRecording = Task { [weak self] in
-                var endpoint = VoiceRequestEndpoint()
-                let began = ProcessInfo.processInfo.systemUptime
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .milliseconds(50))
-                    guard !Task.isCancelled, let self, self.recording else { return }
-                    if endpoint.shouldFinish(at: ProcessInfo.processInfo.systemUptime - began,
-                                             power: self.talk.averagePower, isRecording: self.talk.isRecording) {
-                        self.stopTalking()
-                        return
-                    }
-                }
-            }
         }
+        return recording
     }
 
-    func stopTalking() {
+    func beginTalking() {
+        guard foreground, !interrupted, !recording, !transcribing else { return }
+        guard controlUp && sensorUp else { return voice.say("Not connected to the Mac.") }
+        buttonHold.press()
+    }
+
+    func endTalking() { buttonHold.release() }
+
+    func cancelTalking() { buttonHold.cancel() }
+
+    private func stopTalking() {
         guard recording else { return }
-        buttonRecording?.cancel()
-        buttonRecording = nil
         recording = false
         let wav = talk.stop()
         transcriptionGeneration += 1
@@ -395,14 +371,15 @@ final class AppModel: ObservableObject {
     }
 
     private func cancelTranscription() {
-        buttonRequest?.cancel()
-        buttonRequest = nil
-        buttonRecording?.cancel()
-        buttonRecording = nil
+        buttonHold.cancel()
         transcriptionGeneration += 1
         transcription?.cancel()
         transcription = nil
         transcribing = false
+        discardRecording()
+    }
+
+    private func discardRecording() {
         if recording {
             _ = talk.stop()
             recording = false

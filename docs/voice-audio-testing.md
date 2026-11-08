@@ -1,7 +1,7 @@
 # Voice and spatial audio testing
 
-Beacon uses **Calibrate** and **Talk to Beacon** on the main screen. Tap to record,
-speak and pause to send, or tap again to send early. The Mac transcribes the recording.
+Beacon uses **Calibrate** and **Talk to Beacon** on the main screen. Hold to record,
+speak and release to send. The Mac transcribes the recording.
 There is no wake-word listening or Action button activation in the main app. Use a
 physical iPhone for microphone, spatial audio and AR tracking checks.
 
@@ -35,7 +35,7 @@ Use a well-lit room, a bottle or another object supported by the current detecto
 and headphones paired with the iPhone. Start at a low camera frame rate if the test
 Mac is slow. Stay in a clear area while checking spatial audio.
 
-For each spoken request below, tap **Talk to Beacon**, speak and pause to send.
+For each spoken request below, hold **Talk to Beacon**, speak and release to send.
 
 1. Open Beacon and tap **Calibrate** with the phone pointing ahead. With compatible
    AirPods, face the same direction. Allow Microphone access when first recording.

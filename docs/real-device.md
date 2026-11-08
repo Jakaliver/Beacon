@@ -110,24 +110,28 @@ Allow incoming connections for the backend if macOS prompts. Use the Mac's Wi-Fi
    and an increasing point count.
 3. Hold the phone ahead of your torso, facing forward, and tap **Calibrate**. If testing
    head tracking, wear compatible AirPods paired with the phone during calibration.
-4. Tap **Talk to Beacon**, say **find the bottle**, then pause to send automatically. Tap
-   again to send early. With VoiceOver, double-tap the button. The app must remain open.
+4. Hold **Talk to Beacon**, say **find the bottle**, then release to send.
+   With VoiceOver, double-tap and hold, then lift your finger. The app must remain open.
 5. The selected target appears red in the Mac view. Keep it visible while moving closer:
    consistent new sightings refine its position and surface. Larger corrections require
    three agreeing observations so a single bad depth frame does not move the target.
 6. **Stop** appears while a request or guidance is active. It silences guidance and cancels
-   any pending voice request. To continue, tap the button and say **"resume"**, or ask
-   for another object. Audio changes and app interruptions can also stop guidance.
+   any pending voice request. To continue, hold the button, say **"resume"** and release,
+   or ask for another object. Audio changes and app interruptions can also stop guidance.
 
 ### Recording a request
 
-Tap **Talk to Beacon**, speak and pause. Roughly one second of silence after speech
-sends the request, or tap again to send early. Recording is capped at six seconds.
+Hold **Talk to Beacon** while speaking, then release to send. Pauses do not end the
+recording, and longer requests are no longer cut off at six seconds. If the microphone
+permission prompt interrupts your first hold, allow access, then hold the button again.
 **Stop** cancels without sending. Leaving the app cancels recording and pending requests.
 The microphone stays closed between requests; the main app does not request Speech
 Recognition access or offer an Action button shortcut.
 
-`bash scripts/test-action-button.sh` checks the shared end-of-request timing.
+`bash scripts/test-hold-to-talk.sh` checks release, cancellation and delayed microphone permissions.
+On the phone, hold for more than six seconds with a pause between words: **Listening…**
+should remain until release, then one request should send. Leaving the app during a hold
+should discard that recording, with no request sent when you return.
 
 ### Reading the room view
 
@@ -174,7 +178,7 @@ the sound aligned with the object. The reverb is a room preset, not measured roo
 | `vision_ready: false` / `speech_ready: false` | Wait for model loading and check the backend terminal. Re-run setup online if downloads did not finish. |
 | Connected, but no room points | Allow Camera/Local Network access, wait for normal tracking, scan the floor, and check `vision_ready`. |
 | Room stops changing | Check the camera age in the viewer and keep the iPhone app foregrounded. |
-| Speech works, but guidance is silent | Connect AirPods to the **iPhone**, check its audio output, then send a new **find** command or tap **Talk to Beacon** and say **"resume"**. Listen for the spoken stop reason if guidance pauses. |
+| Speech works, but guidance is silent | Connect AirPods to the **iPhone**, check its audio output, then send a new **find** command or hold **Talk to Beacon**, say **"resume"** and release. Listen for the spoken stop reason if guidance pauses. |
 | Sounds turn the wrong way with your head | Recalibrate while facing ahead; try the app's **Reverse head turn** setting. |
 
 For a playback check independent of camera detection, launch an installed **Debug** build

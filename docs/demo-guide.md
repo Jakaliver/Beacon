@@ -5,7 +5,7 @@
 3. Keep AirPods connected to the iPhone. Use the phone for commands and audio guidance.
 4. Scan a well-lit floor and nearby furniture slowly. The web view builds a grey point cloud,
    with the iPhone marked **YOU**. The header shows **Live** when observations are fresh.
-5. Tap **Talk to Beacon**, say **"find the bottle"**, and pause. Once selected, it appears in
+5. Hold **Talk to Beacon**, say **"find the bottle"**, and release. Once selected, it appears in
    red in the web view with its estimated distance. The browser does not select targets.
 6. Switch between **3D** and **Overhead**. **Fit room** restores automatic framing after
    manual camera movement. **Locate** centres the selected target.

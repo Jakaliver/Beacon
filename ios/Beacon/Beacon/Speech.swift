@@ -237,12 +237,6 @@ final class PushToTalk {
     private var recorder: AVAudioRecorder?
     private let url = FileManager.default.temporaryDirectory.appendingPathComponent("ptt.wav")
 
-    var isRecording: Bool { recorder?.isRecording ?? false }
-    var averagePower: Float {
-        recorder?.updateMeters()
-        return recorder?.averagePower(forChannel: 0) ?? -160
-    }
-
     func start() -> Bool {
         let session = AVAudioSession.sharedInstance()
         if let mic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
@@ -257,9 +251,8 @@ final class PushToTalk {
             AVLinearPCMIsBigEndianKey: false,
         ]
         guard let recorder = try? AVAudioRecorder(url: url, settings: settings) else { return false }
-        recorder.isMeteringEnabled = true
         self.recorder = recorder
-        return recorder.record(forDuration: 6)
+        return recorder.record()
     }
 
     func stop() -> Data? {
