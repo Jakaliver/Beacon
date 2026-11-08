@@ -67,6 +67,8 @@ final class AudioGuide {
     private var lastHeadSample = -TimeInterval.infinity
     private var baseForward = SIMD3<Float>(0, 0, -1)
     private var listenerPosition = SIMD3<Float>(0, 0, 0)
+    private var listenerTarget: SIMD3<Float>?
+    private var listenerMotion = GuidanceListenerMotion()
     private var listenerForward = SIMD3<Float>(0, 0, -1)
     private var listenerUp = SIMD3<Float>(0, 1, 0)
 
@@ -346,6 +348,10 @@ final class AudioGuide {
 
     /// Call with `headLock` held.
     private func updateListener() {
+        if let target = listenerTarget,
+           let position = listenerMotion.update(towards: target, at: ProcessInfo.processInfo.systemUptime) {
+            listenerPosition = position
+        }
         let f = simd_normalize(listenerForward)
         let right = simd_normalize(simd_cross(f, listenerUp))
         let up = simd_cross(right, f)
@@ -359,10 +365,13 @@ final class AudioGuide {
     func setListener(_ position: SIMD3<Float>) {
         let adjust = Float(UserDefaults.standard.double(forKey: Settings.soundHeightKey))
         headLock.withLock {
-            listenerPosition = position + SIMD3<Float>(0, 0.45 - adjust, 0)
+            listenerTarget = position + SIMD3<Float>(0, 0.45 - adjust, 0)
             updateListener()
         }
     }
+
+    /// Advance translation smoothly even between incoming camera/network poses.
+    func updateSpatialAudio() { headLock.withLock { updateListener() } }
 
     /// Call while the user faces where the phone points: that world direction becomes "ahead".
     func setForward(_ forward: SIMD3<Float>) {
@@ -398,6 +407,7 @@ final class AudioGuide {
         guard ensureRunning(), let duration = clipDurations[name],
               cueTiming.start(at: ProcessInfo.processInfo.systemUptime, duration: duration) else { return false }
         let p = position ?? headLock.withLock { listenerPosition + simd_normalize(listenerForward) * 0.6 }
+        guard p.x.isFinite, p.y.isFinite, p.z.isFinite else { return false }
         var transform = matrix_identity_float4x4
         transform.columns.3 = SIMD4(p, 1)
         source.transform = transform

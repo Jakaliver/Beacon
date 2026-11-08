@@ -112,6 +112,21 @@ struct HoldToTalkSessionTests {
         next.session.release()
         precondition(quick.permissions.isEmpty && quick.starts == 0, "A released touch cannot request permission later")
 
-        print("Hold-to-talk: release, duplicate touches, cancellation, stale permissions, denial and recorder failure passed")
+        let action = Microphone()
+        action.session.toggle()
+        await waitFor { action.permissions.count == 1 }
+        action.permissions[0].resume(returning: true)
+        await waitFor { action.starts == 1 }
+        precondition(action.session.isActive && action.sends == 0, "First Action activation keeps recording")
+        action.session.toggle()
+        precondition(!action.session.isActive && action.sends == 1, "Second Action activation sends exactly once")
+        action.session.toggle()
+        await waitFor { action.permissions.count == 2 }
+        action.session.toggle()
+        action.permissions[1].resume(returning: true)
+        await waitFor { action.returned == 2 }
+        await Task.yield()
+        precondition(action.starts == 1 && action.sends == 1, "Second activation during permission cancels a pending start")
+        print("Talk controls: screen hold/release, Action toggle, cancellation, stale permissions and recorder failure passed")
     }
 }

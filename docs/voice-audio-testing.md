@@ -2,7 +2,8 @@
 
 Beacon uses **Calibrate** and **Talk to Beacon** on the main screen. Hold to record,
 speak and release to send. The Mac transcribes the recording.
-There is no wake-word listening or Action button activation in the main app. Use a
+The Action button shortcut also supports activate-to-start, activate-again-to-send.
+There is no wake-word listening in the main app. Use a
 physical iPhone for microphone, spatial audio and AR tracking checks.
 
 ## Get the app and install
@@ -75,6 +76,20 @@ Check the beeps very close to the object as well as farther away. They use fixed
 headroom, no automatic loudness boost, and distance gain capped at unity. New notes wait
 for the preceding cue to finish; guidance also waits while the app speaks. The room
 reverb remains enabled. Listen for crackle during quick approach/close transitions.
+Live listener-position updates are smoothed, and output-route notifications only restart
+audio when the actual output or format changes. Compare stationary test beeps with live
+guidance while moving the phone; both should remain clean.
+
+With either Beeps or Chest selected, proximity vibrations begin within 1.2 m during
+close guidance. They grow stronger, longer and faster as the phone approaches, reaching
+full intensity within 5 cm. Rotate the phone without moving it: pulse strength should
+remain unchanged. Recording, Stop, lost tracking and leaving the app must stop vibrations.
+
+For the Action button, choose Settings → Action Button → Shortcut → Beacon →
+**Talk to Beacon**. iOS activates it with a press-and-hold: the first activation starts
+recording and the next sends, with no silence timeout. Test a cold launch and an already
+open app. Test activating twice during connection/permission setup: no delayed recording
+should start after cancellation. The on-screen control remains hold-to-talk.
 
 ## Speaking voice
 

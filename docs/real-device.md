@@ -126,7 +126,9 @@ recording, and longer requests are no longer cut off at six seconds. If the micr
 permission prompt interrupts your first hold, allow access, then hold the button again.
 **Stop** cancels without sending. Leaving the app cancels recording and pending requests.
 The microphone stays closed between requests; the main app does not request Speech
-Recognition access or offer an Action button shortcut.
+Recognition access. To use the Action button, choose Settings → Action Button → Shortcut
+→ Beacon → **Talk to Beacon**. Press and hold to activate: once to start recording,
+again to stop and send. The on-screen control remains hold-to-talk.
 
 `bash scripts/test-hold-to-talk.sh` checks release, cancellation and delayed microphone permissions.
 On the phone, hold for more than six seconds with a pause between words: **Listening…**
@@ -174,7 +176,9 @@ All speech and spatial guidance play on the iPhone. The browser never opens an a
 microphone session and cannot change the phone's guidance state.
 Guidance defaults to **Beeps**: clean beeps accelerate as the phone approaches the object,
 then become a short, rising double beep inside the close-distance threshold (normally 20 cm).
-Phone rotation does not change proximity feedback. Sounds retain distance attenuation
+Phone rotation does not change proximity feedback. Vibrations become stronger and faster
+inside 1.2 m, reaching full strength in the last 5 cm with either sound style.
+Sounds retain distance attenuation
 and audible small-room reverb. Settings → **Object sound** also offers **Chest**, a
 continuous sound at the object that lowers while the app speaks.
 For voice controls and audio acceptance checks, use the

@@ -116,7 +116,7 @@ struct ContentView: View {
             VStack(spacing: 6) {
                 Text(model.recording ? "Listening…" : model.transcribing ? "Sending request…" : "Talk to Beacon")
                     .font(.title2.weight(.semibold))
-                Text(model.recording ? "Release to send" : model.transcribing ? "One moment" : "Hold to speak · release to send")
+                Text(model.recording ? (model.recordingFromActionButton ? "Press Action button again to send" : "Release to send") : model.transcribing ? "One moment" : "Hold to speak · release to send")
                     .font(.subheadline)
                     .opacity(0.7)
             }
@@ -130,7 +130,7 @@ struct ContentView: View {
         .overlay {
             HoldToTalkControl(
                 enabled: connected && !model.transcribing,
-                label: model.recording ? "Listening. Release to send" : model.transcribing ? "Sending request" : "Talk to Beacon",
+                label: model.recording ? (model.recordingFromActionButton ? "Listening. Press Action button again to send" : "Listening. Release to send") : model.transcribing ? "Sending request" : "Talk to Beacon",
                 onPress: model.beginTalking,
                 onRelease: model.endTalking,
                 onCancel: model.cancelTalking
@@ -151,12 +151,14 @@ struct ContentView: View {
     }
 
     private var statusDetail: String {
-        if model.recording { return "Keep holding while you speak. Release to send your request." }
+        if model.recording {
+            return model.recordingFromActionButton ? "Speak, then press the Action button again to send your request." : "Keep holding while you speak. Release to send your request."
+        }
         if model.transcribing { return "You can tap Stop to cancel." }
         if !connected { return "Connect to the same Wi-Fi and add your Mac’s address in Settings." }
         if model.tracking != "normal" { return "Point the camera at the room and move slowly while tracking settles." }
         if !model.choices.isEmpty { return "More than one match is in view." }
-        if guiding { return "Follow the object’s sound. Tap Stop whenever you need to pause." }
+        if guiding { return "Follow the sound. Vibrations get stronger as your phone gets closer." }
         if model.mode == "searching" { return "Slowly scan the room with the camera." }
         if model.stopReason != nil || model.mode == "stopped" { return "Hold below and say “resume”, or ask for a different object." }
         return "Calibrate, then hold below and say what you want to find."

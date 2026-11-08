@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BEEA00000000000000000004 /* ProximityHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEA00000000000000000005 /* ProximityHaptics.swift */; };
         BEEA00000000000000000001 /* GuidanceSounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEA00000000000000000003 /* GuidanceSounds.swift */; };
         BEEA00000000000000000002 /* GuidanceSounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEA00000000000000000003 /* GuidanceSounds.swift */; };
 		AF01B2C3D4E5F60718293047 /* TargetProximity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19926C6AF4279DD4FAE9AED0 /* TargetProximity.swift */; };
@@ -41,6 +42,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		BEEA00000000000000000005 /* ProximityHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityHaptics.swift; sourceTree = "<group>"; };
         BEEA00000000000000000003 /* GuidanceSounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceSounds.swift; sourceTree = "<group>"; };
 		AA01B2C3D4E5F60718293042 /* HoldToTalkSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoldToTalkSession.swift; sourceTree = "<group>"; };
 		00888A4EF1F1884442A5E887 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -92,6 +94,7 @@
 				88593297C40A9B03AD0701FB /* ARSensor.swift */,
 				308C7C8FAF760F96A7D562BD /* AudioGuide.swift */,
                 BEEA00000000000000000003 /* GuidanceSounds.swift */,
+				BEEA00000000000000000005 /* ProximityHaptics.swift */,
 				92B939C21C39F7911E8ABFE5 /* chest_loop.wav */,
 				EE6DDF5BCF93CDF29CCED18F /* Connection.swift */,
 				8618FC10F163DFF865E31228 /* ContentView.swift */,
@@ -227,6 +230,7 @@
 				FFFFB19290A045889C0A79C7 /* ARSensor.swift in Sources */,
 				8A999AB239C34C17EE0C15A4 /* AudioGuide.swift in Sources */,
                 BEEA00000000000000000001 /* GuidanceSounds.swift in Sources */,
+				BEEA00000000000000000004 /* ProximityHaptics.swift in Sources */,
 				E3B56C6C1E2E4B43F6F622D6 /* Connection.swift in Sources */,
 				24FAD47C8E67BDED849F4BB9 /* ContentView.swift in Sources */,
 				450B677CFB6538F4859AAAF3 /* GuidanceSoundSettings.swift in Sources */,

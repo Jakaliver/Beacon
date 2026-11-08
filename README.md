@@ -5,14 +5,17 @@ audio guidance. The iPhone runs the app, captures ARKit poses and camera frames,
 commands and plays guidance through headphones. The Mac runs depth estimation, object
 recognition, button-request speech recognition, mapping and target tracking locally.
 Hold **Talk to Beacon** on the screen while you speak, then release to send.
-Recording continues through pauses until you release. The Mac transcribes it locally.
+Recording continues through pauses until you release. The Action button shortcut also
+starts recording on one activation and sends on the next. The Mac transcribes it locally.
 Found objects play spatial beeps by default; choose **Beeps** or **Chest** in Settings.
 Hold and say **"loot mode on"** for the chest sound or **"loot mode off"** for
 Beeps. The choice is remembered and does not resume a paused search.
 Guidance uses one clean beep sound that speeds up as the phone approaches the object.
 Inside the close-distance threshold (normally 20 cm), they become a short, rising double beep with a
 small-room reverb tail. Only the phone's position matters; its pointing angle does not.
-Distance uses the nearest observed object surface, falling back to its centre.
+Distance uses the nearest observed object surface, falling back to its centre. Nearby
+vibration pulses get stronger and faster as the phone approaches, reaching full strength
+in the last 5 cm. They work with either sound style and stop when guidance stops.
 See the [voice and audio test guide](docs/voice-audio-testing.md)
 for installation, expected behavior and checks on a real iPhone.
 

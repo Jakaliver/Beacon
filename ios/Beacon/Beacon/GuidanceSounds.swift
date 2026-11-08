@@ -54,3 +54,25 @@ struct GuidanceCueTiming {
 
     mutating func reset() { readyAt = -Double.infinity }
 }
+
+/// Smooth network pose steps before they reach the audio renderer. Head rotation
+/// remains live; only listener translation is eased over a short 80 ms window.
+struct GuidanceListenerMotion {
+    private var position: SIMD3<Float>?
+    private var lastUpdate: Double?
+
+    mutating func update(towards target: SIMD3<Float>, at time: Double) -> SIMD3<Float>? {
+        guard target.x.isFinite, target.y.isFinite, target.z.isFinite, time.isFinite else { return position }
+        guard let current = position, let lastUpdate else {
+            position = target
+            self.lastUpdate = time
+            return target
+        }
+        let elapsed = min(0.1, max(0, time - lastUpdate))
+        let blend = Float(1 - exp(-elapsed / 0.08))
+        let next = current + (target - current) * blend
+        position = next
+        self.lastUpdate = time
+        return next
+    }
+}

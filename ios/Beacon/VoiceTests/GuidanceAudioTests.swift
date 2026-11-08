@@ -104,7 +104,28 @@ struct GuidanceAudioTests {
         precondition(timing.start(at: 0.27, duration: beepLength))
         timing.reset()
         precondition(timing.start(at: 0.28, duration: beepLength), "Stop/reset must release the timing gate")
-        print("Guidance audio: position-only proximity, two-note cue, headroom, bounded gain and overlap prevention passed")
+
+        var motion = GuidanceListenerMotion()
+        precondition(motion.update(towards: .zero, at: 0) == .zero)
+        let step = motion.update(towards: SIMD3(1, 0, 0), at: 0.02)!
+        precondition(step.x > 0 && step.x < 0.3, "A live position update must not jump the audio listener")
+        var settled = step
+        for i in 2...30 { settled = motion.update(towards: SIMD3(1, 0, 0), at: Double(i) * 0.02)! }
+        precondition(settled.x > 0.99 && settled.x <= 1, "Audio position converges without overshoot")
+        precondition(motion.update(towards: SIMD3(.nan, 0, 0), at: 0.7) == settled, "Invalid poses cannot enter the audio scene")
+
+        let distances: [Float] = [1.2, 0.8, 0.4, 0.2, 0.1, 0.05]
+        let haptics = distances.map { TargetProximity.hapticPulse(forDistance: $0)! }
+        for (far, near) in zip(haptics, haptics.dropFirst()) {
+            precondition(near.intensity > far.intensity && near.interval < far.interval,
+                         "Vibrations must grow stronger and faster as the phone gets closer")
+        }
+        precondition(haptics.last!.intensity == 1 && haptics.last!.interval >= 0.13,
+                     "Final positioning gets full intensity with distinct pulses")
+        precondition(haptics.allSatisfy { $0.duration < $0.interval && (0...1).contains($0.intensity) })
+        precondition(TargetProximity.hapticPulse(forDistance: 2) == nil)
+        precondition(TargetProximity.hapticPulse(forDistance: .nan) == nil)
+        print("Guidance: proximity, audio headroom/timing, smooth listener motion and progressively stronger haptics passed")
 
         if CommandLine.arguments.count > 1 {
             let directory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)

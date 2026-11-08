@@ -2,6 +2,24 @@ import simd
 
 /// Proximity depends only on the phone's position, never its viewing direction.
 struct TargetProximity {
+    struct HapticPulse {
+        let intensity: Float
+        let sharpness: Float
+        let duration: Double
+        let interval: Double
+    }
+
+    /// A continuous distance gradient, strongest in the last 5 cm. It remains
+    /// useful inside the audio's wider close zone for precise final positioning.
+    static func hapticPulse(forDistance distance: Float) -> HapticPulse? {
+        guard distance.isFinite, distance >= 0, distance <= 1.2 else { return nil }
+        let closeness = min(1, max(0, (1.2 - distance) / 1.15))
+        return HapticPulse(intensity: 0.25 + 0.75 * closeness,
+                           sharpness: 0.3 + 0.4 * closeness,
+                           duration: 0.025 + 0.035 * Double(closeness),
+                           interval: 0.8 * pow(0.14 / 0.8, Double(closeness)))
+    }
+
     struct Output {
         let interval: Double
         let onObject: Bool
