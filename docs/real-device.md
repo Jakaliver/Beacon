@@ -156,8 +156,8 @@ has a red outline and label; its distance appears in the bottom status bar.
 Use **3D** to see height, **Overhead** for a floor plan, and **Fit** to restore automatic
 framing after dragging or zooming. **Locate** centres the selected target.
 **First person** places the view at the iPhone camera and follows its direction, including
-looking up and down. Move the phone to look around; a paused scan holds the last valid
-camera position. Select **3D** or **Overhead** to return to the external room views.
+looking up and down. Move the phone to look around; if phone tracking pauses, the view
+holds the last valid camera position. Select **3D** or **Overhead** to return to the external room views.
 Use **Talk to Beacon** in the iPhone app to select a target; the browser is read-only.
 The geometry comes from monocular depth estimates, not a hardware LiDAR scan.
 
@@ -174,10 +174,10 @@ Beacon keeps the iPhone screen awake while open. Manually locking it or leaving 
 pauses capture. The viewer keeps the last scan and labels it paused until fresh frames return.
 All speech and spatial guidance play on the iPhone. The browser never opens an audio or
 microphone session and cannot change the phone's guidance state.
-Guidance plays a continuous chest sound at the found object's position by default, with
-distance attenuation and a subtle small-room reverb. Settings → **Object sound** switches
-between **Chest** and the original **Beeps**. The chest sound lowers while the app speaks.
-For the hands-free controls and audio acceptance checks, use the
+Guidance plays spatial beeps at the found object's position by default. Settings →
+**Object sound** switches between **Beeps** and a continuous **Chest** sound with distance
+attenuation and a subtle small-room reverb. The chest sound lowers while the app speaks.
+For the voice controls and audio acceptance checks, use the
 [voice and audio test guide](voice-audio-testing.md).
 With AirPods on, face where the phone points and press **Calibrate** so head turns keep
 the sound aligned with the object. The reverb is a room preset, not measured room acoustics.
