@@ -82,9 +82,19 @@ enum VoiceCommand: Equatable {
             return .lootMode(false)
         case "turn off voice mode", "turn voice mode off", "disable voice mode", "voice mode off", "stop listening":
             return .disableVoice
-        default: return parseChoice(utterance)
+        default:
+            if let choice = parseChoice(utterance) { return choice }
+            // "Stop" works with common filler ("stop it", "okay stop", "stop beeping"), but only when every
+            // other word is filler: "don't stop" and "I said stop earlier" must not halt guidance.
+            let words = utterance.split(separator: " ").map(String.init)
+            return words.contains("stop") && words.allSatisfy(stopFiller.contains) ? .pause : nil
         }
     }
+
+    private static let stopFiller: Set<String> = [
+        "stop", "it", "now", "okay", "ok", "the", "that", "beeping", "sound", "sounds", "search", "searching",
+        "looking", "guidance", "navigation", "please", "right", "just", "all",
+    ]
 
     private static func removingPrefix(_ prefix: String, from text: String) -> String {
         text.hasPrefix(prefix) ? String(text.dropFirst(prefix.count)) : text
