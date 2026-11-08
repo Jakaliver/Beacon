@@ -582,17 +582,21 @@ final class AppModel: ObservableObject {
         if !fresh { autoStop("stale") }
         guard !recording, !transcribing, foreground, !searchCleared, stopReason == nil, fresh, tracking == "normal", let g = guidance else {
             audio.stopTargetLoop()
+            audio.updateTargetAlignment(at: nil)
             haptics.stop()
             return resetProbe()
         }
 
-        if ["walking", "probe", "hotcold"].contains(g.mode) { haptics.update(distance: phoneDistance(g)) }
-        else { haptics.stop() }
-
-        if let target = g.target, target.valid, let p = target.position,
+        let guiding = ["walking", "probe", "hotcold"].contains(g.mode)
+        let targetPosition: SIMD3<Float>?
+        if guiding, let target = g.target, target.valid, let p = target.position,
            p.count == 3, pose?.epoch == g.epoch {
-            audio.updateTargetPosition(SIMD3(p[0], p[1], p[2]))
-        }
+            targetPosition = SIMD3(p[0], p[1], p[2])
+        } else { targetPosition = nil }
+        let lookingAtTarget = audio.updateTargetAlignment(at: targetPosition)
+        if guiding { haptics.update(distance: phoneDistance(g), lookingAtTarget: lookingAtTarget) }
+        else { haptics.stop() }
+        if let targetPosition { audio.updateTargetPosition(targetPosition) }
         if g.mode == "walking", let p = g.waypoint?.position, p.count == 3 {
             audio.updateWaypointPosition(SIMD3(p[0], p[1], p[2]))
         }

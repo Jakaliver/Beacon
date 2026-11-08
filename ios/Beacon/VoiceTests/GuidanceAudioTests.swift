@@ -72,6 +72,45 @@ struct GuidanceAudioTests {
         precondition(TargetProximity.interval(forDistance: 0.3) < TargetProximity.interval(forDistance: 1.5),
                      "Taps accelerate as the phone approaches")
 
+        func headForward(degrees: Float) -> SIMD3<Float> {
+            let angle = degrees * .pi / 180
+            return SIMD3(sin(angle), 0, -cos(angle))
+        }
+        var aim = TargetAlignment()
+        let distantTarget = SIMD3<Float>(0, 0, -5)
+        precondition(!aim.update(origin: .zero, forward: headForward(degrees: 0), target: distantTarget, at: 0),
+                     "Passing across the target briefly must not flicker the aiming cue")
+        precondition(aim.update(origin: .zero, forward: headForward(degrees: 0), target: distantTarget, at: 0.13),
+                     "Looking directly at a distant target activates the cue")
+        precondition(aim.update(origin: .zero, forward: headForward(degrees: 10), target: distantTarget, at: 0.2),
+                     "Small head wobbles stay inside the wider exit cone")
+        precondition(!aim.update(origin: .zero, forward: headForward(degrees: 13), target: distantTarget, at: 0.3))
+        precondition(!aim.update(origin: .zero, forward: headForward(degrees: 10), target: distantTarget, at: 1),
+                     "Entering requires the tighter cone")
+        precondition(!aim.update(origin: .zero, forward: SIMD3(0, 0, 1), target: distantTarget, at: 2),
+                     "An object behind the head must never count as aligned")
+        let above = SIMD3<Float>(0, 2, -5)
+        precondition(!aim.update(origin: .zero, forward: headForward(degrees: 0), target: above, at: 3),
+                     "Head elevation matters as well as left/right direction")
+        precondition(!aim.update(origin: .zero, forward: simd_normalize(above), target: above, at: 4))
+        precondition(aim.update(origin: .zero, forward: simd_normalize(above), target: above, at: 4.13))
+        precondition(!aim.update(origin: .zero, forward: simd_normalize(above), target: SIMD3(.nan, 0, 0), at: 5),
+                     "Invalid targets clear a previously active aiming cue")
+        precondition(!aim.update(origin: .zero, forward: .zero, target: above, at: 6))
+        precondition(!aim.update(origin: .zero, forward: headForward(degrees: 0), target: .zero, at: 7))
+
+        let aimHaptic = TargetProximity.guidanceHapticPulse(distance: 5, lookingAtTarget: true)!
+        precondition(aimHaptic.intensity < 0.25 && aimHaptic.duration < 0.04 && aimHaptic.interval >= 0.75,
+                     "Facing the target gets a subtle repeated vibration beyond the proximity range")
+        precondition(TargetProximity.guidanceHapticPulse(distance: 5, lookingAtTarget: false) == nil)
+        precondition(TargetProximity.guidanceHapticPulse(distance: nil, lookingAtTarget: false) == nil)
+        let closeHaptic = TargetProximity.hapticPulse(forDistance: 0.1)!
+        for looking in [true, false] {
+            let combined = TargetProximity.guidanceHapticPulse(distance: 0.1, lookingAtTarget: looking)!
+            precondition(combined.intensity == closeHaptic.intensity && combined.interval == closeHaptic.interval,
+                         "Looking away must not weaken or cancel precise distance feedback")
+        }
+
         let sounds = [("approach", GuidanceSounds.pulse), ("on-object", GuidanceSounds.onObject),
                       ("waypoint", GuidanceSounds.waypoint), ("stop", GuidanceSounds.stop), ("rescan", GuidanceSounds.rescan)]
         for (name, samples) in sounds {
@@ -91,6 +130,8 @@ struct GuidanceAudioTests {
         }
         precondition(attacks == 2, "The close cue must contain two distinct short beeps")
         precondition(Double(tick.count) / GuidanceSounds.sampleRate < 0.2, "The double cue should remain compact")
+        precondition(GuidanceSounds.alignedPitchRatio > 1 && GuidanceSounds.alignedPitchRatio < 1.07,
+                     "Head alignment should give only a small upward pitch shift")
         precondition(GuidanceSounds.waypoint == GuidanceSounds.pulse, "Walking and approaching must use the same clean sound")
         let fundamental = tonalEnergy(GuidanceSounds.pulse, hz: 988)
         let harmonics = (2...6).reduce(0.0) { $0 + tonalEnergy(GuidanceSounds.pulse, hz: 988 * Double($1)) }
@@ -164,7 +205,7 @@ struct GuidanceAudioTests {
         precondition(TargetProximity.hapticPulse(forDistance: 1.51) == nil)
         precondition(TargetProximity.hapticPulse(forDistance: -0.1) == nil)
         precondition(TargetProximity.hapticPulse(forDistance: .nan) == nil)
-        print("Guidance: proximity, audio headroom/timbre, live positioning and progressive haptics passed")
+        print("Guidance: proximity, head alignment, audio headroom/timbre, live positioning and haptic feedback passed")
 
         if CommandLine.arguments.count > 1 {
             let directory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)

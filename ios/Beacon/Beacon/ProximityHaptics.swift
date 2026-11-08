@@ -11,11 +11,12 @@ final class ProximityHaptics {
     private var lastPulse = -Double.infinity
     private let fallback = UIImpactFeedbackGenerator(style: .heavy)
 
-    func update(distance: Float?) {
-        guard let distance, distance.isFinite, distance >= 0 else { stop(); return }
-        let smoothed = smoothedDistance.map { $0 + 0.25 * (distance - $0) } ?? distance
-        smoothedDistance = smoothed
-        guard let pulse = TargetProximity.hapticPulse(forDistance: smoothed) else { stop(); return }
+    func update(distance: Float?, lookingAtTarget: Bool) {
+        if let distance, distance.isFinite, distance >= 0 {
+            smoothedDistance = smoothedDistance.map { $0 + 0.25 * (distance - $0) } ?? distance
+        } else { smoothedDistance = nil }
+        guard let pulse = TargetProximity.guidanceHapticPulse(distance: smoothedDistance,
+                                                            lookingAtTarget: lookingAtTarget) else { stop(); return }
         let now = ProcessInfo.processInfo.systemUptime
         guard now - lastPulse >= pulse.interval else { return }
         lastPulse = now
