@@ -49,10 +49,6 @@ $("viewPlan").onclick = () => setView("plan");
 $("viewFirst").onclick = () => setView("first");
 $("fitRoom").onclick = () => room?.setAutoFit(true);
 $("focusTarget").onclick = () => room?.focusTarget();
-$("focusPhone").onclick = () => {
-  if (currentView === "first") setView("3d");
-  room?.focusPhone();
-};
 let colourEnabled = $("viewColour").getAttribute("aria-pressed") === "true";
 try {
   const saved = localStorage.getItem("beacon.viewer.colour") ?? localStorage.getItem("trident.viewer.colour");
@@ -109,19 +105,6 @@ function displaySnapshot(snapshot: Recon) {
 function updateFreshness() {
   const phone = phoneState.location(performance.now(), connected);
   room?.updatePhone(phone);
-  $("phoneCard").dataset.state = phone.state;
-  $("phoneStatus").textContent = { live: "Live", stale: "Last known", tracking: "Tracking limited", waiting: "Waiting" }[phone.state];
-  $("phoneHeight").textContent = phone.height === null ? "—" : phone.height.toFixed(2);
-  $("phoneHeightNote").textContent = phone.height !== null ? "above the floor"
-    : phone.position ? "Waiting for floor estimate" : "Waiting for phone tracking";
-  const format = (value: number) => (Math.abs(value) < 0.005 ? 0 : value).toFixed(2);
-  for (const [index, axis] of ["X", "Y", "Z"].entries()) {
-    $("phone" + axis).textContent = phone.position ? format(phone.position[index]) : "—";
-  }
-  $("phoneUpdated").textContent = phone.state === "live" ? "Position updating live"
-    : phone.ageMs === null ? "Open Beacon on your iPhone"
-    : `Last position ${(phone.ageMs / 1000).toFixed(1)}s ago`;
-  $<HTMLButtonElement>("focusPhone").disabled = !room || !phone.position;
   $<HTMLButtonElement>("viewFirst").disabled = !phone.position || !phone.forward;
   $("emptyState").hidden = !room || pointCount > 0 || !!phone.position;
   const elapsed = lastSnapshot ? performance.now() - lastSnapshot : Infinity;

@@ -33,26 +33,6 @@ main { position: relative; flex: 1; min-height: 0; overflow: hidden; background:
 .empty-state { position: absolute; top: 46%; left: 50%; width: min(300px, 80%); transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
 .empty-state h2 { font-size: 16px; font-weight: 500; margin: 0 0 10px; }
 .empty-state p { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 0; }
-.phone-card { position: absolute; top: 18px; left: 20px; width: 256px; padding: 15px 16px 10px; border: 1px solid #414747; border-radius: 8px; background: #202424f2; box-shadow: 0 4px 18px #0003; font-variant-numeric: tabular-nums; }
-.phone-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.phone-card-heading strong { font-size: 12px; font-weight: 600; }
-.phone-status { color: #a0a9aa; font-size: 10px; display: inline-flex; align-items: center; gap: 5px; }
-.phone-status::before { content: ""; width: 5px; height: 5px; background: currentColor; border-radius: 50%; }
-.phone-card[data-state="live"] .phone-status { color: #8dd7cb; }
-.phone-card[data-state="tracking"] .phone-status { color: #e2c08a; }
-.phone-height { display: flex; align-items: baseline; gap: 6px; margin-top: 12px; }
-#phoneHeight { font-size: 30px; font-weight: 500; letter-spacing: -1px; line-height: 1.1; }
-.phone-unit { font-size: 14px; color: #a0acac; }
-.phone-height-note { margin: 5px 0 14px; color: #b5bfbf; font-size: 11px; }
-.phone-coordinates { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0; padding-top: 11px; border-top: 1px solid #3e4747; }
-.phone-coordinates > div { display: flex; align-items: baseline; gap: 7px; }
-.phone-coordinates dt { font-size: 10px; color: #8c9b9b; }
-.phone-coordinates dd { margin: 0; font-size: 12px; }
-.phone-origin { margin: 6px 0 10px; font-size: 9px; color: #8c9b9b; }
-.phone-card-footer { display: flex; justify-content: space-between; align-items: center; gap: 7px; border-top: 1px solid #3e4747; padding-top: 7px; }
-#phoneUpdated { font-size: 9px; color: #9ca9a9; }
-#focusPhone { font-size: 10px; padding: 0 6px; min-height: 28px; color: #d2e1df; }
-.phone-card[data-state="stale"] #phoneHeight, .phone-card[data-state="tracking"] #phoneHeight { color: #aab3b3; }
 .target-label { position: absolute; z-index: 2; pointer-events: none; white-space: nowrap; background: #202020ed; padding: 4px 7px; font-size: 11px; line-height: 1.4; }
 .target-label { transform: translate(-50%, calc(-100% - 6px)); border-left: 2px solid var(--red); color: #efb0b0; text-transform: capitalize; }
 .target-label::after { content: ""; position: absolute; top: 100%; left: 50%; width: 1px; height: 10px; background: var(--red); opacity: .6; }
@@ -82,10 +62,6 @@ main { position: relative; flex: 1; min-height: 0; overflow: hidden; background:
   .metrics { gap: 12px; }
 }
 @media (max-width: 620px) {
-  .phone-card { top: 12px; left: 14px; width: 222px; padding: 11px 12px 6px; }
-  #phoneHeight { font-size: 25px; }
-  .phone-height { margin-top: 8px; }
-  .phone-height-note { margin-bottom: 10px; }
   .toolbar { padding: 0 14px; gap: 12px; }
   .brand { gap: 9px; }
   .brand > span, h1 { display: none; }

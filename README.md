@@ -41,14 +41,11 @@ selected target. Right-drag to pan and scroll/pinch to zoom. In Overhead mode, d
 cloud, with a level horizon and perspective depth. Move the phone to look around. If
 tracking pauses, it holds the last valid view; choose **3D** to return to the room orbit.
 
-The phone model shows its actual position and orientation, with a vertical line and
-footprint on the detected floor. Its card shows **height above the floor** and **X/Y/Z
-room coordinates** in metres from the scan origin. **Locate phone** centres it. Height
-stays unknown until a floor estimate is available. Lost tracking freezes the last valid
-pose and labels it **Tracking limited** or **Last known**. Phone updates arrive up to
-30 times per second independently of the slower room scan; no extra vision inference is
-needed. The existing iPhone app supplies the pose, so this change only needs the updated
-Mac backend and browser viewer.
+The phone model shows its actual position and orientation. Once the floor is detected,
+a vertical line and footprint show its position above the floor. Lost tracking freezes
+the last valid pose. Phone updates arrive up to 30 times per second independently of the
+slower room scan; no extra vision inference is needed. The existing iPhone app supplies
+the pose, so this change only needs the updated Mac backend and browser viewer.
 
 **Colour** switches the grey LiDAR view to soft dots coloured from their source camera
 pixels. Selected targets remain red. The scan builds up to 60,000 points in 2.5 cm cells.

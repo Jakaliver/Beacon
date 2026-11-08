@@ -23,18 +23,6 @@
     <div id="injected" class="notice" hidden>Debug observations · not live camera inference</div>
     <div id="emptyState" class="empty-state"><h2>No scan yet</h2><p id="emptyHint">Open Beacon on your iPhone and scan the room.</p></div>
     <div id="renderError" class="empty-state" hidden><h2>3D view unavailable</h2><p>Enable hardware acceleration or use a browser with WebGL 2 support.</p></div>
-    <section id="phoneCard" class="phone-card" data-state="waiting" aria-label="iPhone location">
-      <div class="phone-card-heading"><strong>iPhone</strong><span id="phoneStatus" class="phone-status" role="status">Waiting</span></div>
-      <div class="phone-height"><span id="phoneHeight">—</span><span class="phone-unit">m</span></div>
-      <p id="phoneHeightNote" class="phone-height-note">Waiting for phone tracking</p>
-      <dl class="phone-coordinates" aria-label="Room coordinates in metres">
-        <div><dt>X</dt><dd id="phoneX">—</dd></div>
-        <div><dt>Y</dt><dd id="phoneY">—</dd></div>
-        <div><dt>Z</dt><dd id="phoneZ">—</dd></div>
-      </dl>
-      <p class="phone-origin">Metres from the scan origin</p>
-      <div class="phone-card-footer"><span id="phoneUpdated">Open Beacon on your iPhone</span><button id="focusPhone" disabled>Locate phone</button></div>
-    </section>
     <div id="targetLabel" class="target-label" hidden><span id="targetLabelText"></span></div>
     <div class="canvas-footer">
       <p id="interactionHint">Drag to pause · Scroll to zoom · 3D to resume</p>
