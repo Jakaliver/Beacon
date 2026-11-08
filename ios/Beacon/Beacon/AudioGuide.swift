@@ -25,8 +25,8 @@ final class AudioGuide {
     private let listener: PHASEListener
     private let targetSource: PHASESource
     private let targetLoopSource: PHASESource
-    // 12 dB quieter per doubling of distance (physical spreading is 6 dB): nearer sounds stand out more.
-    private static let rolloff = 2.0
+    // Natural spreading for the continuous source: about 6 dB per distance doubling.
+    private static let rolloff = 1.0
     private let beaconSource: PHASESource
     private let cueSource: PHASESource
     // Events are asynchronous: .stopped also describes an event still preparing.
@@ -69,10 +69,19 @@ final class AudioGuide {
     private var listenerPosition = SIMD3<Float>(0, 0, 0)
     private var listenerTarget: SIMD3<Float>?
     private var listenerMotion = GuidanceListenerMotion()
+    private var phonePose: simd_float4x4?
+    private var phoneEpoch: Int?
+    private var targetPosition: SIMD3<Float>?
+    private var waypointPosition: SIMD3<Float>?
+    private var targetMotion = GuidanceListenerMotion()
+    private var waypointMotion = GuidanceListenerMotion()
     private var listenerForward = SIMD3<Float>(0, 0, -1)
     private var listenerUp = SIMD3<Float>(0, 1, 0)
 
     init() {
+        // Explicitly use PHASE's externalizing renderer, including on headphones
+        // whose route might otherwise be treated as a conventional stereo output.
+        engine.outputSpatializationMode = .alwaysUseBinaural
         engine.defaultReverbPreset = .smallRoom
         listener = PHASEListener(engine: engine)
         targetSource = PHASESource(engine: engine)
@@ -144,8 +153,8 @@ final class AudioGuide {
                 return
             }
             pipeline.entries[PHASESpatialCategory.directPathTransmission]?.sendLevel = 1.0
-            pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = 0.3
-            pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = 0.14
+            pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = GuidanceSounds.earlyReflections
+            pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = GuidanceSounds.lateReverb
             let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "chest-loop-mixer")
             let distance = PHASEGeometricSpreadingDistanceModelParameters()
             distance.rolloffFactor = Self.rolloff
@@ -181,9 +190,8 @@ final class AudioGuide {
             }
             return
         }
-        var transform = matrix_identity_float4x4
-        transform.columns.3 = SIMD4(position, 1)
-        targetLoopSource.transform = transform
+        updateTargetPosition(position)
+        updateSources()
         guard ensureRunning() else {
             stopTargetLoop()
             return
@@ -290,10 +298,14 @@ final class AudioGuide {
         let active = Array(playing.values)
         playing.removeAll()
         active.forEach { $0.stopAndInvalidate() }
+        targetPosition = nil
+        waypointPosition = nil
+        targetMotion = GuidanceListenerMotion()
+        waypointMotion = GuidanceListenerMotion()
     }
 
     func reportStatus() {
-        diagnostic("state=\(engine.renderingState.rawValue); assets=\(mixerIDs.count); prepared=\(prepared.values.reduce(0) { $0 + $1.count }); active=\(playing.count); chestRegistered=\(targetLoopMixerID != nil); chestEvent=\(targetLoopEvent != nil); ducked=\(guidanceDucked)")
+        diagnostic("state=\(engine.renderingState.rawValue); spatializer=binaural; listener=\(headLock.withLock { phonePose == nil ? "preview" : "local AR" }); headTracking=\(headTrackingLive); assets=\(mixerIDs.count); prepared=\(prepared.values.reduce(0) { $0 + $1.count }); active=\(playing.count); chestRegistered=\(targetLoopMixerID != nil); chestEvent=\(targetLoopEvent != nil); ducked=\(guidanceDucked)")
     }
 
     #if DEBUG
@@ -365,18 +377,72 @@ final class AudioGuide {
     func setListener(_ position: SIMD3<Float>) {
         let adjust = Float(UserDefaults.standard.double(forKey: Settings.soundHeightKey))
         headLock.withLock {
+            phonePose = nil
+            phoneEpoch = nil
             listenerTarget = position + SIMD3<Float>(0, 0.45 - adjust, 0)
             updateListener()
         }
     }
 
-    /// Advance translation smoothly even between incoming camera/network poses.
-    func updateSpatialAudio() { headLock.withLock { updateListener() } }
+    /// Use local AR translation in every guidance mode, including the final
+    /// approach. Network listener anchors must not pin the sound as the user moves.
+    func setPhonePose(_ camera: simd_float4x4, epoch: Int) {
+        headLock.withLock {
+            phonePose = camera
+            if phoneEpoch != epoch { listenerMotion = GuidanceListenerMotion() }
+            phoneEpoch = epoch
+            updatePhoneListener()
+            updateListener()
+        }
+    }
+
+    /// Call with headLock held. Head turns affect orientation, never this offset.
+    private func updatePhoneListener() {
+        guard let phonePose else { return }
+        let height = Float(UserDefaults.standard.double(forKey: Settings.soundHeightKey))
+        if let position = GuidanceListenerGeometry.position(camera: phonePose,
+                                                            calibratedForward: baseForward, soundHeight: height) {
+            listenerTarget = position
+        }
+    }
+
+    /// Advance listener and source positions between incoming estimates. A source
+    /// stays fixed in world space as the listener moves; corrections ease in.
+    func updateSpatialAudio() {
+        headLock.withLock { updateListener() }
+        updateSources()
+    }
+
+    func updateTargetPosition(_ position: SIMD3<Float>) {
+        guard position.x.isFinite, position.y.isFinite, position.z.isFinite else { return }
+        targetPosition = position
+    }
+
+    func updateWaypointPosition(_ position: SIMD3<Float>) {
+        guard position.x.isFinite, position.y.isFinite, position.z.isFinite else { return }
+        waypointPosition = position
+    }
+
+    private func updateSources() {
+        let now = ProcessInfo.processInfo.systemUptime
+        if let targetPosition, let p = targetMotion.update(towards: targetPosition, at: now) {
+            var transform = matrix_identity_float4x4
+            transform.columns.3 = SIMD4(p, 1)
+            targetSource.transform = transform
+            targetLoopSource.transform = transform
+        }
+        if let waypointPosition, let p = waypointMotion.update(towards: waypointPosition, at: now) {
+            var transform = matrix_identity_float4x4
+            transform.columns.3 = SIMD4(p, 1)
+            beaconSource.transform = transform
+        }
+    }
 
     /// Call while the user faces where the phone points: that world direction becomes "ahead".
     func setForward(_ forward: SIMD3<Float>) {
         headLock.withLock {
             baseForward = forward
+            updatePhoneListener()
             headReference = latestHead?.copy() as? CMAttitude
             applyHead()
         }
@@ -408,9 +474,13 @@ final class AudioGuide {
               cueTiming.start(at: ProcessInfo.processInfo.systemUptime, duration: duration) else { return false }
         let p = position ?? headLock.withLock { listenerPosition + simd_normalize(listenerForward) * 0.6 }
         guard p.x.isFinite, p.y.isFinite, p.z.isFinite else { return false }
-        var transform = matrix_identity_float4x4
-        transform.columns.3 = SIMD4(p, 1)
-        source.transform = transform
+        if source === targetSource { updateTargetPosition(p); updateSources() }
+        else if source === beaconSource { updateWaypointPosition(p); updateSources() }
+        else {
+            var transform = matrix_identity_float4x4
+            transform.columns.3 = SIMD4(p, 1)
+            source.transform = transform
+        }
         let next: (UUID, PHASESoundEvent)?
         if var ready = prepared[name], !ready.isEmpty {
             next = ready.removeFirst()

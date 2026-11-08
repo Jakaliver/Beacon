@@ -1,4 +1,5 @@
 import Foundation
+import simd
 
 /// One clean beep timbre throughout; the close cue pairs two short, rising notes.
 /// PHASE supplies the room reflections and spatial position during playback.
@@ -6,12 +7,13 @@ enum GuidanceSounds {
     static let sampleRate = 44_100.0
     // Leave more than 12 dB of sample headroom before spatialization and room tails.
     static let peak: Float = 0.24
-    static let earlyReflections = 0.30
-    static let lateReverb = 0.16
-    // Gain is capped at unity even when the source is beside the listener.
+    static let earlyReflections = 0.32
+    static let lateReverb = 0.22
+    // Softened inverse-distance spreading, capped at unity beside the listener.
+    // Avoid a flat close-range plateau so small movements still change loudness.
     static let distanceGains: [SIMD2<Double>] = [
-        SIMD2(0, 1), SIMD2(0.5, 1), SIMD2(1, 0.75), SIMD2(2, 0.35),
-        SIMD2(4, 0.15), SIMD2(8, 0.06), SIMD2(20, 0),
+        SIMD2(0, 1), SIMD2(0.25, 0.95), SIMD2(0.5, 0.83), SIMD2(1, 0.6),
+        SIMD2(2, 0.35), SIMD2(4, 0.185), SIMD2(8, 0.094), SIMD2(20, 0),
     ]
     static let pulse = beep(hz: 988)
     static let waypoint = pulse
@@ -38,6 +40,20 @@ enum GuidanceSounds {
 
     private static func silence(_ seconds: Double) -> [Float] {
         Array(repeating: 0, count: Int(seconds * sampleRate))
+    }
+}
+
+/// ARKit tracks the phone, not the ears. Approximate the head 30 cm behind and
+/// 45 cm above the phone held at chest height. Keep that offset in the calibrated
+/// world frame: rotating the phone or turning the head must not move the listener.
+enum GuidanceListenerGeometry {
+    static func position(camera: simd_float4x4, calibratedForward: SIMD3<Float>,
+                         soundHeight: Float) -> SIMD3<Float>? {
+        let phone = SIMD3(camera.columns.3.x, camera.columns.3.y, camera.columns.3.z)
+        let flat = SIMD3<Float>(calibratedForward.x, 0, calibratedForward.z)
+        guard phone.x.isFinite, phone.y.isFinite, phone.z.isFinite, soundHeight.isFinite,
+              flat.x.isFinite, flat.z.isFinite, simd_length(flat) > 0.001 else { return nil }
+        return phone - simd_normalize(flat) * 0.3 + SIMD3(0, 0.45 - soundHeight, 0)
     }
 }
 

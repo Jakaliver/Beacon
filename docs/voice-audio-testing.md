@@ -76,12 +76,26 @@ Check the beeps very close to the object as well as farther away. They use fixed
 headroom, no automatic loudness boost, and distance gain capped at unity. New notes wait
 for the preceding cue to finish; guidance also waits while the app speaks. The room
 reverb remains enabled. Listen for crackle during quick approach/close transitions.
-Live listener-position updates are smoothed, and output-route notifications only restart
+Live listener-position and target-position updates are smoothed, and output-route notifications only restart
 audio when the actual output or format changes. Compare stationary test beeps with live
 guidance while moving the phone; both should remain clean.
 
-With either Beeps or Chest selected, proximity vibrations begin within 1.2 m during
-close guidance. They grow stronger, longer and faster as the phone approaches, reaching
+PHASE uses binaural rendering with the same small-room reflection/reverb sends for
+all guidance cues. The listener follows local AR translation in every guidance mode,
+including the final approach, instead of the backend's stationary probe anchor.
+Calibrate with the phone held at chest height and your head facing the same direction.
+Walk sideways and towards a stationary target, then turn your head: the source should
+stay at the object while its direction and level change. Rotating only the phone must
+not move the listener. Source corrections ease into place without restarting playback.
+Route waypoints still provide walking instructions when a path is active.
+
+Head position remains an estimate (30 cm behind and 45 cm above the phone in the
+calibrated direction); AirPods supply rotation, not absolute head translation. Keep
+the phone near that calibrated holding position for the most accurate placement.
+The small-room response is a preset, not a measurement of the current room.
+
+With either Beeps or Chest selected, proximity vibrations begin within 1.5 m during
+walking and close guidance. They grow stronger, longer and faster as the phone approaches, reaching
 full intensity within 5 cm. Rotate the phone without moving it: pulse strength should
 remain unchanged. Recording, Stop, lost tracking and leaving the app must stop vibrations.
 

@@ -539,7 +539,8 @@ final class AppModel: ObservableObject {
             guidanceAt = Date()
             if g.mode != mode { mode = g.mode }
             if g.mode != "choosing" && !choices.isEmpty { choices = [] }
-            if let l = g.listener, l.count == 3 { audio.setListener(SIMD3(l[0], l[1], l[2])) }
+            // Audio follows local AR tracking. The server's listener can be
+            // anchored during probing and arrives later than the phone pose.
         case "say":
             if !searchCleared, stopReason == nil, let text = message.text { voice.say(text) }
         case "choices":
@@ -555,6 +556,7 @@ final class AppModel: ObservableObject {
 
     private func update(pose sample: PoseSample) {
         pose = sample
+        if sample.tracking == "normal" { audio.setPhonePose(sample.transform, epoch: sample.epoch) }
         if sample.tracking != tracking { tracking = sample.tracking }
         if sample.tracking != "normal" { autoStop("tracking_lost") }
     }
@@ -571,8 +573,16 @@ final class AppModel: ObservableObject {
             return resetProbe()
         }
 
-        if ["probe", "hotcold"].contains(g.mode) { haptics.update(distance: phoneDistance(g)) }
+        if ["walking", "probe", "hotcold"].contains(g.mode) { haptics.update(distance: phoneDistance(g)) }
         else { haptics.stop() }
+
+        if let target = g.target, target.valid, let p = target.position,
+           p.count == 3, pose?.epoch == g.epoch {
+            audio.updateTargetPosition(SIMD3(p[0], p[1], p[2]))
+        }
+        if g.mode == "walking", let p = g.waypoint?.position, p.count == 3 {
+            audio.updateWaypointPosition(SIMD3(p[0], p[1], p[2]))
+        }
 
         if Settings.guidanceSoundStyle == .chest {
             resetProbe()

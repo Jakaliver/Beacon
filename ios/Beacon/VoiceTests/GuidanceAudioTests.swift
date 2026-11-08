@@ -114,7 +114,30 @@ struct GuidanceAudioTests {
         precondition(settled.x > 0.99 && settled.x <= 1, "Audio position converges without overshoot")
         precondition(motion.update(towards: SIMD3(.nan, 0, 0), at: 0.7) == settled, "Invalid poses cannot enter the audio scene")
 
-        let distances: [Float] = [1.2, 0.8, 0.4, 0.2, 0.1, 0.05]
+        let facing = SIMD3<Float>(0, 0, -1)
+        let listener = GuidanceListenerGeometry.position(camera: camera(position: position, yaw: 0),
+                                                          calibratedForward: facing, soundHeight: 0)!
+        for yaw: Float in [0, 0.5, 1.5, .pi] {
+            precondition(GuidanceListenerGeometry.position(camera: camera(position: position, yaw: yaw),
+                           calibratedForward: facing, soundHeight: 0) == listener,
+                         "Turning the phone cannot slide the virtual listener around the object")
+        }
+        let movement = SIMD3<Float>(0.5, 0.1, -0.2)
+        let movedListener = GuidanceListenerGeometry.position(camera: camera(position: position + movement, yaw: 1),
+                                                              calibratedForward: facing, soundHeight: 0)!
+        precondition(simd_distance(movedListener - listener, movement) < 0.0001,
+                     "Close approach and sideways movement must move the listener, never leave it anchored")
+        precondition(abs(listener.y - position.y - 0.45) < 0.0001 && abs(listener.z - position.z - 0.3) < 0.0001,
+                     "Audio originates from the estimated ears, not the camera lens")
+        let raised = GuidanceListenerGeometry.position(camera: camera(position: position, yaw: 0),
+                                                       calibratedForward: facing, soundHeight: 0.2)!
+        precondition(abs(listener.y - raised.y - 0.2) < 0.0001, "Keep the sound-height preference")
+        precondition(GuidanceListenerGeometry.position(camera: camera(position: SIMD3(.nan, 0, 0), yaw: 0),
+                         calibratedForward: facing, soundHeight: 0) == nil)
+        precondition(GuidanceListenerGeometry.position(camera: matrix_identity_float4x4,
+                         calibratedForward: .zero, soundHeight: 0) == nil)
+
+        let distances: [Float] = [1.5, 1.3, 1.2, 0.8, 0.4, 0.2, 0.1, 0.05]
         let haptics = distances.map { TargetProximity.hapticPulse(forDistance: $0)! }
         for (far, near) in zip(haptics, haptics.dropFirst()) {
             precondition(near.intensity > far.intensity && near.interval < far.interval,
@@ -124,8 +147,10 @@ struct GuidanceAudioTests {
                      "Final positioning gets full intensity with distinct pulses")
         precondition(haptics.allSatisfy { $0.duration < $0.interval && (0...1).contains($0.intensity) })
         precondition(TargetProximity.hapticPulse(forDistance: 2) == nil)
+        precondition(TargetProximity.hapticPulse(forDistance: 1.51) == nil)
+        precondition(TargetProximity.hapticPulse(forDistance: -0.1) == nil)
         precondition(TargetProximity.hapticPulse(forDistance: .nan) == nil)
-        print("Guidance: proximity, audio headroom/timing, smooth listener motion and progressively stronger haptics passed")
+        print("Guidance: proximity, audio headroom/timing, live world positioning and earlier progressive haptics passed")
 
         if CommandLine.arguments.count > 1 {
             let directory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
