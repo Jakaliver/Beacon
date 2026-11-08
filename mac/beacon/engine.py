@@ -107,6 +107,7 @@ class Engine:
         self.stats = {"vision_fps": 0.0, "frame_age_ms": None, "pose_hz": 0.0, "dropped_frames": 0,
                       "depth_ms": 0.0, "detect_ms": 0.0}
         self._last_pose_rx = 0.0
+        self._tracking_bad_since: float | None = None
         self._last_frame_done = 0.0
 
     # World state ---------------------------------------------------------
@@ -179,6 +180,10 @@ class Engine:
             pose = Pose(pose_matrix(msg["pose"]), msg["t"], msg["seq"], msg["tracking"],
                         head["q"] if head and head.get("available") else None, now)
             self.pose = pose
+            if msg["tracking"] == "normal":
+                self._tracking_bad_since = None
+            elif self._tracking_bad_since is None:
+                self._tracking_bad_since = now
             # Not in Probe mode: there the hand may reach over furniture the body cannot cross.
             if msg["tracking"] == "normal" and self.map.floor_y is not None and self.mode != "probe":
                 self.map.mark_walked(self.walking_body()[[0, 2]], now)
@@ -489,7 +494,7 @@ class Engine:
             self.stop("connection", "Stopped. Connection lost.")
         elif self.clock_offset is not None and now - (self.pose.t + self.clock_offset) > CONFIG.max_pose_latency_s:
             self.stop("stale", "Stopped. Updates late.")
-        elif self.pose.tracking != "normal":
+        elif self.pose.tracking != "normal" and not self._probe_tracking_pause(now):
             self.stop("tracking_lost", "Stopped. Tracking lost.")
         elif not self.audio_ok:
             self.stop("audio", "Stopped. No audio.")
@@ -497,6 +502,11 @@ class Engine:
             self.stop("interrupted", "Stopped. Interrupted.")
         elif self.mode == "walking" and now - self.last_frame_processed > CONFIG.walking_perception_timeout_s:
             self.stop("stale", "Stopped. Map out of date.")
+
+    def _probe_tracking_pause(self, now: float) -> bool:
+        """Within reach, briefly limited tracking (camera covered by the target) pauses guidance."""
+        return (self.mode == "probe" and self.pose.tracking == "limited" and self._tracking_bad_since is not None
+                and now - self._tracking_bad_since < CONFIG.probe_limited_tracking_s)
 
     def _update_target_state(self, now: float) -> None:
         if self.mode == "searching" and self.want_label:
@@ -539,7 +549,7 @@ class Engine:
             self.listener_anchor = self.walking_body()
             # No speech on entering or leaving: the switch between beeps and the torch tone is the cue.
             self.path, self.waypoint = [], None
-        elif self.mode == "probe":
+        elif self.mode == "probe" and self.pose.tracking == "normal":  # a limited pose may jump
             drift = math.hypot(phone[0] - self.listener_anchor[0], phone[2] - self.listener_anchor[2])
             if drift > CONFIG.probe_leave and dh > CONFIG.probe_enter:
                 self.mode = "walking" if self.navigation else "hotcold"

@@ -554,11 +554,24 @@ final class AppModel: ObservableObject {
         }
     }
 
+    private var limitedTrackingSince: Date?
+    private static let probeLimitedTracking: TimeInterval = 10  // matches the Mac's probe_limited_tracking_s
+
     private func update(pose sample: PoseSample) {
         pose = sample
         if sample.tracking == "normal" { audio.setPhonePose(sample.transform, epoch: sample.epoch) }
         if sample.tracking != tracking { tracking = sample.tracking }
-        if sample.tracking != "normal" { autoStop("tracking_lost") }
+        if sample.tracking == "normal" {
+            limitedTrackingSince = nil
+        } else if mode == "probe", sample.tracking == "limited" {
+            // Touching the target covers the camera and ARKit limits tracking. Within reach that is
+            // arrival, not a fault: the sound pauses (tick needs normal tracking) unless it lasts.
+            let since = limitedTrackingSince ?? Date()
+            limitedTrackingSince = since
+            if Date().timeIntervalSince(since) > Self.probeLimitedTracking { autoStop("tracking_lost") }
+        } else {
+            autoStop("tracking_lost")
+        }
     }
 
     private func tick() {

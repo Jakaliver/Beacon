@@ -55,6 +55,9 @@ class Config:
     sigma_growth_per_s: float = 0.01
 
     pose_timeout_s: float = 1.0
+    # Touching the target covers the camera and ARKit limits tracking: within reach that is arrival,
+    # so guidance pauses instead of stopping, unless it lasts this long.
+    probe_limited_tracking_s: float = 10.0
     max_pose_latency_s: float = 0.5  # beyond the fastest pose seen this session
     walking_perception_timeout_s: float = 2.5
 
