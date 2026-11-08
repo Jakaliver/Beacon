@@ -13,6 +13,7 @@ IGNORED = {"person"}
 FAMILY = {"cup": "bottle", "vase": "bottle", "wine glass": "bottle"}
 # Flat things on a wall: their box keeps the depth that was seen instead of an assumed one.
 FLAT = {"door", "window", "light switch", "power outlet", "tv"}
+BOX_PAD = 0.02  # metres added to each box size, so the box encloses the object rather than cutting it
 
 
 def canonical(label: str) -> str:
@@ -88,12 +89,17 @@ def observe(label: str, mask: np.ndarray, depth: np.ndarray, K, T: np.ndarray,
         world = cam + (world - cam) * s
         med *= s
     surface = world[np.random.default_rng(0).choice(len(world), min(48, len(world)), replace=False)]
-    centre, extent, yaw = view_box(label, world, cam)
+    # Width and height come from the whole instance outline placed at the object's distance:
+    # erosion and depth-edge rejection above trimmed the top, bottom and sides.
+    outline, _ = unproject(np.full(mask.shape, med, np.float32), K, step=2, mask=mask)
+    centre, extent, yaw = view_box(label, world, cam, to_world(T, outline) if len(outline) else None)
     return Observation(label, centre, extent, surface, 0.05 + 0.1 * med, med, yaw)
 
 
-def view_box(label: str, world: np.ndarray, cam: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
-    """Box (centre, [across, up, along] size, yaw) from the visible surface, in the camera's view frame.
+def view_box(label: str, world: np.ndarray, cam: np.ndarray,
+             outline: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray, float]:
+    """Box (centre, [across, up, along] size, yaw) in the camera's view frame. `world` is the visible
+    surface (it sets the front face); `outline`, if given, sets the width and height.
 
     The camera sees only an object's front, so the box extends behind it: as deep as it is wide
     (at most 0.6 m), except for flat wall objects. Its centre is then the same from every viewpoint.
@@ -102,12 +108,14 @@ def view_box(label: str, world: np.ndarray, cam: np.ndarray) -> tuple[np.ndarray
     yaw = float(np.arctan2(ray[0], ray[2]))  # three.js rotation.y that turns local +Z along the view
     along = np.array([np.sin(yaw), 0.0, np.cos(yaw)])
     across = np.array([along[2], 0.0, -along[0]])
-    local = np.stack([world @ across, world[:, 1], world @ along], axis=1)
-    lo, hi = np.percentile(local, 5, axis=0), np.percentile(local, 95, axis=0)
-    size = np.maximum(hi - lo, 0.03)
+    outline = world if outline is None else outline
+    flat = np.stack([outline @ across, outline[:, 1]], axis=1)
+    lo, hi = np.percentile(flat, 1, axis=0), np.percentile(flat, 99, axis=0)
+    front, back = np.percentile(world @ along, [5, 95])
+    size = np.maximum([hi[0] - lo[0], hi[1] - lo[1], back - front], 0.03) + BOX_PAD
     if label not in FLAT:
         size[2] = max(size[2], min(size[0], 0.6))
-    mid = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2] + size[2] / 2])
+    mid = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, front - BOX_PAD / 2 + size[2] / 2])
     centre = mid[0] * across + mid[2] * along
     centre[1] = mid[1]
     return centre, size, yaw
@@ -289,8 +297,8 @@ if __name__ == "__main__":
     obs = observe("bottle", mask, depth, K, T)
     # The box centre sits behind the visible face, half the bottle's width deeper.
     assert obs and abs(obs.position[2] + 1.5 + obs.extent[2] / 2) < 0.02, obs
-    # 40 x 80 px at 1.5 m is 0.12 x 0.24 m; as deep as it is wide.
-    assert abs(obs.extent[0] - 0.12) < 0.025 and abs(obs.extent[1] - 0.24) < 0.04, obs.extent
+    # The 50 x 90 px mask at 1.5 m is 0.15 x 0.27 m, plus padding; as deep as it is wide.
+    assert abs(obs.extent[0] - 0.17) < 0.01 and abs(obs.extent[1] - 0.29) < 0.01, obs.extent
     assert abs(obs.extent[2] - obs.extent[0]) < 1e-6, obs.extent
     tr = Tracker()
     tr.update([obs], depth, K, T, 0.0, False)
