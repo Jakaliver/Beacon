@@ -124,7 +124,7 @@ struct ContentView: View {
         }
         .foregroundStyle(Color(.systemBackground))
         .padding(24)
-        .frame(maxWidth: .infinity, minHeight: 190)
+        .frame(maxWidth: .infinity, minHeight: 220)
         .background(Color.primary.opacity(connected ? (model.recording ? 0.8 : 1) : 0.35), in: RoundedRectangle(cornerRadius: 22))
         .accessibilityHidden(true)
         .overlay {

@@ -40,6 +40,16 @@ struct GuidanceAudioTests {
         return low / total
     }
 
+    static func localizationDetailFraction(_ samples: [Float]) -> Double {
+        let total = energy(samples[...]) * Double(samples.count)
+        let firstBin = Int(ceil(2_500 * Double(samples.count) / GuidanceSounds.sampleRate))
+        let lastBin = Int(8_000 * Double(samples.count) / GuidanceSounds.sampleRate)
+        return (firstBin...lastBin).reduce(0.0) { sum, bin in
+            let hz = Double(bin) * GuidanceSounds.sampleRate / Double(samples.count)
+            return sum + 2 * tonalEnergy(samples, hz: hz)
+        } / total
+    }
+
     static func main() throws {
         let centre = SIMD3<Float>(0, 0, -0.5)
         let surface = [centre + SIMD3(0, 0, 0.04), centre - SIMD3(0, 0, 0.04)]
@@ -142,6 +152,14 @@ struct GuidanceAudioTests {
         let harmonics = (2...6).reduce(0.0) { $0 + tonalEnergy(GuidanceSounds.pulse, hz: 988 * Double($1)) }
         precondition(harmonics / fundamental > 0.008 && harmonics / fundamental < 0.1,
                      "Spatial cues need audible spectral detail while the lower fundamental stays dominant")
+        let detail = localizationDetailFraction(GuidanceSounds.pulse)
+        precondition(detail > 0.008 && detail < 0.05,
+                     "The cue needs upper-frequency localization detail without becoming a bright noise burst")
+        let onset = Array(GuidanceSounds.pulse.prefix(Int(0.018 * GuidanceSounds.sampleRate)))
+        let body = Array(GuidanceSounds.pulse.dropFirst(Int(0.025 * GuidanceSounds.sampleRate)))
+        precondition(localizationDetailFraction(onset) > 2 * localizationDetailFraction(body)
+                     && localizationDetailFraction(body) < 0.01,
+                     "Localization texture belongs to the attack, not a sustained hiss over the tone")
         precondition(Double(GuidanceSounds.pulse.count) / GuidanceSounds.sampleRate < TargetProximity.interval(forDistance: 0),
                      "Approach taps must fit within the fastest repeat interval")
 

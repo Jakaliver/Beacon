@@ -7,7 +7,8 @@ enum GuidanceSounds {
     static let sampleRate = 44_100.0
     // Leave more than 12 dB of sample headroom before spatialization and room tails.
     static let peak: Float = 0.24
-    static let lateReverb = 0.18
+    // Keep a little room around the source without the diffuse tail masking its bearing.
+    static let lateReverb = 0.10
     // Softened inverse-distance spreading, capped at unity beside the listener.
     // Avoid a flat close-range plateau so small movements still change loudness.
     static let distanceGains: [SIMD2<Double>] = [
@@ -25,6 +26,7 @@ enum GuidanceSounds {
     /// quickly, keeping the same lower pitch without a shrill sustained tone.
     private static func beep(hz: Double) -> [Float] {
         let count = Int(0.065 * sampleRate)
+        let detail = localizationAttack(count: count)
         let samples = (0..<count).map { i -> Float in
             let t = Double(i) / sampleRate
             let phase = 2 * Double.pi * hz * t
@@ -34,10 +36,31 @@ enum GuidanceSounds {
             let partials = 0.22 * sin(2 * phase) + 0.12 * sin(3 * phase)
                 + 0.075 * sin(4 * phase) + 0.04 * sin(5 * phase) + 0.02 * sin(6 * phase)
             let tone = sin(phase) + partials * exp(-t / 0.035)
-            return Float(tone * envelope)
+            return Float(tone * envelope + detail[i])
         }
         let sourcePeak = samples.map { abs($0) }.max() ?? 1
         return samples.map { $0 * (peak / max(sourcePeak, 0.0001)) }
+    }
+
+    /// A quiet, band-shaped 18 ms attack gives the binaural filters more spectral
+    /// detail. It ends before the tonal body, so the beep keeps its pitch and does
+    /// not acquire a sustained hiss. Fixed noise makes repeated cues consistent.
+    private static func localizationAttack(count: Int) -> [Double] {
+        var seed: UInt32 = 0x42656163
+        var low = 0.0, high = 0.0
+        let lowBlend = 1 - exp(-2 * Double.pi * 1_800 / sampleRate)
+        let highBlend = 1 - exp(-2 * Double.pi * 7_000 / sampleRate)
+        return (0..<count).map { i in
+            let t = Double(i) / sampleRate
+            guard t < 0.018 else { return 0 }
+            seed = 1_664_525 &* seed &+ 1_013_904_223
+            let noise = Double(seed) / Double(UInt32.max) * 2 - 1
+            low += lowBlend * (noise - low)
+            high += highBlend * (noise - high)
+            let fadeIn = sin(.pi / 2 * min(1, t / 0.002))
+            let fadeOut = cos(.pi / 2 * t / 0.018)
+            return 0.45 * (high - low) * fadeIn * fadeIn * fadeOut * fadeOut
+        }
     }
 
     private static func silence(_ seconds: Double) -> [Float] {
