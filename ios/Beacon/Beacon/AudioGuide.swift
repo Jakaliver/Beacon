@@ -77,9 +77,6 @@ final class AudioGuide {
     private var targetMotion = GuidanceListenerMotion()
     private var waypointMotion = GuidanceListenerMotion()
     private var roomEpoch: Int?
-    private var roomSize: GuidanceRoomSize?
-    private var roomAnchor: SIMD3<Float>?
-    private var settingsObserver: NSObjectProtocol?
     private var roomSurfaces: [PHASEOccluder] = []
     private var listenerForward = SIMD3<Float>(0, 0, -1)
     private var listenerUp = SIMD3<Float>(0, 1, 0)
@@ -88,7 +85,7 @@ final class AudioGuide {
         // Explicitly use PHASE's externalizing renderer, including on headphones
         // whose route might otherwise be treated as a conventional stereo output.
         engine.outputSpatializationMode = .alwaysUseBinaural
-        engine.defaultReverbPreset = Settings.guidanceRoomSize == .large ? .mediumRoom : .smallRoom
+        engine.defaultReverbPreset = .mediumRoom
         listener = PHASEListener(engine: engine)
         targetSource = PHASESource(engine: engine)
         targetLoopSource = PHASESource(engine: engine)
@@ -108,16 +105,6 @@ final class AudioGuide {
         register("rescan", GuidanceSounds.rescan)
         registerTargetLoop()
         headLock.withLock { updateListener() }
-        settingsObserver = NotificationCenter.default.addObserver(
-            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            guard let self, let epoch = self.roomEpoch else { return }
-            self.configureRoomIfNeeded(epoch: epoch)
-        }
-    }
-
-    deinit {
-        if let settingsObserver { NotificationCenter.default.removeObserver(settingsObserver) }
     }
 
     /// One PHASE sound event per sound: sampler → spatial mixer with direct path, early reflections and late reverb.
@@ -414,23 +401,17 @@ final class AudioGuide {
         configureRoomIfNeeded(epoch: epoch)
     }
 
-    /// Six simple slabs provide directional reflections without waiting for a scan.
-    /// A room-size change replaces only these surfaces and the reverb preset;
-    /// listener/source positions and active sound events remain in the same frame.
+    /// A fixed 7 x 9 x 3 m room, as requested. Six simple slabs provide directional
+    /// early reflections immediately, without waiting for a scan or rebuilding
+    /// geometry during guidance. Material presets are estimates, not measurements.
     private func configureRoomIfNeeded(epoch: Int) {
-        let selectedRoom = Settings.guidanceRoomSize
-        guard roomEpoch != epoch || roomSize != selectedRoom else { return }
-        let position: SIMD3<Float>
-        if roomEpoch == epoch, let roomAnchor { position = roomAnchor }
-        else { position = headLock.withLock { listenerTarget ?? listenerPosition } }
-        let surfaces = GuidanceRoomAcoustics.surfaces(around: position, room: selectedRoom)
+        guard roomEpoch != epoch else { return }
+        let position = headLock.withLock { listenerTarget ?? listenerPosition }
+        let surfaces = GuidanceRoomAcoustics.surfaces(around: position)
         guard surfaces.count == 6 else { return }
         for old in roomSurfaces { engine.rootObject.removeChild(old) }
         roomSurfaces.removeAll()
         roomEpoch = epoch
-        roomSize = selectedRoom
-        roomAnchor = position
-        engine.defaultReverbPreset = selectedRoom == .large ? .mediumRoom : .smallRoom
         for surface in surfaces {
             let mesh = MDLMesh(boxWithExtent: surface.size, segments: SIMD3<UInt32>(repeating: 1),
                                inwardNormals: false, geometryType: .triangles, allocator: nil)
@@ -443,7 +424,7 @@ final class AudioGuide {
                 roomSurfaces.append(object)
             } catch { diagnostic("room surface failed: \(error)") }
         }
-        diagnostic("room acoustics: \(selectedRoom.label); \(roomSurfaces.count) fixed boundaries; dimensions=\(selectedRoom.dimensions)")
+        diagnostic("room acoustics: \(roomSurfaces.count) fixed boundaries; assumed room 7 x 9 x 3 m")
     }
 
     /// Call with headLock held. Head turns affect orientation, never this offset.

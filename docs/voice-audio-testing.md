@@ -81,14 +81,9 @@ audio when the actual output or format changes. Compare stationary test beeps wi
 guidance while moving the phone; both should remain clean.
 
 PHASE uses binaural rendering with the same reflection/reverb sends for all guidance
-cues. **Settings → Room size** selects **Large room** (7 × 9 × 3 metres, the default)
-or **Meeting room** (3.2 × 4 × 2.6 metres, approximately four people). The choice
-persists and updates the audio immediately in both Beacon and Voice Lab. Switch
-while guiding: the object and listener should stay fixed and playback should continue.
-Reopen the app and check the selected room is retained.
-The room is positioned once in each AR world with the listener initially 1.6 m above
-its floor. Six simple acoustic slabs and wood/drywall material presets supply
-directional reflections, with medium-room or small-room late reverb respectively.
+cues. It assumes a 7 × 9 × 3 metre room, positioned once in each AR world with the
+listener initially 1.6 m above its floor. Six simple acoustic slabs and wood/drywall
+material presets supply directional reflections, with a medium-room late reverb.
 The room stays fixed when you move or recalibrate heading and needs no scanned walls.
 The beep retains its 988 Hz fundamental and short rising pair; brief, softly fading
 upper harmonics give the renderer more directional detail without a low thud.
