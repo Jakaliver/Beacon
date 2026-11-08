@@ -28,7 +28,7 @@ const roundedRectangle = (width: number, height: number, radius: number) => {
   shape.quadraticCurveTo(x, y, x + radius, y);
   return shape;
 };
-export type RoomViewMode = "3d" | "plan" | "first";
+export type RoomViewMode = "3d" | "first";
 
 /** Displays measured reconstruction snapshots without inventing unseen surfaces. */
 export class RoomView {
@@ -252,12 +252,8 @@ export class RoomView {
       this.invalidate();
       return;
     }
-    const offset = view === "plan" ? new THREE.Vector3(0, 14, 0.001)
-      : new THREE.Vector3().setFromSphericalCoords(14, Math.PI / 2 - ORBIT_ELEVATION, Math.PI / 4);
+    const offset = new THREE.Vector3().setFromSphericalCoords(14, Math.PI / 2 - ORBIT_ELEVATION, Math.PI / 4);
     this.camera.position.copy(this.controls.target).add(offset);
-    this.controls.enableRotate = view !== "plan";
-    this.controls.mouseButtons.LEFT = view === "plan" ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
-    this.controls.touches.ONE = view === "plan" ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE;
     this.camera.lookAt(this.controls.target);
     this.controls.update(0);
     if (this.autoFit) this.fit();
@@ -363,7 +359,7 @@ export class RoomView {
     this.camera.updateProjectionMatrix();
     this.camera.lookAt(this.anchor);
     this.camera.updateMatrixWorld();
-    // Fit projected bounds, including height, for both plan and oblique views.
+    // Fit projected bounds, including height.
     let extentX = 0.25, extentY = 0.25;
     if (this.orbit) {
       // Fit every heading of the orbit so rotation doesn't pump the zoom or crop walls.

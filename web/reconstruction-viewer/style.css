@@ -16,67 +16,46 @@ button:hover { color: #f1f1f1; background: #303030; }
 button:disabled { opacity: .4; cursor: default; background: transparent; }
 button:focus-visible, canvas:focus-visible { outline: 2px solid #bcbcbc; outline-offset: 2px; }
 .toolbar { flex: 0 0 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; gap: 20px; background: #202020; border-bottom: 1px solid var(--line); }
-.brand { display: flex; align-items: baseline; gap: 14px; white-space: nowrap; }
-.brand strong { font-size: 13px; font-weight: 600; letter-spacing: -.2px; }
-.brand > span { color: #555; }
-h1 { font-size: 13px; font-weight: 400; color: var(--muted); margin: 0; }
+.brand { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: -.2px; white-space: nowrap; }
 nav { display: flex; align-items: center; gap: 14px; }
 .view-switch { display: flex; gap: 2px; }
 .view-switch button[aria-pressed="true"] { color: #eee; background: #393939; }
 #viewColour[aria-pressed="true"] { color: #eee; background: #393939; }
 #fitRoom { border-left: 1px solid #3c3c3c; border-radius: 0; padding-right: 0; padding-left: 18px; }
 #fitRoom:hover { background: transparent; }
-#fitRoom svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.25; }
+button svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.25; stroke-linejoin: round; }
 main { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #181818; }
 #roomCanvas { display: block; width: 100%; height: 100%; touch-action: none; outline-offset: -4px; }
-.notice { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); padding: 6px 10px; background: #2b2b2b; border: 1px solid #555; color: #ddd; white-space: nowrap; font-size: 11px; }
 .empty-state { position: absolute; top: 46%; left: 50%; width: min(300px, 80%); transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
 .empty-state h2 { font-size: 16px; font-weight: 500; margin: 0 0 10px; }
 .empty-state p { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 0; }
 .target-label { position: absolute; z-index: 2; pointer-events: none; white-space: nowrap; background: #202020ed; padding: 4px 7px; font-size: 11px; line-height: 1.4; }
 .target-label { transform: translate(-50%, calc(-100% - 6px)); border-left: 2px solid var(--red); color: #efb0b0; text-transform: capitalize; }
 .target-label::after { content: ""; position: absolute; top: 100%; left: 50%; width: 1px; height: 10px; background: var(--red); opacity: .6; }
-.canvas-footer { position: absolute; bottom: 18px; left: 20px; right: 20px; display: flex; align-items: end; justify-content: space-between; gap: 24px; pointer-events: none; color: #858585; font-size: 10px; }
-#interactionHint { margin: 0; line-height: 1.6; }
-.scale { display: grid; grid-template-columns: auto auto; align-items: end; gap: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-#scaleBar { display: block; height: 5px; border: 1px solid #777; border-top: 0; margin-bottom: 4px; }
-.depth-note { grid-column: 1 / -1; text-align: right; color: #737373; }
-.statusbar { flex: 0 0 44px; display: flex; align-items: center; gap: 20px; padding: 0 20px; background: #202020; border-top: 1px solid var(--line); font-size: 11px; white-space: nowrap; }
+#debugToggle[aria-pressed="true"] { color: #eee; background: #393939; }
+.debug { position: absolute; top: 14px; right: 14px; z-index: 3; width: 240px; max-height: calc(100% - 28px); overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; background: #202020f2; border: 1px solid var(--line); border-radius: 4px; font-size: 11px; }
 .connection { display: flex; align-items: center; gap: 7px; color: #bdbdbd; }
-.connection i, .selection i { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; background: #777; }
+.connection i { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; background: #777; }
 .connection[data-state="live"] i { background: #a9b9a3; }
 #frameAge { color: var(--muted); font-variant-numeric: tabular-nums; }
-.selection { display: flex; align-items: center; gap: 10px; min-width: 0; padding-left: 20px; border-left: 1px solid #414141; }
-.selection i { background: var(--red); border-radius: 1px; }
-.selection strong { font-weight: 500; text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; }
+.notice { margin: 0; padding: 6px 8px; background: #2b2b2b; border: 1px solid #555; color: #ddd; }
+.selection { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.selection strong { font-weight: 500; text-transform: capitalize; color: #efb0b0; }
 #targetDistance { color: #ccc; font-variant-numeric: tabular-nums; }
 #targetState { color: var(--muted); }
 #targetState:empty { display: none; }
-#focusTarget { min-height: 28px; padding: 0 8px; font-size: 11px; color: #bcbcbc; }
-.no-target { margin: 0; color: var(--muted); }
-.metrics { display: flex; gap: 18px; margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
-@media (max-width: 800px) {
-  .statusbar { gap: 14px; }
-  .selection { gap: 8px; padding-left: 14px; }
-  #targetState { display: none; }
-  .metrics { gap: 12px; }
-}
+#focusTarget { min-height: 26px; padding: 0 8px; margin-left: auto; font-size: 11px; color: #bcbcbc; }
+#debugStats { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 0; padding-top: 10px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+#debugStats dt { color: var(--muted); }
+#debugStats dd { margin: 0; text-align: right; color: #d0d0d0; }
+.scale { display: flex; align-items: end; gap: 8px; color: #858585; font-size: 10px; white-space: nowrap; }
+#scaleBar { display: block; height: 5px; border: 1px solid #777; border-top: 0; margin-bottom: 3px; }
 @media (max-width: 620px) {
+  .debug { left: 14px; width: auto; }
   .toolbar { padding: 0 14px; gap: 12px; }
-  .brand { gap: 9px; }
-  .brand > span, h1 { display: none; }
   nav { gap: 8px; }
   button { min-height: 36px; padding: 0 10px; }
   #fitRoom { padding-left: 12px; }
-  .statusbar { flex-basis: auto; min-height: 66px; flex-wrap: wrap; gap: 0 14px; padding: 6px 14px; align-content: center; }
-  .connection { min-height: 28px; }
-  .selection { margin-left: auto; border: 0; padding-left: 0; }
-  .metrics { flex-basis: 100%; margin: 0; min-height: 22px; align-items: center; font-size: 10px; }
-  .no-target { margin-left: auto; font-size: 10px; }
-  #frameAge { display: none; }
-  .canvas-footer { left: 14px; right: 14px; bottom: 14px; gap: 20px; }
-  #interactionHint { max-width: 170px; }
-  .depth-note { font-size: 9px; }
 }
 @media (max-width: 520px) {
   .toolbar { padding: 0 10px; }
