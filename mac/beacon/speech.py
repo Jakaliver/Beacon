@@ -3,7 +3,6 @@ import io
 import re
 import wave
 
-import mlx.core as mx
 import numpy as np
 
 from .config import PARAKEET_MODEL
@@ -32,6 +31,7 @@ class Speech:
             n = int(len(pcm) * self.rate / rate)
             pcm = np.interp(np.linspace(0, len(pcm) - 1, n), np.arange(len(pcm)), pcm)
         pcm = pcm[: self.rate * 15]  # short push-to-talk clips only
+        import mlx.core as mx
         from parakeet_mlx.audio import get_logmel
         mel = get_logmel(mx.array(pcm.astype(np.float32)),
                          self.model.preprocessor_config)
@@ -67,6 +67,8 @@ WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "first": 1, "second": 2, "th
 def parse_command(text: str, labels: set[str]) -> dict:
     t = re.sub(r"[^a-z0-9 ]", " ", text.lower()).strip()
     t = re.sub(r"\s+", " ", t)
+    if t in {"pathfinding on", "pathfinding off"}:
+        return {"cmd": "pathfinding", "on": t == "pathfinding on"}
     for verb in ("stop", "cancel", "repeat", "inspect", "resume", "calibrate"):
         if re.search(rf"\b{verb}\b", t):
             return {"cmd": verb}

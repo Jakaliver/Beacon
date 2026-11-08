@@ -27,8 +27,10 @@ implementation comes from the main iPhone app and uses PHASE.
   plane larger than 2 m² and at least 65 cm below the phone. Scan from normal holding height
   first. Without a trusted floor, the scan still displays, but floor-scale correction waits.
 - The occupancy grid is 8×8 m with 10 cm cells and recentres as the phone moves. It can show
-  a different footprint from the retained point cloud. It does not model overhangs beyond
-  obstacle heights from 0.15 m to 2.0 m above the floor.
+  a different footprint from the retained point cloud. Navigation now keeps height-bin
+  occupancy and clearance between 0.06 m and 2.1 m above one estimated floor. Smaller
+  hazards, thin geometry missed by sampling, transparent surfaces and ground-level changes
+  are not reliably resolved. Unknown ground is blocked; this is not stair navigation.
 - Red points lie inside the selected target's estimated box; they are not a separate
   per-point segmentation result. Camera-coloured dots use image pixels and soft splats,
   not a trained 3D Gaussian scene; lighting changes and occlusions can leave colour seams.
@@ -38,7 +40,7 @@ implementation comes from the main iPhone app and uses PHASE.
 ## Detection and guidance
 
 - Object recognition is limited to the detector's vocabulary: the COCO classes plus the
-  household prompts in `EXTRA_PROMPTS` (`mac/trident/perception.py`), such as doors and light
+  household prompts in `EXTRA_PROMPTS` (`mac/beacon/perception.py`), such as doors and light
   switches. Small, cropped, distant and partly hidden objects may be missed or mislabelled.
   Extreme close-ups of a light switch, with no wall around it, are often missed.
 - Depth may fall on an occluder instead of the requested object, shifting the target's
@@ -46,9 +48,21 @@ implementation comes from the main iPhone app and uses PHASE.
 - Selected identity is retained offscreen, while new sightings refine its geometry. Closer
   views get more weight and large corrections require agreement. Similar objects along the
   same viewing direction remain ambiguous.
-- Walking guidance needs observed floor. Unknown or narrow spaces may have no usable route;
-  depth error and obstacle inflation can make open gaps appear blocked.
-- The body position is estimated behind the phone. Head orientation is measured separately;
-  AirPods do not supply a tracked head position.
+- Pathfinding is opt-in through push-to-talk. It requires observed floor and height
+  clearance, including a recent local corridor and a fresh depth capture. Unknown or
+  narrow spaces may have no usable route; depth error and conservative body inflation
+  can make open gaps appear blocked. Two independent observations do not eliminate
+  correlated monocular depth errors.
+- Route position uses the phone's translation with an isotropic hand/body uncertainty
+  allowance; rotating the phone cannot create walked-floor evidence. This is not a
+  measured torso or foot position. The default footprint inflation rounds up to about
+  0.7 m, so narrow doorways may be refused. AirPods do not supply a tracked head position.
+- Object approaches check observed geometry; they do not model actual arm reach,
+  bending or body posture. Extending the phone over furniture can pause guidance again.
+- The stopping horizon uses estimated phone motion, the maximum permitted local-evidence
+  age and configured response
+  assumptions. These have not been validated as a person's stopping distance. The
+  nonverbal pathfinding branch needs the [real-iPhone acceptance checks](pathfinding-testing.md)
+  before merging; it has not been established as independent mobility assistance.
 - Local network connectivity and foreground camera capture are required. The phone needs
   the Mac host name or IP; automatic discovery is not implemented.

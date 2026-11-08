@@ -87,6 +87,8 @@ final class AudioGuide {
         register("pulse", GuidanceSounds.pulse)
         register("confirm", GuidanceSounds.onObject, gain: 0.8)
         register("beacon", GuidanceSounds.waypoint)
+        register("route", PathfindingSounds.waypoint)
+        register("path-stop", PathfindingSounds.stop)
         register("stop", GuidanceSounds.stop)
         register("rescan", GuidanceSounds.rescan)
         registerTargetLoop()
@@ -376,6 +378,16 @@ final class AudioGuide {
     @discardableResult
     func beaconPing(at position: SIMD3<Float>) -> Bool { play("beacon", from: beaconSource, at: position) }
 
+    /// Route guidance is a distinct chime, independent of the selected object sound style.
+    @discardableResult
+    func routePing(at position: SIMD3<Float>) -> Bool { play("route", from: beaconSource, at: position) }
+
+    /// Safety has priority over all previously playing guidance, including a preparing loop.
+    func pathfindingStop() {
+        silence()
+        play("path-stop", from: cueSource, at: nil)
+    }
+
     /// Hot/cold pulses come from the estimated target position, so the user hears where it is.
     /// Without a position they come from just in front of the listener.
     @discardableResult
@@ -394,7 +406,7 @@ final class AudioGuide {
     @discardableResult
     private func play(_ name: String, from source: PHASESource, at position: SIMD3<Float>?) -> Bool {
         // Speech has its own output path. Avoid adding new guidance notes over it.
-        if guidanceDucked, ["pulse", "confirm", "beacon"].contains(name) { return false }
+        if guidanceDucked, ["pulse", "confirm", "beacon", "route"].contains(name) { return false }
         guard ensureRunning(), let duration = clipDurations[name],
               cueTiming.start(at: ProcessInfo.processInfo.systemUptime, duration: duration) else { return false }
         let p = position ?? headLock.withLock { listenerPosition + simd_normalize(listenerForward) * 0.6 }
@@ -433,7 +445,7 @@ final class AudioGuide {
     }
 
     private func source(for name: String) -> PHASESource {
-        name == "beacon" ? beaconSource : ["pulse", "confirm"].contains(name) ? targetSource : cueSource
+        ["beacon", "route"].contains(name) ? beaconSource : ["pulse", "confirm"].contains(name) ? targetSource : cueSource
     }
 
     private func makeEvent(_ name: String) -> (UUID, PHASESoundEvent)? {

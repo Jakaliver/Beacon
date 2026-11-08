@@ -6,7 +6,8 @@ commands and plays guidance through headphones. The Mac runs depth estimation, o
 recognition, button-request speech recognition, mapping and target tracking locally.
 Hold **Talk to Beacon** on the screen while you speak, then release to send.
 Recording continues through pauses until you release. The Mac transcribes it locally.
-Found objects play spatial beeps by default; choose **Beeps** or **Chest** in Settings.
+The app screen has only push-to-talk. Configuration lives in **iPhone Settings → Apps → Beacon**.
+Found objects play spatial beeps by default; choose **Beeps** or **Chest** there.
 Hold and say **"loot mode on"** for the chest sound or **"loot mode off"** for
 Beeps. The choice is remembered and does not resume a paused search.
 Guidance uses one clean beep sound that speeds up as the phone approaches the object.
@@ -15,6 +16,13 @@ small-room reverb tail. Only the phone's position matters; its pointing angle do
 Distance uses the nearest observed object surface, falling back to its centre.
 See the [voice and audio test guide](docs/voice-audio-testing.md)
 for installation, expected behavior and checks on a real iPhone.
+
+On this test branch, **pathfinding on** and **pathfinding off** are the only new voice
+commands. Pathfinding uses spatial waypoint cues and caution/stop haptics, without spoken
+turn-by-turn instructions. It starts off on a fresh install and remembers your choice;
+the existing direct object sound remains available.
+Both the backend and iPhone app must be updated together. See the
+[real-iPhone pathfinding test](docs/pathfinding-testing.md) before merging this branch.
 
 The browser is a **read-only room visualization**: grey LiDAR-style dots, a solid 3D iPhone
 with a screen and camera detail, and the selected target in red. It connects only to `/ws/viewer`. It has no microphone,
@@ -30,8 +38,9 @@ scripts/dev.sh     # backend on :8787, room view on :5173
 Open <http://localhost:5173>. Keep Beacon open on an iPhone connected to the same Wi-Fi.
 See [iPhone setup](docs/real-device.md) for signing, installation and connection settings.
 
-On the iPhone, tap **Calibrate**, then hold **Talk to Beacon**, speak and release to send.
-**Stop** appears during active requests or guidance. Connection settings live behind the gear.
+On the iPhone, hold **Talk to Beacon**, speak and release to send. Existing requests such as
+**calibrate**, **pause**, **resume** and **start over** use that same button. Holding again
+replaces a pending transcription. There are no separate calibration, stop, choice or settings buttons.
 Use the iPhone app to find an object. Its selected target appears automatically in the room
 view. **3D** slowly circles the scan at 30° above horizontal, completing a turn in 90
 seconds. Drag or zoom to pause and inspect; press **3D** to resume. **Overhead** shows a
@@ -87,7 +96,7 @@ height; camera geometry can still display while floor detection settles.
 - `BEACON_VIEWER_HZ`: room view updates per second, default `5`. The point cloud is only resent
   when it changes, and at most 5 times a second, so a fast Mac can use `30`. Put per-machine values in `mac/local.env`
   (not in Git), for example `BEACON_VIEWER_HZ=30`; `scripts/dev.sh` loads it.
-- The iPhone's camera frame rate is in the app's Settings (2–30 per second, default 20).
+- The iPhone's camera frame rate is in **iPhone Settings → Apps → Beacon** (2–30 per second, default 20).
 - `BEACON_DEBUG_DIR`: optional local image, point-cloud and observation logs.
 - Mapping and guidance settings: `mac/beacon/config.py`.
 - Requirements: Apple-silicon Mac, Python 3.11, uv, Node and Xcode supporting your iPhone.

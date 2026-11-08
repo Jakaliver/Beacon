@@ -6,6 +6,9 @@ struct PoseSample {
     let transform: simd_float4x4
     let tracking: String
     let epoch: Int
+    let session: String
+    let timestamp: TimeInterval
+    let sampledAt: TimeInterval
 }
 
 /// Runs ARKit on its own queue and streams poses and JPEG frames to `/ws/sensor`.
@@ -97,7 +100,8 @@ final class ARSensor: NSObject, ARSessionDelegate {
                 message["planes"] = Self.planes(frame)
             }
             link?.sendJSON(message)
-            let sample = PoseSample(transform: camera.transform, tracking: tracking, epoch: epoch)
+            let sample = PoseSample(transform: camera.transform, tracking: tracking, epoch: epoch,
+                                    session: sessionID, timestamp: t, sampledAt: ProcessInfo.processInfo.systemUptime)
             DispatchQueue.main.async { self.onPose?(sample) }
         }
 

@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>StringsTable</key>
+	<string>Root</string>
+	<key>PreferenceSpecifiers</key>
+	<array>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Connection</string>
+			<key>FooterText</key>
+			<string>Enter your Mac’s local hostname or Wi-Fi IP address, without http:// or a port. Keep both devices on the same Wi-Fi. Changes apply when you return to Beacon.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTextFieldSpecifier</string>
+			<key>Title</key>
+			<string>Mac host</string>
+			<key>Key</key>
+			<string>host</string>
+			<key>DefaultValue</key>
+			<string>Malins-Macbook-Pro-3.local</string>
+			<key>IsSecure</key>
+			<false/>
+			<key>AutocapitalizationType</key>
+			<string>None</string>
+			<key>AutocorrectionType</key>
+			<string>No</string>
+			<key>KeyboardType</key>
+			<string>URL</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Camera</string>
+			<key>FooterText</key>
+			<string>Lower frame rates reduce the work on your Mac.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSMultiValueSpecifier</string>
+			<key>Title</key>
+			<string>Camera frame rate</string>
+			<key>Key</key>
+			<string>frameRate</string>
+			<key>DefaultValue</key>
+			<real>20.0</real>
+			<key>Titles</key>
+			<array>
+				<string>2 per second</string>
+				<string>3 per second</string>
+				<string>4 per second</string>
+				<string>5 per second</string>
+				<string>6 per second</string>
+				<string>7 per second</string>
+				<string>8 per second</string>
+				<string>9 per second</string>
+				<string>10 per second</string>
+				<string>11 per second</string>
+				<string>12 per second</string>
+				<string>13 per second</string>
+				<string>14 per second</string>
+				<string>15 per second</string>
+				<string>16 per second</string>
+				<string>17 per second</string>
+				<string>18 per second</string>
+				<string>19 per second</string>
+				<string>20 per second</string>
+				<string>21 per second</string>
+				<string>22 per second</string>
+				<string>23 per second</string>
+				<string>24 per second</string>
+				<string>25 per second</string>
+				<string>26 per second</string>
+				<string>27 per second</string>
+				<string>28 per second</string>
+				<string>29 per second</string>
+				<string>30 per second</string>
+			</array>
+			<key>Values</key>
+			<array>
+				<real>2.0</real>
+				<real>3.0</real>
+				<real>4.0</real>
+				<real>5.0</real>
+				<real>6.0</real>
+				<real>7.0</real>
+				<real>8.0</real>
+				<real>9.0</real>
+				<real>10.0</real>
+				<real>11.0</real>
+				<real>12.0</real>
+				<real>13.0</real>
+				<real>14.0</real>
+				<real>15.0</real>
+				<real>16.0</real>
+				<real>17.0</real>
+				<real>18.0</real>
+				<real>19.0</real>
+				<real>20.0</real>
+				<real>21.0</real>
+				<real>22.0</real>
+				<real>23.0</real>
+				<real>24.0</real>
+				<real>25.0</real>
+				<real>26.0</real>
+				<real>27.0</real>
+				<real>28.0</real>
+				<real>29.0</real>
+				<real>30.0</real>
+			</array>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Guidance sound</string>
+			<key>FooterText</key>
+			<string>Beeps change as you approach an object. Chest plays continuously from its position. Changing this setting does not resume paused guidance.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSMultiValueSpecifier</string>
+			<key>Title</key>
+			<string>Object sound</string>
+			<key>Key</key>
+			<string>guidanceSoundStyle</string>
+			<key>DefaultValue</key>
+			<string>beeps</string>
+			<key>Titles</key>
+			<array>
+				<string>Beeps</string>
+				<string>Chest</string>
+			</array>
+			<key>Values</key>
+			<array>
+				<string>beeps</string>
+				<string>chest</string>
+			</array>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Headphones</string>
+			<key>FooterText</key>
+			<string>Reverse a direction only if sounds move the wrong way when you turn or tilt your head. Positive sound height raises guidance sounds; negative height lowers them.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Reverse head turn</string>
+			<key>Key</key>
+			<string>reverseHeadTurn</string>
+			<key>DefaultValue</key>
+			<false/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Reverse head tilt</string>
+			<key>Key</key>
+			<string>reverseHeadTilt</string>
+			<key>DefaultValue</key>
+			<false/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSMultiValueSpecifier</string>
+			<key>Title</key>
+			<string>Sound height</string>
+			<key>Key</key>
+			<string>soundHeight</string>
+			<key>DefaultValue</key>
+			<real>0.0</real>
+			<key>Titles</key>
+			<array>
+				<string>-60 cm</string>
+				<string>-55 cm</string>
+				<string>-50 cm</string>
+				<string>-45 cm</string>
+				<string>-40 cm</string>
+				<string>-35 cm</string>
+				<string>-30 cm</string>
+				<string>-25 cm</string>
+				<string>-20 cm</string>
+				<string>-15 cm</string>
+				<string>-10 cm</string>
+				<string>-5 cm</string>
+				<string>0 cm</string>
+				<string>+5 cm</string>
+				<string>+10 cm</string>
+				<string>+15 cm</string>
+				<string>+20 cm</string>
+				<string>+25 cm</string>
+				<string>+30 cm</string>
+				<string>+35 cm</string>
+				<string>+40 cm</string>
+				<string>+45 cm</string>
+				<string>+50 cm</string>
+				<string>+55 cm</string>
+				<string>+60 cm</string>
+			</array>
+			<key>Values</key>
+			<array>
+				<real>-0.6</real>
+				<real>-0.55</real>
+				<real>-0.5</real>
+				<real>-0.45</real>
+				<real>-0.4</real>
+				<real>-0.35</real>
+				<real>-0.3</real>
+				<real>-0.25</real>
+				<real>-0.2</real>
+				<real>-0.15</real>
+				<real>-0.1</real>
+				<real>-0.05</real>
+				<real>0.0</real>
+				<real>0.05</real>
+				<real>0.1</real>
+				<real>0.15</real>
+				<real>0.2</real>
+				<real>0.25</real>
+				<real>0.3</real>
+				<real>0.35</real>
+				<real>0.4</real>
+				<real>0.45</real>
+				<real>0.5</real>
+				<real>0.55</real>
+				<real>0.6</real>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

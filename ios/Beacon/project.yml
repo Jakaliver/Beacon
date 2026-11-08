@@ -12,7 +12,12 @@ targets:
   Beacon:
     type: application
     platform: iOS
-    sources: [Beacon]
+    sources:
+      - path: Beacon
+        excludes: [Settings.bundle]
+      - path: Beacon/Settings.bundle
+        type: folder
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.trident.app.m9ac3a7n78
@@ -52,6 +57,7 @@ targets:
       - Beacon/AudioGuide.swift
       - Beacon/TargetProximity.swift
       - Beacon/GuidanceSounds.swift
+      - Beacon/PathfindingFeedback.swift
       - Beacon/chest_loop.wav
     settings:
       base:

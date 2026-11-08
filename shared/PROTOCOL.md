@@ -109,12 +109,21 @@ The backend labels all results from such frames as injected.
 {"type": "stop", "reason": "user"}
 {"type": "resume"}
 {"type": "calibrate"}
-{"type": "config", "navigation": true, "probe_offset": [0, 0, 0]}
+{"type": "config", "navigation": true, "navigation_request_id": "opaque-client-request-id", "probe_offset": [0, 0, 0]}
 {"type": "client_status", "audio_ok": true, "interrupted": false}
 ```
 
 Command text accepts `find [object]`, `stop`, `cancel`, `repeat`, `inspect`,
-`resume`, `calibrate`, `choose N`, `navigation on|off`.
+`resume`, `calibrate`, `choose N`, `pathfinding on|off`. The older backend
+`navigation on|off` spelling remains a protocol compatibility alias; the iPhone
+adds only the two `pathfinding` phrases to its existing command grammar.
+
+The iPhone translates these two commands into `config.navigation`. It generates a
+new opaque `navigation_request_id` for each setting request and on control reconnect.
+The backend echoes the ID and current boolean on guidance messages. The phone must
+withhold both route and target audio until both match its latest request, including
+when switching pathfinding off. A delayed acknowledgement must not restore an older
+sound mode. Changing this setting does not resume a user or hazard pause.
 
 `viewer` clients may send commands but do not contribute audio availability or
 interruption status. Their optional Mac playback is independent of iPhone guidance.
@@ -130,10 +139,10 @@ protocol compatibility; the current room visualization does not send control mes
 ```json
 {
   "type": "guidance",
-  "mode": "idle" | "searching" | "choosing" | "walking" | "probe" | "stopped",
-  "stop_reason": null | "user" | "tracking_lost" | "connection" | "stale" | "route_blocked" | "audio" | "interrupted" | "world_reset" | "rescan",
+  "mode": "idle" | "searching" | "choosing" | "hotcold" | "walking" | "probe" | "stopped",
+  "stop_reason": null | "user" | "tracking_lost" | "connection" | "stale" | "route_blocked" | "pathfinding_blocked" | "pathfinding_unknown" | "audio" | "interrupted" | "world_reset" | "rescan",
   "epoch": 0,
-  "source": {"pose_seq": 901, "pose_t": 1234.600, "frame_seq": 40, "frame_t": 1234.400},
+  "source": {"session": "sensor-session-id", "epoch": 0, "pose_seq": 901, "pose_t": 1234.600, "frame_seq": 40, "frame_t": 1234.400},
   "perception": "real" | "injected",
   "target": null | {
     "id": "bottle-1", "label": "bottle",
@@ -144,7 +153,18 @@ protocol compatibility; the current room visualization does not send control mes
   "proximity": null | {"distance": 0.82, "pulse_interval": 0.45, "confirm": false, "threshold": 0.2},
   "waypoint": null | {"position": [x, y, z], "distance": 1.4, "azimuth_head": -0.4, "azimuth_phone": -0.3, "instruction": "turn left"},
   "listener": [x, y, z],
-  "audio_yaw_offset": 0.0
+  "audio_yaw_offset": 0.0,
+  "navigation": true,
+  "navigation_request_id": "opaque-client-request-id",
+  "safety": {
+    "state": "clear" | "caution" | "blocked" | "unknown",
+    "reason": null | "obstacle" | "corridor_unobserved" | "stale_capture",
+    "capture_t": 1234.400,
+    "frame_seq": 40,
+    "age_ms": 200,
+    "valid_for_ms": 1500,
+    "distance": 0.9
+  }
 }
 ```
 
@@ -153,6 +173,45 @@ protocol compatibility; the current room visualization does not send control mes
 - `azimuth_*`: radians, positive = to the right.
 - `listener`: approximate body position. In Probe mode it stays fixed at mode
   entry.
+
+### Nonverbal pathfinding
+
+`source.session` and `source.epoch` identify the AR clock/world used for all source
+timestamps. The depth capture is published before slower object recognition finishes.
+`safety.capture_t` and `safety.frame_seq` match `source.frame_t` and `source.frame_seq`;
+they are null before usable depth arrives. `age_ms` is the backend's estimate of
+capture age, not time since inference completed. `distance` is nullable diagnostic
+geometry information, not a guarantee of a stopping distance. `reason` is an extensible
+diagnostic string; clients must not rely on the example reason list being exhaustive.
+
+Local corridor ground and height-clearance evidence must be at most 3 seconds old,
+independently of the latest global capture. The stopping horizon budgets that entire
+local-evidence lifetime along with estimated phone speed and response time. Actual
+sideways/backward phone motion is checked as well as the intended waypoint corridor.
+
+The phone separately computes capture age from its latest AR timestamp plus elapsed
+local monotonic time since that pose sample. Its policy requires a matching sensor
+session, epoch, frame identity and config acknowledgement; recent pose and guidance;
+and capture age within `valid_for_ms` (capped locally at 1500 ms). Receiving the same
+old capture again cannot renew it. Missing, malformed or mismatched evidence is unknown.
+
+`clear` and `caution` permit the currently checked local corridor, subject to these
+freshness checks and the current mode. `blocked` and `unknown` suppress movement cues
+and latch a pause. Fresh evidence may update while stopped, but an explicit existing
+`resume` or new search is required before guidance can restart. The backend rechecks
+the route on resume; the phone also requires stable usable evidence. Unchanged latched
+warnings do not queue or repeat periodically.
+
+Walking uses the waypoint sound regardless of the selected Chest/Beeps preference.
+The target chest loop is suppressed during a detour and remains anchored to the
+actual target when used for approach. Caution and stop signals use haptics; stop also
+interrupts current audio with a distinct short cue. These checks precede the phone's
+recording/transcription audio gates. `waypoint.instruction` is diagnostic text retained
+for protocol compatibility, not a request for spoken turn-by-turn output.
+
+The only new user commands are `pathfinding on` and `pathfinding off`; the app retains
+push-to-talk as its sole interaction control. Both backend and iPhone must be updated
+together for this contract. The browser continues to be read-only.
 
 Other Mac → client messages:
 

@@ -7,130 +7,137 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-        BEEA00000000000000000001 /* GuidanceSounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEA00000000000000000003 /* GuidanceSounds.swift */; };
-        BEEA00000000000000000002 /* GuidanceSounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEA00000000000000000003 /* GuidanceSounds.swift */; };
-		AF01B2C3D4E5F60718293047 /* TargetProximity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19926C6AF4279DD4FAE9AED0 /* TargetProximity.swift */; };
-		AA01B2C3D4E5F60718293041 /* HoldToTalkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01B2C3D4E5F60718293042 /* HoldToTalkSession.swift */; };
-		003664E3FC270F86549FEEDD /* VoiceLabModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 247917A730008C5656BD9E75 /* VoiceLabModel.swift */; };
-		103EEC9C2E5B1B70D4813886 /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B59A25BACFD98E15CDA2E09 /* Model.swift */; };
-		10A563FCF00234DE6D614054 /* VoiceModeControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26BDB727AAE491B1B3CDD97 /* VoiceModeControls.swift */; };
-		1FE3F0F56E9692CF95734D37 /* VoiceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EA97D92FF8CA7257357EB11 /* VoiceSession.swift */; };
-		24FAD47C8E67BDED849F4BB9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8618FC10F163DFF865E31228 /* ContentView.swift */; };
-		2F7CA199256A9E0C840A2631 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F577A93D3B5A320DC985C67 /* Settings.swift */; };
-		38241429A9005A174FE1DC33 /* VoiceCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E5CB0422209FAD39344FB7 /* VoiceCommand.swift */; };
-		3C5F198BD5858EEF0A51E6F1 /* VoiceLabApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 216132FC9DCA6503179AA09A /* VoiceLabApp.swift */; };
-		3FBA18A21B1A81B3177F86B8 /* chest_loop.wav in Resources */ = {isa = PBXBuildFile; fileRef = 92B939C21C39F7911E8ABFE5 /* chest_loop.wav */; };
-		450B677CFB6538F4859AAAF3 /* GuidanceSoundSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CE2E3066EDD9706B7B4F783 /* GuidanceSoundSettings.swift */; };
-		4C94184990D710D6E49D9745 /* VoiceCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E5CB0422209FAD39344FB7 /* VoiceCommand.swift */; };
-		68A4445940353C664A4FE8C9 /* AudioGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308C7C8FAF760F96A7D562BD /* AudioGuide.swift */; };
-		71C4C0EF134657A099115DA9 /* VoiceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EA97D92FF8CA7257357EB11 /* VoiceSession.swift */; };
-		748E15202DBC14BEF324D870 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F577A93D3B5A320DC985C67 /* Settings.swift */; };
-		88040329777D90F730F89B10 /* Speech.swift in Sources */ = {isa = PBXBuildFile; fileRef = 604702D284EFE94A88B04A53 /* Speech.swift */; };
-		8A999AB239C34C17EE0C15A4 /* AudioGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308C7C8FAF760F96A7D562BD /* AudioGuide.swift */; };
-		8AB4A90F0B0A6BC9EF3BCD2D /* TargetProximity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19926C6AF4279DD4FAE9AED0 /* TargetProximity.swift */; };
-		9F3E8163128180A07B132007 /* GuidanceSoundSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CE2E3066EDD9706B7B4F783 /* GuidanceSoundSettings.swift */; };
-		AF642317531D6E0CFEE9ADFD /* BeaconApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D3606D4B91643D76C2EE34 /* BeaconApp.swift */; };
-		C8747309B378D6F602F9009F /* VoiceListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517AC3B0527BB348E37B989E /* VoiceListener.swift */; };
-		CE25236A5DA80643629DA457 /* VoiceModeControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26BDB727AAE491B1B3CDD97 /* VoiceModeControls.swift */; };
-		D462A44B3408A13B8F314499 /* Speech.swift in Sources */ = {isa = PBXBuildFile; fileRef = 604702D284EFE94A88B04A53 /* Speech.swift */; };
-		E3B56C6C1E2E4B43F6F622D6 /* Connection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE6DDF5BCF93CDF29CCED18F /* Connection.swift */; };
-		E762DDAA6352C04129F1DC12 /* chest_loop.wav in Resources */ = {isa = PBXBuildFile; fileRef = 92B939C21C39F7911E8ABFE5 /* chest_loop.wav */; };
-		F45AA76CEF87253158F578BC /* VoiceListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517AC3B0527BB348E37B989E /* VoiceListener.swift */; };
-		FEDE55D98819E167048F0124 /* VoiceLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1CE1B4A5F861C5592AE6866 /* VoiceLabView.swift */; };
-		FFFFB19290A045889C0A79C7 /* ARSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88593297C40A9B03AD0701FB /* ARSensor.swift */; };
+		04AB92226EE91F52A270B31C /* chest_loop.wav in Resources */ = {isa = PBXBuildFile; fileRef = C2214DDE6BEF4E527E1FBA04 /* chest_loop.wav */; };
+		082B059EFF8D665C3639E6BE /* GuidanceSoundSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1242B4058B20C5C1B71A850 /* GuidanceSoundSettings.swift */; };
+		0899EE9DA41BC2EFA3AFB9CF /* Speech.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3880797BCBD91896E9317E6 /* Speech.swift */; };
+		0A83CA648A799FCACD6FA311 /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C3BA97FBD03642FD11A6032 /* Model.swift */; };
+		1023D4A0D0B8124690B3D160 /* VoiceListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C9624DF936337DC910AE975 /* VoiceListener.swift */; };
+		13BC9068DD024D885A1D93D0 /* VoiceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C518D99D46C56C722173A52 /* VoiceSession.swift */; };
+		1734A0B24749554AF0DCA2E3 /* ARSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A7F28BF5F05FC77CE1F80F /* ARSensor.swift */; };
+		26ABE112C407A664659F406A /* Settings.bundle in Resources */ = {isa = PBXBuildFile; fileRef = C97C27422BF883FA653D12F8 /* Settings.bundle */; };
+		2BA9AAFAC113B10393E5B9AC /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DDA423D15DB04D3BFADE6EE /* ContentView.swift */; };
+		2C752D4349B11C5E017E3E61 /* AudioGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = A99D977356083027641B595E /* AudioGuide.swift */; };
+		2DC42718433E243BF5C4424F /* PathfindingFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A71C20AE0EA0A5DB6AFE438 /* PathfindingFeedback.swift */; };
+		4D18D338A43DE69C81B000B3 /* VoiceListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C9624DF936337DC910AE975 /* VoiceListener.swift */; };
+		54D523020AC607A83494B15A /* VoiceLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AED07F522FF320B5E13F430 /* VoiceLabView.swift */; };
+		5571B2E61A1372B3697FECA7 /* Speech.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3880797BCBD91896E9317E6 /* Speech.swift */; };
+		5A90E84E43F2696D37EF0654 /* VoiceCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = E936ADA0D67CA72E5065C983 /* VoiceCommand.swift */; };
+		795C0958E750620E04024FD6 /* Connection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 482E4EA38FA38DE3D6457E68 /* Connection.swift */; };
+		7ABAD16F61B1E823579C406B /* VoiceLabApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3274A4F6FA20901F9D52C6E9 /* VoiceLabApp.swift */; };
+		7FBEFE6DA8E0CF9591494295 /* PathfindingFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A71C20AE0EA0A5DB6AFE438 /* PathfindingFeedback.swift */; };
+		81FCFD6011EF9F9C3D6BD0C0 /* GuidanceSoundSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1242B4058B20C5C1B71A850 /* GuidanceSoundSettings.swift */; };
+		825C0E5F468EE2FEBA2C9AB9 /* VoiceModeControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F64067B0098D507701616AA /* VoiceModeControls.swift */; };
+		962C471744F5AB2BB0C975D6 /* TargetProximity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19C02E3D48278CE3393AB86D /* TargetProximity.swift */; };
+		AAA0DE439A54010D4159D9A1 /* VoiceLabModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C95907ABC7570E3D7EE62E8 /* VoiceLabModel.swift */; };
+		ACD037C50CD3B95D65E1ADD6 /* TargetProximity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19C02E3D48278CE3393AB86D /* TargetProximity.swift */; };
+		B02D9E4798FC25AF2CDB704A /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E096F605D217BA39392D2D3A /* Settings.swift */; };
+		BE2D2F109089DCDCFD159923 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E096F605D217BA39392D2D3A /* Settings.swift */; };
+		C444D432D05EFB0BF6E806F2 /* GuidanceSounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 911134394AD16017F16B80F8 /* GuidanceSounds.swift */; };
+		CA66D796BD7C39D91F600775 /* chest_loop.wav in Resources */ = {isa = PBXBuildFile; fileRef = C2214DDE6BEF4E527E1FBA04 /* chest_loop.wav */; };
+		D1478971A0D6BE224F00D3CB /* VoiceModeControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F64067B0098D507701616AA /* VoiceModeControls.swift */; };
+		DB8E79C40D7B4A1AB07DDAF5 /* HoldToTalkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEC138AD0355A3F7A62A01FE /* HoldToTalkSession.swift */; };
+		E1DE6C9F35F0386478AFC0A4 /* VoiceCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = E936ADA0D67CA72E5065C983 /* VoiceCommand.swift */; };
+		EC5F35B7F0FF4B2EC9CFA598 /* VoiceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C518D99D46C56C722173A52 /* VoiceSession.swift */; };
+		F21F632D6D1767FBB8ED69DE /* AudioGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = A99D977356083027641B595E /* AudioGuide.swift */; };
+		F38D05F7C043F502A90F437A /* GuidanceSounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 911134394AD16017F16B80F8 /* GuidanceSounds.swift */; };
+		FF61F6AC77AB72657477474C /* BeaconApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5315C8C1882D3E0B9BF6645C /* BeaconApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-        BEEA00000000000000000003 /* GuidanceSounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceSounds.swift; sourceTree = "<group>"; };
-		AA01B2C3D4E5F60718293042 /* HoldToTalkSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoldToTalkSession.swift; sourceTree = "<group>"; };
-		00888A4EF1F1884442A5E887 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		19926C6AF4279DD4FAE9AED0 /* TargetProximity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TargetProximity.swift; sourceTree = "<group>"; };
-		216132FC9DCA6503179AA09A /* VoiceLabApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceLabApp.swift; sourceTree = "<group>"; };
-		247917A730008C5656BD9E75 /* VoiceLabModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceLabModel.swift; sourceTree = "<group>"; };
-		2B59A25BACFD98E15CDA2E09 /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
-		308C7C8FAF760F96A7D562BD /* AudioGuide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioGuide.swift; sourceTree = "<group>"; };
-		4CE2E3066EDD9706B7B4F783 /* GuidanceSoundSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceSoundSettings.swift; sourceTree = "<group>"; };
-		517AC3B0527BB348E37B989E /* VoiceListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceListener.swift; sourceTree = "<group>"; };
-		5F577A93D3B5A320DC985C67 /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
-		604702D284EFE94A88B04A53 /* Speech.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Speech.swift; sourceTree = "<group>"; };
-		6EA97D92FF8CA7257357EB11 /* VoiceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSession.swift; sourceTree = "<group>"; };
-		83A4D838F67B55312BA55A50 /* BeaconVoiceLab.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BeaconVoiceLab.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		83E5CB0422209FAD39344FB7 /* VoiceCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCommand.swift; sourceTree = "<group>"; };
-		8618FC10F163DFF865E31228 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		88593297C40A9B03AD0701FB /* ARSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARSensor.swift; sourceTree = "<group>"; };
-		92B939C21C39F7911E8ABFE5 /* chest_loop.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = chest_loop.wav; sourceTree = "<group>"; };
-		A07C855A4B9703F7CFCBFC4E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		A26BDB727AAE491B1B3CDD97 /* VoiceModeControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceModeControls.swift; sourceTree = "<group>"; };
-		C1CE1B4A5F861C5592AE6866 /* VoiceLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceLabView.swift; sourceTree = "<group>"; };
-		C2D42317C13FA6629FCC997F /* Beacon.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Beacon.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E9D3606D4B91643D76C2EE34 /* BeaconApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconApp.swift; sourceTree = "<group>"; };
-		EE6DDF5BCF93CDF29CCED18F /* Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connection.swift; sourceTree = "<group>"; };
+		161BBBB797430B0BFC0697CA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		19C02E3D48278CE3393AB86D /* TargetProximity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TargetProximity.swift; sourceTree = "<group>"; };
+		2C518D99D46C56C722173A52 /* VoiceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSession.swift; sourceTree = "<group>"; };
+		2F64067B0098D507701616AA /* VoiceModeControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceModeControls.swift; sourceTree = "<group>"; };
+		3274A4F6FA20901F9D52C6E9 /* VoiceLabApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceLabApp.swift; sourceTree = "<group>"; };
+		3AED07F522FF320B5E13F430 /* VoiceLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceLabView.swift; sourceTree = "<group>"; };
+		482E4EA38FA38DE3D6457E68 /* Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connection.swift; sourceTree = "<group>"; };
+		5315C8C1882D3E0B9BF6645C /* BeaconApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconApp.swift; sourceTree = "<group>"; };
+		5C9624DF936337DC910AE975 /* VoiceListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceListener.swift; sourceTree = "<group>"; };
+		6C3BA97FBD03642FD11A6032 /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
+		6DDA423D15DB04D3BFADE6EE /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		911134394AD16017F16B80F8 /* GuidanceSounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceSounds.swift; sourceTree = "<group>"; };
+		9A71C20AE0EA0A5DB6AFE438 /* PathfindingFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathfindingFeedback.swift; sourceTree = "<group>"; };
+		9C95907ABC7570E3D7EE62E8 /* VoiceLabModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceLabModel.swift; sourceTree = "<group>"; };
+		A0A7F28BF5F05FC77CE1F80F /* ARSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARSensor.swift; sourceTree = "<group>"; };
+		A99D977356083027641B595E /* AudioGuide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioGuide.swift; sourceTree = "<group>"; };
+		AEC138AD0355A3F7A62A01FE /* HoldToTalkSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoldToTalkSession.swift; sourceTree = "<group>"; };
+		B088C0722EF75E8A074D62DC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		C2214DDE6BEF4E527E1FBA04 /* chest_loop.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = chest_loop.wav; sourceTree = "<group>"; };
+		C3880797BCBD91896E9317E6 /* Speech.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Speech.swift; sourceTree = "<group>"; };
+		C7409072D89DD197776401F6 /* BeaconVoiceLab.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BeaconVoiceLab.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C97C27422BF883FA653D12F8 /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Settings.bundle; path = Beacon/Settings.bundle; sourceTree = SOURCE_ROOT; };
+		D1242B4058B20C5C1B71A850 /* GuidanceSoundSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceSoundSettings.swift; sourceTree = "<group>"; };
+		E096F605D217BA39392D2D3A /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
+		E936ADA0D67CA72E5065C983 /* VoiceCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCommand.swift; sourceTree = "<group>"; };
+		F3F190BF934C72E1601D3F2B /* Beacon.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Beacon.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
-		26E6D92631E3CE3CA201B562 = {
+		2A419C6D47671DA87C294481 /* VoiceLab */ = {
 			isa = PBXGroup;
 			children = (
-				8243A99044365329FE77F005 /* Beacon */,
-				E0D030A3BEDC3C640B1EF63A /* VoiceLab */,
-				300FDC2BC26B512FBA6393E4 /* Products */,
+				161BBBB797430B0BFC0697CA /* Info.plist */,
+				3274A4F6FA20901F9D52C6E9 /* VoiceLabApp.swift */,
+				9C95907ABC7570E3D7EE62E8 /* VoiceLabModel.swift */,
+				3AED07F522FF320B5E13F430 /* VoiceLabView.swift */,
 			);
+			path = VoiceLab;
 			sourceTree = "<group>";
 		};
-		300FDC2BC26B512FBA6393E4 /* Products */ = {
+		3775047BE660E575CD18F67A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C2D42317C13FA6629FCC997F /* Beacon.app */,
-				83A4D838F67B55312BA55A50 /* BeaconVoiceLab.app */,
+				F3F190BF934C72E1601D3F2B /* Beacon.app */,
+				C7409072D89DD197776401F6 /* BeaconVoiceLab.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		8243A99044365329FE77F005 /* Beacon */ = {
+		7D305C7354F60FF4F0BA1A1C = {
 			isa = PBXGroup;
 			children = (
-				88593297C40A9B03AD0701FB /* ARSensor.swift */,
-				308C7C8FAF760F96A7D562BD /* AudioGuide.swift */,
-                BEEA00000000000000000003 /* GuidanceSounds.swift */,
-				92B939C21C39F7911E8ABFE5 /* chest_loop.wav */,
-				EE6DDF5BCF93CDF29CCED18F /* Connection.swift */,
-				8618FC10F163DFF865E31228 /* ContentView.swift */,
-				4CE2E3066EDD9706B7B4F783 /* GuidanceSoundSettings.swift */,
-				00888A4EF1F1884442A5E887 /* Info.plist */,
-				2B59A25BACFD98E15CDA2E09 /* Model.swift */,
-				5F577A93D3B5A320DC985C67 /* Settings.swift */,
-				604702D284EFE94A88B04A53 /* Speech.swift */,
-				19926C6AF4279DD4FAE9AED0 /* TargetProximity.swift */,
-				E9D3606D4B91643D76C2EE34 /* BeaconApp.swift */,
-				AA01B2C3D4E5F60718293042 /* HoldToTalkSession.swift */,
-				83E5CB0422209FAD39344FB7 /* VoiceCommand.swift */,
-				517AC3B0527BB348E37B989E /* VoiceListener.swift */,
-				A26BDB727AAE491B1B3CDD97 /* VoiceModeControls.swift */,
-				6EA97D92FF8CA7257357EB11 /* VoiceSession.swift */,
+				C97C27422BF883FA653D12F8 /* Settings.bundle */,
+				F2D2F9C80A263A168D2A87AC /* Beacon */,
+				2A419C6D47671DA87C294481 /* VoiceLab */,
+				3775047BE660E575CD18F67A /* Products */,
 			);
-			path = Beacon;
 			sourceTree = "<group>";
 		};
-		E0D030A3BEDC3C640B1EF63A /* VoiceLab */ = {
+		F2D2F9C80A263A168D2A87AC /* Beacon */ = {
 			isa = PBXGroup;
 			children = (
-				A07C855A4B9703F7CFCBFC4E /* Info.plist */,
-				216132FC9DCA6503179AA09A /* VoiceLabApp.swift */,
-				247917A730008C5656BD9E75 /* VoiceLabModel.swift */,
-				C1CE1B4A5F861C5592AE6866 /* VoiceLabView.swift */,
+				A0A7F28BF5F05FC77CE1F80F /* ARSensor.swift */,
+				A99D977356083027641B595E /* AudioGuide.swift */,
+				5315C8C1882D3E0B9BF6645C /* BeaconApp.swift */,
+				C2214DDE6BEF4E527E1FBA04 /* chest_loop.wav */,
+				482E4EA38FA38DE3D6457E68 /* Connection.swift */,
+				6DDA423D15DB04D3BFADE6EE /* ContentView.swift */,
+				911134394AD16017F16B80F8 /* GuidanceSounds.swift */,
+				D1242B4058B20C5C1B71A850 /* GuidanceSoundSettings.swift */,
+				AEC138AD0355A3F7A62A01FE /* HoldToTalkSession.swift */,
+				B088C0722EF75E8A074D62DC /* Info.plist */,
+				6C3BA97FBD03642FD11A6032 /* Model.swift */,
+				9A71C20AE0EA0A5DB6AFE438 /* PathfindingFeedback.swift */,
+				E096F605D217BA39392D2D3A /* Settings.swift */,
+				C3880797BCBD91896E9317E6 /* Speech.swift */,
+				19C02E3D48278CE3393AB86D /* TargetProximity.swift */,
+				E936ADA0D67CA72E5065C983 /* VoiceCommand.swift */,
+				5C9624DF936337DC910AE975 /* VoiceListener.swift */,
+				2F64067B0098D507701616AA /* VoiceModeControls.swift */,
+				2C518D99D46C56C722173A52 /* VoiceSession.swift */,
 			);
-			path = VoiceLab;
+			path = Beacon;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		3F3B910FD04FC8EB084BEB9F /* BeaconVoiceLab */ = {
+		5CAD71D955C09B53834E3FDE /* BeaconVoiceLab */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = FBB65E0DAF79B15E2F3208F3 /* Build configuration list for PBXNativeTarget "BeaconVoiceLab" */;
+			buildConfigurationList = 27389B0460037E58C5CFA08B /* Build configuration list for PBXNativeTarget "BeaconVoiceLab" */;
 			buildPhases = (
-				C2C7A9564D2CC41E4C718BB2 /* Sources */,
-				237E26901E191CD02B196E03 /* Resources */,
+				D92D386B796DCC0FE8BCE9D6 /* Sources */,
+				7635D5DF3481DB0D02CF53E5 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -140,15 +147,15 @@
 			packageProductDependencies = (
 			);
 			productName = BeaconVoiceLab;
-			productReference = 83A4D838F67B55312BA55A50 /* BeaconVoiceLab.app */;
+			productReference = C7409072D89DD197776401F6 /* BeaconVoiceLab.app */;
 			productType = "com.apple.product-type.application";
 		};
-		6599E2CA25A5C26AFEE6193D /* Beacon */ = {
+		D228A6A5953A527AE307B4BE /* Beacon */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3671F856DAB8C776E01CFA20 /* Build configuration list for PBXNativeTarget "Beacon" */;
+			buildConfigurationList = 101E2A57E418B0D9774856C5 /* Build configuration list for PBXNativeTarget "Beacon" */;
 			buildPhases = (
-				2A8800A0F03001AEEECAEDC1 /* Sources */,
-				98F1758F19095C1926EA12FF /* Resources */,
+				E558E1C064562CA63E2A134F /* Sources */,
+				AF300B166967F8C9DA7439E9 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -158,115 +165,118 @@
 			packageProductDependencies = (
 			);
 			productName = Beacon;
-			productReference = C2D42317C13FA6629FCC997F /* Beacon.app */;
+			productReference = F3F190BF934C72E1601D3F2B /* Beacon.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		F612FF228587B7DD929DB1BF /* Project object */ = {
+		C6CDC17607DFF5D714886E77 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
-					3F3B910FD04FC8EB084BEB9F = {
+					5CAD71D955C09B53834E3FDE = {
 						DevelopmentTeam = M9AC3A7N78;
 						ProvisioningStyle = Automatic;
 					};
-					6599E2CA25A5C26AFEE6193D = {
+					D228A6A5953A527AE307B4BE = {
 						DevelopmentTeam = M9AC3A7N78;
 						ProvisioningStyle = Automatic;
 					};
 				};
 			};
-			buildConfigurationList = C1CD4170B33314F4AF7EC3B3 /* Build configuration list for PBXProject "Beacon" */;
+			buildConfigurationList = 880646F2C181B43B6D369452 /* Build configuration list for PBXProject "Beacon" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
 				en,
 			);
-			mainGroup = 26E6D92631E3CE3CA201B562;
+			mainGroup = 7D305C7354F60FF4F0BA1A1C;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 300FDC2BC26B512FBA6393E4 /* Products */;
+			productRefGroup = 3775047BE660E575CD18F67A /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				6599E2CA25A5C26AFEE6193D /* Beacon */,
-				3F3B910FD04FC8EB084BEB9F /* BeaconVoiceLab */,
+				D228A6A5953A527AE307B4BE /* Beacon */,
+				5CAD71D955C09B53834E3FDE /* BeaconVoiceLab */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		237E26901E191CD02B196E03 /* Resources */ = {
+		7635D5DF3481DB0D02CF53E5 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3FBA18A21B1A81B3177F86B8 /* chest_loop.wav in Resources */,
+				04AB92226EE91F52A270B31C /* chest_loop.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		98F1758F19095C1926EA12FF /* Resources */ = {
+		AF300B166967F8C9DA7439E9 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E762DDAA6352C04129F1DC12 /* chest_loop.wav in Resources */,
+				26ABE112C407A664659F406A /* Settings.bundle in Resources */,
+				CA66D796BD7C39D91F600775 /* chest_loop.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		2A8800A0F03001AEEECAEDC1 /* Sources */ = {
+		D92D386B796DCC0FE8BCE9D6 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FFFFB19290A045889C0A79C7 /* ARSensor.swift in Sources */,
-				8A999AB239C34C17EE0C15A4 /* AudioGuide.swift in Sources */,
-                BEEA00000000000000000001 /* GuidanceSounds.swift in Sources */,
-				E3B56C6C1E2E4B43F6F622D6 /* Connection.swift in Sources */,
-				24FAD47C8E67BDED849F4BB9 /* ContentView.swift in Sources */,
-				450B677CFB6538F4859AAAF3 /* GuidanceSoundSettings.swift in Sources */,
-				103EEC9C2E5B1B70D4813886 /* Model.swift in Sources */,
-				748E15202DBC14BEF324D870 /* Settings.swift in Sources */,
-				D462A44B3408A13B8F314499 /* Speech.swift in Sources */,
-				8AB4A90F0B0A6BC9EF3BCD2D /* TargetProximity.swift in Sources */,
-				AF642317531D6E0CFEE9ADFD /* BeaconApp.swift in Sources */,
-				AA01B2C3D4E5F60718293041 /* HoldToTalkSession.swift in Sources */,
-				4C94184990D710D6E49D9745 /* VoiceCommand.swift in Sources */,
-				F45AA76CEF87253158F578BC /* VoiceListener.swift in Sources */,
-				CE25236A5DA80643629DA457 /* VoiceModeControls.swift in Sources */,
-				71C4C0EF134657A099115DA9 /* VoiceSession.swift in Sources */,
+				2C752D4349B11C5E017E3E61 /* AudioGuide.swift in Sources */,
+				81FCFD6011EF9F9C3D6BD0C0 /* GuidanceSoundSettings.swift in Sources */,
+				F38D05F7C043F502A90F437A /* GuidanceSounds.swift in Sources */,
+				2DC42718433E243BF5C4424F /* PathfindingFeedback.swift in Sources */,
+				BE2D2F109089DCDCFD159923 /* Settings.swift in Sources */,
+				5571B2E61A1372B3697FECA7 /* Speech.swift in Sources */,
+				ACD037C50CD3B95D65E1ADD6 /* TargetProximity.swift in Sources */,
+				E1DE6C9F35F0386478AFC0A4 /* VoiceCommand.swift in Sources */,
+				7ABAD16F61B1E823579C406B /* VoiceLabApp.swift in Sources */,
+				AAA0DE439A54010D4159D9A1 /* VoiceLabModel.swift in Sources */,
+				54D523020AC607A83494B15A /* VoiceLabView.swift in Sources */,
+				1023D4A0D0B8124690B3D160 /* VoiceListener.swift in Sources */,
+				D1478971A0D6BE224F00D3CB /* VoiceModeControls.swift in Sources */,
+				13BC9068DD024D885A1D93D0 /* VoiceSession.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		C2C7A9564D2CC41E4C718BB2 /* Sources */ = {
+		E558E1C064562CA63E2A134F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AF01B2C3D4E5F60718293047 /* TargetProximity.swift in Sources */,
-				68A4445940353C664A4FE8C9 /* AudioGuide.swift in Sources */,
-                BEEA00000000000000000002 /* GuidanceSounds.swift in Sources */,
-				9F3E8163128180A07B132007 /* GuidanceSoundSettings.swift in Sources */,
-				2F7CA199256A9E0C840A2631 /* Settings.swift in Sources */,
-				88040329777D90F730F89B10 /* Speech.swift in Sources */,
-				38241429A9005A174FE1DC33 /* VoiceCommand.swift in Sources */,
-				3C5F198BD5858EEF0A51E6F1 /* VoiceLabApp.swift in Sources */,
-				003664E3FC270F86549FEEDD /* VoiceLabModel.swift in Sources */,
-				FEDE55D98819E167048F0124 /* VoiceLabView.swift in Sources */,
-				C8747309B378D6F602F9009F /* VoiceListener.swift in Sources */,
-				10A563FCF00234DE6D614054 /* VoiceModeControls.swift in Sources */,
-				1FE3F0F56E9692CF95734D37 /* VoiceSession.swift in Sources */,
+				1734A0B24749554AF0DCA2E3 /* ARSensor.swift in Sources */,
+				F21F632D6D1767FBB8ED69DE /* AudioGuide.swift in Sources */,
+				FF61F6AC77AB72657477474C /* BeaconApp.swift in Sources */,
+				795C0958E750620E04024FD6 /* Connection.swift in Sources */,
+				2BA9AAFAC113B10393E5B9AC /* ContentView.swift in Sources */,
+				082B059EFF8D665C3639E6BE /* GuidanceSoundSettings.swift in Sources */,
+				C444D432D05EFB0BF6E806F2 /* GuidanceSounds.swift in Sources */,
+				DB8E79C40D7B4A1AB07DDAF5 /* HoldToTalkSession.swift in Sources */,
+				0A83CA648A799FCACD6FA311 /* Model.swift in Sources */,
+				7FBEFE6DA8E0CF9591494295 /* PathfindingFeedback.swift in Sources */,
+				B02D9E4798FC25AF2CDB704A /* Settings.swift in Sources */,
+				0899EE9DA41BC2EFA3AFB9CF /* Speech.swift in Sources */,
+				962C471744F5AB2BB0C975D6 /* TargetProximity.swift in Sources */,
+				5A90E84E43F2696D37EF0654 /* VoiceCommand.swift in Sources */,
+				4D18D338A43DE69C81B000B3 /* VoiceListener.swift in Sources */,
+				825C0E5F468EE2FEBA2C9AB9 /* VoiceModeControls.swift in Sources */,
+				EC5F35B7F0FF4B2EC9CFA598 /* VoiceSession.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		381810D09B5A5085229B2C91 /* Debug */ = {
+		3436E61CA2D1224F41375D18 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -282,9 +292,45 @@
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
+			name = Release;
+		};
+		4B281AAA2250DFDF0F40362D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Beacon/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.trident.app.m9ac3a7n78;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		6B19F9B63D9BF36B829D5BE9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Beacon/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.trident.app.m9ac3a7n78;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
 			name = Debug;
 		};
-		49EE931B831070F11E926805 /* Release */ = {
+		AFE7807B1615640FCC7860B0 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -342,7 +388,7 @@
 			};
 			name = Release;
 		};
-		776BCDB4BECCEE41F037FA88 /* Release */ = {
+		CAB6D68E3CD66AA0262278A9 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -358,9 +404,9 @@
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
-			name = Release;
+			name = Debug;
 		};
-		80E03785FD44362E2C95F37D /* Debug */ = {
+		E5817567C45C64BFB73AD6E5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -425,73 +471,37 @@
 			};
 			name = Debug;
 		};
-		E49FD15BF9B717D22FC8C802 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 1;
-				INFOPLIST_FILE = Beacon/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ai.trident.app.m9ac3a7n78;
-				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = 1;
-			};
-			name = Release;
-		};
-		FBF3642A5C9259AD9B77917B /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 1;
-				INFOPLIST_FILE = Beacon/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ai.trident.app.m9ac3a7n78;
-				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = 1;
-			};
-			name = Debug;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		3671F856DAB8C776E01CFA20 /* Build configuration list for PBXNativeTarget "Beacon" */ = {
+		101E2A57E418B0D9774856C5 /* Build configuration list for PBXNativeTarget "Beacon" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				FBF3642A5C9259AD9B77917B /* Debug */,
-				E49FD15BF9B717D22FC8C802 /* Release */,
+				6B19F9B63D9BF36B829D5BE9 /* Debug */,
+				4B281AAA2250DFDF0F40362D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		C1CD4170B33314F4AF7EC3B3 /* Build configuration list for PBXProject "Beacon" */ = {
+		27389B0460037E58C5CFA08B /* Build configuration list for PBXNativeTarget "BeaconVoiceLab" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				80E03785FD44362E2C95F37D /* Debug */,
-				49EE931B831070F11E926805 /* Release */,
+				CAB6D68E3CD66AA0262278A9 /* Debug */,
+				3436E61CA2D1224F41375D18 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		FBB65E0DAF79B15E2F3208F3 /* Build configuration list for PBXNativeTarget "BeaconVoiceLab" */ = {
+		880646F2C181B43B6D369452 /* Build configuration list for PBXProject "Beacon" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				381810D09B5A5085229B2C91 /* Debug */,
-				776BCDB4BECCEE41F037FA88 /* Release */,
+				E5817567C45C64BFB73AD6E5 /* Debug */,
+				AFE7807B1615640FCC7860B0 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = F612FF228587B7DD929DB1BF /* Project object */;
+	rootObject = C6CDC17607DFF5D714886E77 /* Project object */;
 }

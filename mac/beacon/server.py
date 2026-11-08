@@ -89,6 +89,7 @@ async def broadcast_viewer(text: str) -> None:
 
 
 last_logged_mode = {"mode": None}
+last_logged_safety = {"value": None}
 
 
 async def publish_guidance() -> None:
@@ -102,6 +103,11 @@ async def publish_guidance() -> None:
         events.info("mode %s%s target=%s", g["mode"], f" ({g['stop_reason']})" if g["stop_reason"] else "",
                     target and f"{target['id']} at {target['position']} locked={target.get('locked')}")
     if g:
+        safety = g.get("safety") or {}
+        state = (g.get("navigation"), safety.get("state"), safety.get("reason"))
+        if state != last_logged_safety["value"]:
+            last_logged_safety["value"] = state
+            events.info("pathfinding=%s safety=%s reason=%s capture_age_ms=%s", *state, safety.get("age_ms"))
         msgs.append(g)
     if msgs:
         await broadcast(control_clients, msgs)
@@ -232,7 +238,8 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 @app.get("/api/health")
 def health() -> dict:
     return {"vision_ready": engine.perception is not None, "speech_ready": speech["model"] is not None,
-            "sensor_connected": engine.sensor_connected, "mode": engine.mode, **memory_stats()}
+            "sensor_connected": engine.sensor_connected, "mode": engine.mode,
+            "navigation": engine.navigation, "safety": engine.safety.copy(), **memory_stats()}
 
 
 @app.post("/api/transcribe")
@@ -327,7 +334,7 @@ async def control(ws: WebSocket) -> None:
                     engine.calibrate(quiet=False)
                 elif kind == "config":
                     if "navigation" in m:
-                        engine.navigation = bool(m["navigation"])
+                        engine.set_navigation(bool(m["navigation"]), m.get("navigation_request_id"))
                     if "probe_offset" in m:
                         engine.probe_offset = np.asarray(m["probe_offset"], float)
                 elif kind == "client_status" and control_roles.get(ws) != "viewer":

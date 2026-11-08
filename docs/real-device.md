@@ -88,8 +88,8 @@ file will restore the checked-in developer's signing settings.
 
    Append `.local` to the result. Alternatively, use the Wi-Fi IP shown in macOS Network
    settings (`ipconfig getifaddr en0` when Wi-Fi is on `en0`).
-3. In Beacon on the phone, tap **Settings** (gear), enter that hostname/IP under **Mac host**,
-   then tap **Done**. Enter only the host, **without** `http://`, `ws://` or `:8787`.
+3. Open **iPhone Settings → Apps → Beacon**, enter that hostname/IP under **Mac host**,
+   then return to Beacon. Enter only the host, **without** `http://`, `ws://` or `:8787`.
    The app currently defaults to another developer's Mac, so you must change this.
 4. Allow Camera, Microphone, Motion and Local Network permissions when requested.
 5. The phone should show **Connected** and **Ready**. The health endpoint
@@ -103,28 +103,29 @@ Allow incoming connections for the backend if macOS prompts. Use the Mac's Wi-Fi
 
 ## 5. First camera and target test
 
-1. Keep Beacon open in the foreground. Start at **5 frames/sec** under Settings → Advanced on a
+1. Keep Beacon open in the foreground. Start at **5 frames/sec** in iPhone Settings → Apps → Beacon on a
    MacBook Air; raise the rate only while the displayed camera age remains low.
 2. Sweep slowly across a well-lit floor and nearby furniture. A floor patch of about 1 m²
    helps ARKit establish the floor height. The Mac view should show **Live**
    and an increasing point count.
-3. Hold the phone ahead of your torso, facing forward, and tap **Calibrate**. If testing
+3. Hold the phone ahead of your torso, facing forward, and send **calibrate** using push-to-talk. If testing
    head tracking, wear compatible AirPods paired with the phone during calibration.
 4. Hold **Talk to Beacon**, say **find the bottle**, then release to send.
    With VoiceOver, double-tap and hold, then lift your finger. The app must remain open.
 5. The selected target appears red in the Mac view. Keep it visible while moving closer:
    consistent new sightings refine its position and surface. Larger corrections require
    three agreeing observations so a single bad depth frame does not move the target.
-6. **Stop** appears while a request or guidance is active. It silences guidance and cancels
-   any pending voice request. To continue, hold the button, say **"resume"** and release,
-   or ask for another object. Audio changes and app interruptions can also stop guidance.
+6. To pause, hold the button, say **"pause"** and release. To continue, send **"resume"**
+   or ask for another object. Holding again replaces a pending transcription; a late response
+   must not execute. Audio changes and app interruptions can also stop guidance.
 
 ### Recording a request
 
 Hold **Talk to Beacon** while speaking, then release to send. Pauses do not end the
 recording, and longer requests are no longer cut off at six seconds. If the microphone
 permission prompt interrupts your first hold, allow access, then hold the button again.
-**Stop** cancels without sending. Leaving the app cancels recording and pending requests.
+Leaving the app cancels recording and pending requests. A new hold replaces a pending
+transcription. The main screen has no other controls.
 The microphone stays closed between requests; the main app does not request Speech
 Recognition access or offer an Action button shortcut.
 
@@ -175,11 +176,11 @@ microphone session and cannot change the phone's guidance state.
 Guidance defaults to **Beeps**: clean beeps accelerate as the phone approaches the object,
 then become a short, rising double beep inside the close-distance threshold (normally 20 cm).
 Phone rotation does not change proximity feedback. Sounds retain distance attenuation
-and audible small-room reverb. Settings → **Object sound** also offers **Chest**, a
+and audible small-room reverb. iPhone Settings → Apps → Beacon → **Object sound** also offers **Chest**, a
 continuous sound at the object that lowers while the app speaks.
 For voice controls and audio acceptance checks, use the
 [voice and audio test guide](voice-audio-testing.md).
-With AirPods on, face where the phone points and press **Calibrate** so head turns keep
+With AirPods on, face where the phone points and say **calibrate** through push-to-talk so head turns keep
 the sound aligned with the object. The reverb is a room preset, not measured room acoustics.
 
 ## Troubleshooting
@@ -193,8 +194,8 @@ the sound aligned with the object. The reverb is a room preset, not measured roo
 | `vision_ready: false` / `speech_ready: false` | Wait for model loading and check the backend terminal. Re-run setup online if downloads did not finish. |
 | Connected, but no room points | Allow Camera/Local Network access, wait for normal tracking, scan the floor, and check `vision_ready`. |
 | Room stops changing | Check the camera age in the viewer and keep the iPhone app foregrounded. |
-| Speech works, but guidance is silent | Connect AirPods to the **iPhone**, check its audio output, then send a new **find** command or hold **Talk to Beacon**, say **"resume"** and release. Listen for the spoken stop reason if guidance pauses. |
-| Sounds turn the wrong way with your head | Recalibrate while facing ahead; try the app's **Reverse head turn** setting. |
+| Speech works, but guidance is silent | Connect AirPods to the **iPhone**, check its audio output and read the paused status. With pathfinding on, the next corridor needs recent floor/clearance observations before **resume** can restore guidance. A clear camera view alone does not prove the route is usable. |
+| Sounds turn the wrong way with your head | Recalibrate while facing ahead; try **Reverse head turn** in iPhone Settings → Apps → Beacon. |
 
 For a playback check independent of camera detection, launch an installed **Debug** build
 with the following command, substituting your device identifier and bundle identifier:
@@ -205,7 +206,7 @@ xcrun devicectl device process launch --device YOUR_DEVICE_ID --terminate-existi
 ```
 
 After five seconds, it plays five clean beeps followed by five close double-beeps, evenly spaced.
-**Stop** cancels the sequence.
+Leaving the app cancels the sequence.
 The console reports the active audio route, playback failures and completed sounds;
 confirm that the pulses are actually audible through the selected output. Launch the app
 again without `--audio-self-test` for normal use. Without headphones, audio defaults to

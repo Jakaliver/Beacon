@@ -15,7 +15,7 @@ import numpy as np
 
 from .config import CONFIG
 from .geometry import forward, head_local, pose_matrix, to_world, unproject, wrap, yaw_of
-from .mapping import UNCERTAIN, GridMap
+from .mapping import FREE, OCCUPIED, INFLATED, GridMap
 from .planner import line_clear, plan, ring_cells, walkable_grid
 from .speech import parse_command
 from .targets import IGNORED, Tracker, canonical, observe
@@ -92,6 +92,8 @@ class Engine:
         self.selected: str | None = None
         self.choice_ids: list[str] = []
         self.navigation = False
+        self.navigation_revision = 0
+        self.navigation_request_id: str | None = None
         self.probe_offset = np.zeros(3)
         self.audio_yaw_offset: float | None = None
         self.audio_ok = True
@@ -125,6 +127,9 @@ class Engine:
         self.frame_meta = {"seq": None, "t": None}
         self.last_frame_processed = 0.0
         self._last_plan = (0.0, -1)
+        self._phone_speed = 0.0
+        self._phone_velocity = np.zeros(2)
+        self.safety = self._safety_packet("unknown", "no_depth", time.monotonic())
         self._cache_phone_pose()
 
     def say(self, text: str) -> None:
@@ -138,7 +143,7 @@ class Engine:
         out, self.outbox = self.outbox, []
         return out
 
-    def stop(self, reason: str, message: str) -> None:
+    def stop(self, reason: str, message: str | None = None) -> None:
         if self.mode == "stopped" and self.stop_reason == reason:
             return
         if self.mode in ACTIVE or self.mode in {"searching", "choosing"}:
@@ -146,8 +151,12 @@ class Engine:
         self.mode = "stopped"
         self.stop_reason = reason
         self.smoothed_interval = None
+        self.path, self.waypoint = [], None
+        self._last_plan = (0.0, -1)
         self.cue("stop")
-        self.say(message)
+        # Automatic navigation warnings are nonverbal, including client-side TTL stops.
+        if message and not reason.startswith("pathfinding_") and not (self.navigation and reason != "user"):
+            self.say(message)
 
     def check_epoch(self, epoch: int, session: str | None = None) -> None:
         """A new world epoch or a new sensor session invalidates map, targets and route."""
@@ -178,15 +187,24 @@ class Engine:
             head = msg.get("head")
             pose = Pose(pose_matrix(msg["pose"]), msg["t"], msg["seq"], msg["tracking"],
                         head["q"] if head and head.get("available") else None, now)
+            if self.pose is not None and pose.t > self.pose.t:
+                self._phone_velocity = (pose.T[:3, 3] - self.pose.T[:3, 3])[[0, 2]] / (pose.t - self.pose.t)
+                speed = np.linalg.norm(self._phone_velocity)
+                self._phone_speed = max(float(speed), self._phone_speed * 0.9)
             self.pose = pose
-            # Not in Probe mode: there the hand may reach over furniture the body cannot cross.
-            if msg["tracking"] == "normal" and self.map.floor_y is not None and self.mode != "probe":
-                self.map.mark_walked(self.walking_body()[[0, 2]], now)
             if msg.get("floor_y") is not None:
                 if self.map.arkit_floor is None and self.mode in {"idle", "searching"}:
                     # Geometry integrated before the metric floor was known used an unchecked depth scale.
                     self.reset_world(self.epoch)
-                self.map.arkit_floor = float(msg["floor_y"])
+                floor = float(msg["floor_y"])
+                if (self.map.arkit_floor is not None and math.isfinite(floor)
+                        and abs(floor - self.map.arkit_floor) > CONFIG.floor_band):
+                    # All height bins refer to the old floor. Keep the display
+                    # cloud, but require fresh navigation evidence after a shift.
+                    self.map = GridMap()
+                    self.path, self.waypoint = [], None
+                    self._last_plan = (0.0, -1)
+                self.map.arkit_floor = floor if math.isfinite(floor) else None
             self.map.expect_arkit_floor = msg.get("floor_source") == "arkit"
             if "planes" in msg and msg["tracking"] == "normal":
                 self.planes = plane_snapshot(msg["planes"])
@@ -225,31 +243,51 @@ class Engine:
             # Probe mode refines the lock from every close-up view.
             run_detect = (header["seq"] % CONFIG.detect_every_n_frames == 0) or self.mode in {"searching", "probe"}
             dets = []
-            if run_detect:
-                raw = self.perception.detect(upright)
-                dets = [(canonical(d.label), np.rot90(d.mask, -k)) for d in raw if d.label not in IGNORED]
-                self.stats["detect_ms"] = 1000 * (time.monotonic() - t1)
-                if DEBUG_DIR and header["seq"] % 20 == 0:
-                    dbg = upright.copy()
-                    for d in raw:
-                        x0, y0, x1, y1 = (int(v) for v in d.box)
-                        cv2.rectangle(dbg, (x0, y0), (x1, y1), (0, 255, 0), 1)
-                        cv2.putText(dbg, f"{d.label} {d.conf:.2f}", (x0, y0 - 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
-                    cv2.imwrite(f"{DEBUG_DIR}/frame.jpg", dbg)
 
-        pts, _ = unproject(depth, K, step=8)
+        pts, _ = unproject(depth, K, step=4)
         world = to_world(T, pts)
         cam = T[:3, 3]
         with self.lock:
             if header["epoch"] != self.epoch or header.get("session") != self.session:
                 return
+            if self.frame_meta["t"] is not None and header["t"] <= self.frame_meta["t"]:
+                return
             if DEBUG_DIR and header["seq"] % 20 == 0:
                 np.savez(f"{DEBUG_DIR}/points_{header['seq'] // 20 % 5}.npz", world=world, cam=cam,
                          floor=np.nan if self.map.floor_y is None else self.map.floor_y)
             world, scale = self.map.check_scale(world, cam)
-            self.map.integrate(world, cam, time.monotonic())
-            surface_start = time.monotonic()
             depth_scaled = depth * scale
+            # Age belongs to the captured image, not completion of either model.
+            # Unknown source-clock alignment cannot authorize movement.
+            capture = header["t"] + self.clock_offset if self.clock_offset is not None else None
+            if capture is not None:
+                self.map.integrate(world, cam, capture, depth_scaled, K, T)
+            self.frame_meta = {"seq": header["seq"], "t": header["t"]}
+            self.last_frame_processed = time.monotonic()
+            if capture is not None:
+                self.stats["frame_age_ms"] = round(1000 * (self.last_frame_processed - capture))
+            self.perception_mode = "injected" if injected else "real"
+            self._cache_phone_pose()
+
+        # Publish the geometry before starting detector inference. The 10 Hz
+        # guidance ticker can stop immediately while this same MPS worker detects.
+        # Keep model calls on one thread: concurrent MPS inference deadlocked before.
+        if not injected and run_detect:
+            detect_start = time.monotonic()
+            raw = self.perception.detect(upright)
+            dets = [(canonical(d.label), np.rot90(d.mask, -k)) for d in raw if d.label not in IGNORED]
+            self.stats["detect_ms"] = 1000 * (time.monotonic() - detect_start)
+            if DEBUG_DIR and header["seq"] % 20 == 0:
+                dbg = upright.copy()
+                for d in raw:
+                    x0, y0, x1, y1 = (int(v) for v in d.box)
+                    cv2.rectangle(dbg, (x0, y0), (x1, y1), (0, 255, 0), 1)
+                    cv2.putText(dbg, f"{d.label} {d.conf:.2f}", (x0, y0 - 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                cv2.imwrite(f"{DEBUG_DIR}/frame.jpg", dbg)
+        with self.lock:
+            if header["epoch"] != self.epoch or header.get("session") != self.session:
+                return
+            surface_start = time.monotonic()
             # The display must not crop geometry to navigation's estimated floor/obstacle bands.
             self.surfaces.integrate(depth_scaled, K, T, surface_start, bgr)
             self.stats["surface_ms"] = round(1000 * (time.monotonic() - surface_start), 1)
@@ -265,12 +303,6 @@ class Engine:
             if self._last_frame_done:
                 self.stats["vision_fps"] = 0.8 * self.stats["vision_fps"] + 0.2 / max(done - self._last_frame_done, 1e-3)
             self._last_frame_done = done
-            self.last_frame_processed = done
-            self.frame_meta = {"seq": header["seq"], "t": header["t"]}
-            if self.clock_offset is not None:
-                self.stats["frame_age_ms"] = round(1000 * (done - (header["t"] + self.clock_offset)))
-            self.perception_mode = "injected" if injected else "real"
-            self._cache_phone_pose()  # floor estimates can also improve with depth frames
 
     # Commands --------------------------------------------------------------
     def command(self, text: str) -> None:
@@ -292,6 +324,8 @@ class Engine:
             self.choice_ids = []
             self.mode = "searching"
             self.stop_reason = None
+            self.path, self.waypoint, self.listener_anchor = [], None, None
+            self._last_plan = (0.0, -1)
             if self.audio_yaw_offset is None:
                 self.calibrate(quiet=True)
             self.say(f"Looking for {self.spoken(self.want_label)}.")
@@ -303,6 +337,8 @@ class Engine:
             for t in self.tracker.tracks.values():
                 t.locked = False
             self.mode, self.selected, self.want_label, self.stop_reason = "idle", None, None, None
+            self.path, self.waypoint, self.listener_anchor = [], None, None
+            self._last_plan = (0.0, -1)
             self.say("Cancelled.")
         elif cmd == "repeat":
             if self.last_said:
@@ -315,11 +351,27 @@ class Engine:
             self.calibrate(quiet=False)
         elif cmd == "choose":
             self.choose(c["index"])
-        elif cmd == "navigation":
-            self.navigation = c["on"]
-            self.say(f"Route guidance {'on' if c['on'] else 'off'}.")
+        elif cmd in {"navigation", "pathfinding"}:
+            self.set_navigation(c["on"])
+            self.say(f"Pathfinding {'on' if c['on'] else 'off'}.")
         else:
             self.say("Say find, then an object.")
+
+    def set_navigation(self, enabled: bool, request_id: str | None = None) -> None:
+        """Switch the requested policy, never release a user/safety pause."""
+        enabled = bool(enabled)
+        self.navigation_request_id = request_id
+        if self.navigation == enabled:
+            return
+        self.navigation = enabled
+        self.navigation_revision += 1
+        self.path, self.waypoint, self.listener_anchor = [], None, None
+        self._last_plan = (0.0, -1)
+        self.smoothed_interval = None
+        if self.mode in ACTIVE:
+            self.mode = "walking" if enabled else "hotcold"
+        elif self.mode == "stopped" and self.resume_mode in ACTIVE:
+            self.resume_mode = "walking" if enabled else "hotcold"
 
     def spoken(self, label: str) -> str:
         if label == self.want_label and self.want_word:
@@ -349,15 +401,17 @@ class Engine:
         self.choice_ids = []
         self.start_guidance()
 
-    def start_guidance(self) -> None:
+    def start_guidance(self, announce: bool = True) -> None:
         t = self.tracker.tracks[self.selected]
         t.locked = True
         self.mode = "walking" if self.navigation else "hotcold"
         self.stop_reason = None
         self.listener_anchor = None
         self.path, self.waypoint = [], None
+        self._last_plan = (0.0, -1)
         az, dist = self.relative(t.position)
-        self.say(f"Found it, {dist:.1f} metres {describe_direction(az)}.")
+        if announce:
+            self.say(f"Found it, {dist:.1f} metres {describe_direction(az)}.")
 
     def resume(self) -> None:
         if self.audio_yaw_offset is None:
@@ -367,11 +421,22 @@ class Engine:
             return
         problem = self.blocking_problem()
         if problem:
-            self.say(f"Cannot resume: {problem}.")
+            if not self.navigation:
+                self.say(f"Cannot resume: {problem}.")
+            else:
+                self.cue("stop")
             return
+        target = self.tracker.tracks.get(self.selected)
+        if self.navigation and target is not None:
+            # Re-evaluate the actual route, including the start footprint. A clear
+            # packet from before the stop is never permission to resume now.
+            self._navigation_assessment(target, time.monotonic(), probe=False)
+            if self.safety["state"] not in {"clear", "caution"}:
+                self.cue("stop")
+                return
         self.stop_reason = None
         if self.selected and self.selected in self.tracker.tracks:
-            self.start_guidance()
+            self.start_guidance(announce=not self.navigation)
         elif self.want_label:
             self.mode = "searching"
             self.say("Resumed.")
@@ -396,12 +461,12 @@ class Engine:
 
     # Geometry helpers -------------------------------------------------------
     def walking_body(self) -> np.ndarray:
-        """While walking the phone is held ahead of the torso: the body is behind it."""
-        f = forward(self.pose.T)
-        f_xz = np.array([f[0], 0.0, f[2]])
-        n = np.linalg.norm(f_xz)
-        back = f_xz / n * CONFIG.hand_forward_offset if n > 0.3 else np.zeros(3)
-        return self.pose.T[:3, 3] - back
+        """Phone translation with an isotropic torso envelope, independent of hand yaw.
+
+        No claim of a measured torso position: map inflation includes the possible
+        hand-to-body displacement, and rotating the phone never clears new floor.
+        """
+        return self.pose.T[:3, 3].copy()
 
     def body_position(self) -> np.ndarray:
         if self.mode == "probe" and self.listener_anchor is not None:
@@ -460,12 +525,24 @@ class Engine:
             target = self.tracker.tracks.get(self.selected) if self.selected else None
 
             proximity = waypoint = None
-            if self.mode in ACTIVE and target is not None:
-                self._update_mode(target)
-                if self.mode == "walking":
-                    waypoint = self._route(target, now)
+            if self.navigation:
+                if target is not None and (self.mode in ACTIVE or self.mode == "stopped"):
+                    route_waypoint = self._navigation_assessment(target, now, probe=self.mode == "probe")
+                    if self.safety["state"] in {"blocked", "unknown"}:
+                        if self.mode in ACTIVE:
+                            self.stop("pathfinding_" + self.safety["state"])
+                    elif self.mode in ACTIVE:
+                        self._update_mode(target)
+                        if self.mode == "walking":
+                            waypoint = route_waypoint
+                        else:
+                            proximity = self._proximity(target, now)
                 else:
-                    proximity = self._proximity(target, now)
+                    self.safety = self._safety_packet("unknown", "no_target", now)
+            elif self.mode in ACTIVE and target is not None:
+                self._update_mode(target)
+                proximity = self._proximity(target, now)
+                self.safety = self._safety_packet("unknown", "disabled", now)
             elif self.mode != "stopped":
                 self.smoothed_interval = None
 
@@ -474,12 +551,15 @@ class Engine:
                 "type": "guidance", "mode": self.mode, "stop_reason": self.stop_reason,
                 "epoch": self.epoch, "perception": self.perception_mode,
                 "source": {"pose_seq": self.pose.seq, "pose_t": self.pose.t,
-                           "frame_seq": self.frame_meta["seq"], "frame_t": self.frame_meta["t"]},
+                           "frame_seq": self.frame_meta["seq"], "frame_t": self.frame_meta["t"],
+                           "session": self.session, "epoch": self.epoch},
                 "target": self._target_json(target, now) if target else None,
                 "proximity": proximity, "waypoint": waypoint,
                 "listener": listener.round(3).tolist(),
                 "audio_yaw_offset": self.audio_yaw_offset or 0.0,
                 "navigation": self.navigation,
+                "navigation_request_id": self.navigation_request_id,
+                "safety": self.safety.copy(),
             }
 
     def _check_stops(self, now: float) -> None:
@@ -495,8 +575,6 @@ class Engine:
             self.stop("audio", "Stopped. No audio.")
         elif self.interrupted:
             self.stop("interrupted", "Stopped. Interrupted.")
-        elif self.mode == "walking" and now - self.last_frame_processed > CONFIG.walking_perception_timeout_s:
-            self.stop("stale", "Stopped. Map out of date.")
 
     def _update_target_state(self, now: float) -> None:
         if self.mode == "searching" and self.want_label:
@@ -530,8 +608,7 @@ class Engine:
         dh = math.hypot(phone[0] - target.position[0], phone[2] - target.position[2])
         if self.mode == "walking":
             # With routing, probe only at the approach point: being close across a table is not reachable.
-            arrived = len(self.path) >= 2 and float(np.linalg.norm(self.path[-1] - self.walking_body()[[0, 2]])) < 0.35
-            near = arrived or (dh <= CONFIG.probe_enter and len(self.path) == 2)
+            near = bool(self.path) and float(np.linalg.norm(self.path[-1] - self.walking_body()[[0, 2]])) < 0.15
         else:
             near = dh <= CONFIG.probe_enter
         if self.mode in {"walking", "hotcold"} and near:
@@ -539,11 +616,13 @@ class Engine:
             self.listener_anchor = self.walking_body()
             # No speech on entering or leaving: the switch between beeps and the torch tone is the cue.
             self.path, self.waypoint = [], None
+            self._last_plan = (0.0, -1)
         elif self.mode == "probe":
             drift = math.hypot(phone[0] - self.listener_anchor[0], phone[2] - self.listener_anchor[2])
             if drift > CONFIG.probe_leave and dh > CONFIG.probe_enter:
                 self.mode = "walking" if self.navigation else "hotcold"
                 self.listener_anchor = None
+                self._last_plan = (0.0, -1)
 
     def _proximity(self, target, now: float) -> dict:
         d = float(np.min(np.linalg.norm(target.surface - self.probe_point(), axis=1)))
@@ -564,14 +643,92 @@ class Engine:
                 "confirm": self.confirm, "threshold": round(threshold, 3),
                 "azimuth_head": self.head_azimuth(target.position)}
 
-    def _route(self, target, now: float) -> dict | None:
-        states = self.map.states()
-        phone = self.walking_body()  # route from the body, not the hand-held phone
+    def _safety_packet(self, state: str, reason: str | None, now: float,
+                       distance: float | None = None) -> dict:
+        capture_t = self.frame_meta["t"]
+        offset = getattr(self, "clock_offset", None)
+        age = (now - (capture_t + offset)) if capture_t is not None and offset is not None else None
+        return {"state": state, "reason": reason, "capture_t": capture_t,
+                "frame_seq": self.frame_meta["seq"],
+                "age_ms": max(0, round(age * 1000)) if age is not None and math.isfinite(age) else None,
+                "valid_for_ms": round(CONFIG.safety_capture_timeout_s * 1000),
+                "distance": round(distance, 3) if distance is not None else None}
+
+    def _navigation_assessment(self, target, now: float, probe: bool = False) -> dict | None:
+        packet = self._safety_packet("unknown", "no_depth", now)
+        self.safety = packet
+        problem = self.blocking_problem()
+        if problem:
+            packet["reason"] = "sensor_unavailable"
+            return None
+        if self.map.floor_y is None:
+            packet["reason"] = "floor_unknown"
+            return None
+        if packet["age_ms"] is None or packet["age_ms"] > packet["valid_for_ms"]:
+            packet["reason"] = "stale_capture"
+            return None
+        if self.frame_meta["t"] > self.pose.t + 0.1:
+            packet["reason"] = "capture_clock_mismatch"
+            return None
+        if self._phone_speed > 1.2:
+            packet["reason"] = "motion_too_fast"
+            return None
+        body = self.walking_body()[[0, 2]]
+        radius = CONFIG.inflation_m + min(0.15, self._phone_speed * 0.15)
+        waypoint = None
+        if not probe:
+            waypoint, route_reason = self._route(target, now, radius)
+            if route_reason:
+                # Check an appearing hazard at the current footprint even if it
+                # made the global route impossible before a waypoint was selected.
+                state, reason, distance = self.map.corridor(body, body, now, radius)
+                if state == "clear":
+                    state, reason = ("blocked", "route_blocked") if route_reason == "route_blocked" else ("unknown", route_reason)
+                self.safety = self._safety_packet(state, reason, now, distance)
+                return None
+        # The stopping horizon grows with measured phone motion, reaction time,
+        # and capture latency. Hand-only translation is conservatively motion.
+        speed = max(CONFIG.assumed_walking_speed_mps, self._phone_speed)
+        # Budget the worst permitted LOCAL evidence age. A fresh capture looking
+        # elsewhere must not shorten the stopping horizon of an older corridor.
+        evidence_age = max(CONFIG.corridor_fresh_s, packet["age_ms"] / 1000)
+        horizon = (CONFIG.corridor_min_m + speed * (evidence_age + CONFIG.reaction_time_s)
+                   + speed * speed / (2 * CONFIG.stopping_deceleration_mps2))
+        end = body.copy()
+        if not probe and self.waypoint is not None:
+            direction = self.waypoint - body
+            d = float(np.linalg.norm(direction))
+            if d > 1e-6:
+                end += direction / d * min(d, horizon)
+        elif probe and np.linalg.norm(self._phone_velocity) > 0.1:
+            end += self._phone_velocity / np.linalg.norm(self._phone_velocity) * horizon
+        state, reason, distance = self.map.corridor(body, end, now, radius)
+        if np.linalg.norm(self._phone_velocity) > 0.1:
+            motion_end = body + self._phone_velocity / np.linalg.norm(self._phone_velocity) * horizon
+            motion = self.map.corridor(body, motion_end, now, radius)
+            rank = {"clear": 0, "caution": 1, "unknown": 2, "blocked": 3}
+            if rank[motion[0]] > rank[state]:
+                state, reason, distance = motion
+        if state == "clear":
+            halo = self.map.corridor(body, end, now, radius + 0.2)
+            if halo[0] == "blocked":
+                state, reason = "caution", "close_obstacle"
+        if state == "clear" and (packet["age_ms"] > packet["valid_for_ms"] * 0.65 or self._phone_speed > 0.5):
+            state, reason = "caution", "limited_margin"
+        self.safety = self._safety_packet(state, reason, now, distance)
+        return waypoint
+
+    def _route(self, target, now: float, radius: float | None = None) -> tuple[dict | None, str | None]:
+        states = self.map.states(now, radius)
+        phone = self.walking_body()
         r, c, ok = self.map.cell(phone[[0, 2]])
         if not ok:
-            return None
+            return None, "outside_map"
         start = (int(r), int(c))
         walk = walkable_grid(states, start)
+        if not walk[start]:
+            self.path, self.waypoint = [], None
+            return None, "route_blocked" if states[start] in {OCCUPIED, INFLATED} else "start_unobserved"
         stale = now - self._last_plan[0] > 0.5 or self._last_plan[1] != self.map.version
         if self.path:
             # Replan if the next leg is no longer clear (new obstacle, or the user drifted).
@@ -579,22 +736,21 @@ class Engine:
             if not line_clear(walk, start, (int(nxt[0]), int(nxt[1]))):
                 stale = True
         if stale:
-            tr, tc, _ = self.map.cell(target.position[[0, 2]])
             off = (target.position[[0, 2]] - self.map.origin) / self.map.res
             size = float(max(target.extent[0], target.extent[2]))
-            penalty = np.where(states == UNCERTAIN, 3.0, 1.0)
-            cells = plan(walk, start, (off[1], off[0]), ring_cells(size), penalty)
-            if cells is None:  # e.g. the target sits deep on a table: accept a farther approach point
-                cells = plan(walk, start, (off[1], off[0]), ring_cells(size, slack=0.5), penalty)
+            cells = plan(walk, start, (off[1], off[0]), ring_cells(size),
+                         goal_allowed=lambda cell: self.map.reachable_approach(cell, target.position, target.extent, now))
             self._last_plan = (now, self.map.version)
             if cells is None:
                 self.path, self.waypoint = [], None
-                self.stop("route_blocked", "Stopped. No safe route. Scan the floor.")
-                return None
+                return None, "route_blocked"
             self.path = [self.map.centre_of(rr, cc) for rr, cc in cells]
             self.path[0] = phone[[0, 2]].copy()
-        if len(self.path) < 2:
-            return None
+        if not self.path:
+            return None, "route_blocked"  # a cached failed plan is never an approach
+        if len(self.path) == 1:
+            self.waypoint = phone[[0, 2]].copy()
+            return None, None  # already at a verified reachable approach
         # Look-ahead: farthest path vertex within 2 m that has a clear line from here.
         wp = self.path[1]
         for p in self.path[1:]:
@@ -611,14 +767,10 @@ class Engine:
             instr = "turn around"
         else:
             instr = "turn right" if az > 0 else "turn left"
-        last, when = self.last_instruction
-        if instr != last and now - when > 2.0:
-            self.last_instruction = (instr, now)
-            self.outbox.append({"type": "say", "text": instr})
         return {"position": wp3.round(3).tolist(), "distance": round(dist, 2),
                 "azimuth_phone": round(az, 3), "azimuth_head": self.head_azimuth(wp3),
                 "instruction": instr, "source_head": self.source_in_head(wp3),
-                "pulse_interval": round(0.25 + 0.95 * abs(az) / math.pi, 3)}
+                "pulse_interval": round(0.25 + 0.95 * abs(az) / math.pi, 3)}, None
 
     @staticmethod
     def _target_json(t, now: float) -> dict:
@@ -665,7 +817,7 @@ class Engine:
         import base64
         with self.lock:
             now = time.monotonic()
-            states = self.map.states()
+            states = self.map.states(now)
             snap = {
                 "type": "recon", "epoch": self.epoch, "perception": self.perception_mode,
                 "mode": self.mode, "stop_reason": self.stop_reason, "navigation": self.navigation,

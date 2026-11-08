@@ -5,22 +5,16 @@ import math
 import numpy as np
 
 from .config import CONFIG
-from .mapping import FREE, INFLATED, UNCERTAIN
+from .mapping import FREE
 
 MOVES = [(-1, 0, 1.0), (1, 0, 1.0), (0, -1, 1.0), (0, 1, 1.0),
          (-1, -1, math.sqrt(2)), (-1, 1, math.sqrt(2)), (1, -1, math.sqrt(2)), (1, 1, math.sqrt(2))]
 
 
 def walkable_grid(states: np.ndarray, start: tuple[int, int], escape_cells: int = 4) -> np.ndarray:
-    # UNCERTAIN cells were seen clear of obstacles but without a confirmed floor; plan() charges more for them.
-    walk = (states == FREE) | (states == UNCERTAIN)
-    # The user already stands at the start: allow leaving an inflated margin nearby.
-    r0, c0 = start
-    rr, cc = np.ogrid[: states.shape[0], : states.shape[1]]
-    near = (rr - r0) ** 2 + (cc - c0) ** 2 <= escape_cells ** 2
-    walk |= near & (states == INFLATED)
-    walk[r0, c0] = True
-    return walk
+    # The phone's location is not evidence of safe ground or torso clearance.
+    # Keep the legacy parameter for callers, but never carve an escape through danger.
+    return states == FREE
 
 
 def line_clear(walk: np.ndarray, a: tuple[int, int], b: tuple[int, int]) -> bool:
@@ -37,9 +31,12 @@ def line_clear(walk: np.ndarray, a: tuple[int, int], b: tuple[int, int]) -> bool
 
 
 def plan(walk: np.ndarray, start: tuple[int, int], target: tuple[float, float],
-         ring: tuple[float, float], penalty: np.ndarray | None = None) -> list[tuple[int, int]] | None:
+         ring: tuple[float, float], penalty: np.ndarray | None = None,
+         goal_allowed=None) -> list[tuple[int, int]] | None:
     """Dijkstra to the cheapest reachable cell whose distance (in cells) to target lies in ring."""
     h, w = walk.shape
+    if not (0 <= start[0] < h and 0 <= start[1] < w) or not walk[start]:
+        return None
     dist = np.full(walk.shape, np.inf)
     prev: dict[tuple[int, int], tuple[int, int]] = {}
     dist[start] = 0
@@ -50,7 +47,8 @@ def plan(walk: np.ndarray, start: tuple[int, int], target: tuple[float, float],
         d, (r, c) = heapq.heappop(pq)
         if d > dist[r, c]:
             continue
-        if ring[0] <= math.hypot(r + 0.5 - tr, c + 0.5 - tc) <= ring[1]:
+        if (ring[0] <= math.hypot(r + 0.5 - tr, c + 0.5 - tc) <= ring[1]
+                and (goal_allowed is None or goal_allowed((r, c)))):
             best = (r, c)
             break
         for dr, dc, cost in MOVES:
@@ -69,7 +67,8 @@ def plan(walk: np.ndarray, start: tuple[int, int], target: tuple[float, float],
     path = [best]
     while path[-1] != start:
         path.append(prev[path[-1]])
-    return smooth(walk, path[::-1])
+    # Weighted paths must retain the cells whose cost Dijkstra evaluated.
+    return path[::-1] if penalty is not None else smooth(walk, path[::-1])
 
 
 def smooth(walk: np.ndarray, path: list[tuple[int, int]]) -> list[tuple[int, int]]:
@@ -90,7 +89,7 @@ def ring_cells(target_extent_xz: float, slack: float = 0.0) -> tuple[float, floa
 
 
 if __name__ == "__main__":
-    from .mapping import OCCUPIED
+    from .mapping import OCCUPIED, INFLATED
     s = np.full((40, 40), FREE, np.uint8)
     s[20, 5:35] = OCCUPIED  # a wall between start and target, open at both ends
     s[19, 5:35] = INFLATED

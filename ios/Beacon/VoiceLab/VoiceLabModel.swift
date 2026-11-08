@@ -143,6 +143,8 @@ final class VoiceLabModel: ObservableObject {
             Settings.guidanceSoundStyle = enabled ? .chest : .beeps
             refreshGuidanceSound()
             voice.say(enabled ? "Loot mode on." : "Loot mode off. Back to beeps.")
+        case .pathfinding:
+            voice.say("Pathfinding uses the live camera in the main Beacon app.")
         case .help:
             voice.say(helpReply + " Say loot mode on for chest sounds, or loot mode off for beeps.")
         case .status, .inspect:

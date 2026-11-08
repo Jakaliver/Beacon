@@ -17,6 +17,7 @@ enum VoiceCommand: Equatable {
     case status
     case inspect
     case lootMode(Bool)
+    case pathfinding(Bool)
     case choose(Int)
     case chooseSide(VoiceSide)
     case disableVoice
@@ -80,6 +81,8 @@ enum VoiceCommand: Equatable {
             return .lootMode(true)
         case "loot mode off", "turn off loot mode", "turn loot mode off", "disable loot mode":
             return .lootMode(false)
+        case "pathfinding on": return .pathfinding(true)
+        case "pathfinding off": return .pathfinding(false)
         case "turn off voice mode", "turn voice mode off", "disable voice mode", "voice mode off", "stop listening":
             return .disableVoice
         default: return parseChoice(utterance)

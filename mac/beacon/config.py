@@ -26,15 +26,25 @@ class Config:
     map_size_m: float = 8.0
     cell_m: float = 0.1
 
-    obstacle_min_h: float = 0.15  # above floor
+    obstacle_min_h: float = 0.06  # include low trip hazards above the floor tolerance
     map_max_range_m: float = 4.0
-    obstacle_max_h: float = 2.0
-    floor_band: float = 0.08
+    obstacle_max_h: float = 2.1
+    floor_band: float = 0.04
+    height_bin_m: float = 0.1
+    # Historic geometry can suggest a route; only recent local observations permit travel.
+    ground_memory_s: float = 30.0
+    clearance_memory_s: float = 10.0
+    corridor_fresh_s: float = 3.0
+    safety_capture_timeout_s: float = 1.5
+    corridor_min_m: float = 0.45
+    assumed_walking_speed_mps: float = 0.5
+    reaction_time_s: float = 0.6
+    stopping_deceleration_mps2: float = 0.8
 
     # Inflation terms for walking clearance (metres).
     body_radius: float = 0.22
     clearance_margin: float = 0.08
-    hand_body_uncertainty: float = 0.08
+    hand_body_uncertainty: float = 0.30  # isotropic: the phone does not measure torso heading
     head_above_phone: float = 0.35  # approximate; real AirPods give no head position
     hand_forward_offset: float = 0.3  # phone held this far ahead of the torso while walking
     depth_uncertainty: float = 0.05

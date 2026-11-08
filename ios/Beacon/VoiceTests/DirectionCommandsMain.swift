@@ -109,6 +109,32 @@ struct DirectionCommandsTests {
             ("find loot mode on", .find("loot mode on")),
             ("look for the loot mode off button", .find("the loot mode off button")),
             ("get the enable loot mode sign", .find("the enable loot mode sign")),
+            ("pathfinding on", .pathfinding(true)),
+            ("pathfinding off", .pathfinding(false)),
+            ("PATHFINDING ON!", .pathfinding(true)),
+            ("  pathfinding\n off. ", .pathfinding(false)),
+            ("Please, Beacon, pathfinding on.", .pathfinding(true)),
+            ("Hey Beacon, please pathfinding off!", .pathfinding(false)),
+            ("pathfinding on please", .pathfinding(true)),
+            ("find pathfinding on", .find("pathfinding on")),
+            ("find the pathfinding off switch", .find("the pathfinding off switch")),
+            ("locate pathfinding on", .find("pathfinding on")),
+            ("get the pathfinding off sign", .find("the pathfinding off sign")),
+            ("pathfinding", nil),
+            ("path finding on", nil),
+            ("enable pathfinding", nil),
+            ("disable pathfinding", nil),
+            ("turn on pathfinding", nil),
+            ("turn pathfinding off", nil),
+            ("navigation on", nil),
+            ("enable navigation", nil),
+            ("pathfinding mode on", nil),
+            ("don't turn pathfinding on", nil),
+            ("not pathfinding off", nil),
+            ("I said pathfinding on earlier", nil),
+            ("pathfinding on and off", nil),
+            ("pathfinding on if it is clear", nil),
+            ("pathfinding off now", nil),
         ]
         var failures = 0
         for (utterance, expected) in cases {
@@ -125,6 +151,8 @@ struct DirectionCommandsTests {
             ("right remains a semantic side", VoiceCommand.parse("right") != .choose(2)),
             ("loot mode on waits for the complete command", !VoiceCommand.lootMode(true).isImmediate),
             ("loot mode off waits for the complete command", !VoiceCommand.lootMode(false).isImmediate),
+            ("pathfinding on waits for the complete command", !VoiceCommand.pathfinding(true).isImmediate),
+            ("pathfinding off waits for the complete command", !VoiceCommand.pathfinding(false).isImmediate),
         ]
         for (description, passed) in checks where !passed {
             failures += 1
