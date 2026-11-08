@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AF01B2C3D4E5F60718293047 /* Torch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19926C6AF4279DD4FAE9AED0 /* Torch.swift */; };
+        BEEA00000000000000000001 /* GuidanceSounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEA00000000000000000003 /* GuidanceSounds.swift */; };
+        BEEA00000000000000000002 /* GuidanceSounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEA00000000000000000003 /* GuidanceSounds.swift */; };
+		AF01B2C3D4E5F60718293047 /* TargetProximity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19926C6AF4279DD4FAE9AED0 /* TargetProximity.swift */; };
 		AA01B2C3D4E5F60718293041 /* HoldToTalkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01B2C3D4E5F60718293042 /* HoldToTalkSession.swift */; };
 		003664E3FC270F86549FEEDD /* VoiceLabModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 247917A730008C5656BD9E75 /* VoiceLabModel.swift */; };
 		103EEC9C2E5B1B70D4813886 /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B59A25BACFD98E15CDA2E09 /* Model.swift */; };
@@ -25,7 +27,7 @@
 		748E15202DBC14BEF324D870 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F577A93D3B5A320DC985C67 /* Settings.swift */; };
 		88040329777D90F730F89B10 /* Speech.swift in Sources */ = {isa = PBXBuildFile; fileRef = 604702D284EFE94A88B04A53 /* Speech.swift */; };
 		8A999AB239C34C17EE0C15A4 /* AudioGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308C7C8FAF760F96A7D562BD /* AudioGuide.swift */; };
-		8AB4A90F0B0A6BC9EF3BCD2D /* Torch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19926C6AF4279DD4FAE9AED0 /* Torch.swift */; };
+		8AB4A90F0B0A6BC9EF3BCD2D /* TargetProximity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19926C6AF4279DD4FAE9AED0 /* TargetProximity.swift */; };
 		9F3E8163128180A07B132007 /* GuidanceSoundSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CE2E3066EDD9706B7B4F783 /* GuidanceSoundSettings.swift */; };
 		AF642317531D6E0CFEE9ADFD /* BeaconApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D3606D4B91643D76C2EE34 /* BeaconApp.swift */; };
 		C8747309B378D6F602F9009F /* VoiceListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517AC3B0527BB348E37B989E /* VoiceListener.swift */; };
@@ -39,9 +41,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+        BEEA00000000000000000003 /* GuidanceSounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidanceSounds.swift; sourceTree = "<group>"; };
 		AA01B2C3D4E5F60718293042 /* HoldToTalkSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoldToTalkSession.swift; sourceTree = "<group>"; };
 		00888A4EF1F1884442A5E887 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		19926C6AF4279DD4FAE9AED0 /* Torch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Torch.swift; sourceTree = "<group>"; };
+		19926C6AF4279DD4FAE9AED0 /* TargetProximity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TargetProximity.swift; sourceTree = "<group>"; };
 		216132FC9DCA6503179AA09A /* VoiceLabApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceLabApp.swift; sourceTree = "<group>"; };
 		247917A730008C5656BD9E75 /* VoiceLabModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceLabModel.swift; sourceTree = "<group>"; };
 		2B59A25BACFD98E15CDA2E09 /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
@@ -88,6 +91,7 @@
 			children = (
 				88593297C40A9B03AD0701FB /* ARSensor.swift */,
 				308C7C8FAF760F96A7D562BD /* AudioGuide.swift */,
+                BEEA00000000000000000003 /* GuidanceSounds.swift */,
 				92B939C21C39F7911E8ABFE5 /* chest_loop.wav */,
 				EE6DDF5BCF93CDF29CCED18F /* Connection.swift */,
 				8618FC10F163DFF865E31228 /* ContentView.swift */,
@@ -96,7 +100,7 @@
 				2B59A25BACFD98E15CDA2E09 /* Model.swift */,
 				5F577A93D3B5A320DC985C67 /* Settings.swift */,
 				604702D284EFE94A88B04A53 /* Speech.swift */,
-				19926C6AF4279DD4FAE9AED0 /* Torch.swift */,
+				19926C6AF4279DD4FAE9AED0 /* TargetProximity.swift */,
 				E9D3606D4B91643D76C2EE34 /* BeaconApp.swift */,
 				AA01B2C3D4E5F60718293042 /* HoldToTalkSession.swift */,
 				83E5CB0422209FAD39344FB7 /* VoiceCommand.swift */,
@@ -222,13 +226,14 @@
 			files = (
 				FFFFB19290A045889C0A79C7 /* ARSensor.swift in Sources */,
 				8A999AB239C34C17EE0C15A4 /* AudioGuide.swift in Sources */,
+                BEEA00000000000000000001 /* GuidanceSounds.swift in Sources */,
 				E3B56C6C1E2E4B43F6F622D6 /* Connection.swift in Sources */,
 				24FAD47C8E67BDED849F4BB9 /* ContentView.swift in Sources */,
 				450B677CFB6538F4859AAAF3 /* GuidanceSoundSettings.swift in Sources */,
 				103EEC9C2E5B1B70D4813886 /* Model.swift in Sources */,
 				748E15202DBC14BEF324D870 /* Settings.swift in Sources */,
 				D462A44B3408A13B8F314499 /* Speech.swift in Sources */,
-				8AB4A90F0B0A6BC9EF3BCD2D /* Torch.swift in Sources */,
+				8AB4A90F0B0A6BC9EF3BCD2D /* TargetProximity.swift in Sources */,
 				AF642317531D6E0CFEE9ADFD /* BeaconApp.swift in Sources */,
 				AA01B2C3D4E5F60718293041 /* HoldToTalkSession.swift in Sources */,
 				4C94184990D710D6E49D9745 /* VoiceCommand.swift in Sources */,
@@ -242,8 +247,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AF01B2C3D4E5F60718293047 /* Torch.swift in Sources */,
+				AF01B2C3D4E5F60718293047 /* TargetProximity.swift in Sources */,
 				68A4445940353C664A4FE8C9 /* AudioGuide.swift in Sources */,
+                BEEA00000000000000000002 /* GuidanceSounds.swift in Sources */,
 				9F3E8163128180A07B132007 /* GuidanceSoundSettings.swift in Sources */,
 				2F7CA199256A9E0C840A2631 /* Settings.swift in Sources */,
 				88040329777D90F730F89B10 /* Speech.swift in Sources */,

@@ -82,37 +82,28 @@ final class AudioGuide {
         if Self.automaticHeadTracking, #available(iOS 18.0, *) {
             listener.automaticHeadTrackingFlags = .orientation
         }
-        // A compact, damped tap: the broadband onset supplies direction cues,
-        // while a warmer resonant body gives the source a small physical presence.
-        let tap = Self.tap(hz: 620, seconds: 0.14)
-        register("pulse", tap)
-        // Reached: a rising pair, low then an octave higher.
-        register("confirm", tap + Self.silence(0.05) + Self.tap(hz: 1240, seconds: 0.14))
-        // Probe-mode torch: low when the phone points away, middle when close, high when on the object.
-        // Its lowest note is the normal pulse's pitch, so every torch beep sounds at or above it.
-        register("torch-off", Self.tap(hz: 620, seconds: 0.12))
-        register("torch-near", Self.tap(hz: 930, seconds: 0.12))
-        register("torch-on", Self.tap(hz: 1395, seconds: 0.10))
-        register("beacon", Self.tap(hz: 430, seconds: 0.20))
-        register("stop", Self.tone([(660, 0.1), (440, 0.18)], harmonic: 0.2))
-        register("rescan", Self.tone([(700, 0.06), (0, 0.05), (700, 0.06)], harmonic: 0.2))
+        register("pulse", GuidanceSounds.pulse)
+        register("confirm", GuidanceSounds.onObject, crisp: true, level: -2)
+        register("beacon", GuidanceSounds.waypoint)
+        register("stop", GuidanceSounds.stop)
+        register("rescan", GuidanceSounds.rescan)
         registerTargetLoop()
         headLock.withLock { updateListener() }
     }
 
     /// One PHASE sound event per sound: sampler → spatial mixer with direct path, early reflections and late reverb.
-    private func register(_ name: String, _ samples: [Float]) {
+    private func register(_ name: String, _ samples: [Float], crisp: Bool = false, level: Double = 0) {
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
         do {
             _ = try engine.assetRegistry.registerSoundAsset(data: data, identifier: name, format: format,
                                                             normalizationMode: .dynamic)
             guard let pipeline = PHASESpatialPipeline(flags: [.directPathTransmission, .earlyReflections, .lateReverb])
             else { return }
-            // Keep the transient clearly attached to the source. A modest, short
-            // room tail adds space without washing successive taps together.
+            // Audible small-room reflections keep the sound in the scene. The tick
+            // has a slightly lighter tail, while retaining the same room character.
             pipeline.entries[PHASESpatialCategory.directPathTransmission]?.sendLevel = 1.0
-            pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = 0.3
-            pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = 0.14
+            pipeline.entries[PHASESpatialCategory.earlyReflections]?.sendLevel = crisp ? 0.22 : 0.30
+            pipeline.entries[PHASESpatialCategory.lateReverb]?.sendLevel = crisp ? 0.11 : 0.16
             let mixer = PHASESpatialMixerDefinition(spatialPipeline: pipeline, identifier: "\(name)-mixer")
             let distance = PHASEGeometricSpreadingDistanceModelParameters()
             distance.rolloffFactor = Self.rolloff
@@ -120,7 +111,7 @@ final class AudioGuide {
             mixer.distanceModelParameters = distance
             let sampler = PHASESamplerNodeDefinition(soundAssetIdentifier: name, mixerDefinition: mixer)
             sampler.playbackMode = .oneShot
-            sampler.setCalibrationMode(calibrationMode: .relativeSpl, level: 0)
+            sampler.setCalibrationMode(calibrationMode: .relativeSpl, level: level)
             _ = try engine.assetRegistry.registerSoundEventAsset(rootNode: sampler, identifier: "\(name)-event")
             mixerIDs[name] = mixer.identifier
         } catch { diagnostic("register \(name) failed: \(error)") }
@@ -299,10 +290,12 @@ final class AudioGuide {
     /// No target or camera inference is needed, and Stop cancels the remaining sounds.
     func runPlaybackCheck() {
         let check = playbackCheckGeneration
+        diagnostic("playback check: five approach taps, then five close ticks")
         for index in 0..<10 {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.4) { [weak self] in
                 guard let self, check == self.playbackCheckGeneration else { return }
-                self.pulse(at: nil)
+                if index < 5 { self.pulse(at: nil) }
+                else { self.confirm(at: nil) }
             }
         }
     }
@@ -376,9 +369,6 @@ final class AudioGuide {
     /// Without a position they come from just in front of the listener.
     func pulse(at position: SIMD3<Float>?) { play("pulse", from: targetSource, at: position) }
     func confirm(at position: SIMD3<Float>?) { play("confirm", from: targetSource, at: position) }
-    func torch(_ aim: Torch.Aim, at position: SIMD3<Float>) {
-        play(["torch-off", "torch-near", "torch-on"][aim.rawValue], from: targetSource, at: position)
-    }
 
     func cue(_ name: String) {
         switch name {
@@ -425,7 +415,7 @@ final class AudioGuide {
     }
 
     private func source(for name: String) -> PHASESource {
-        name == "beacon" ? beaconSource : ["pulse", "confirm"].contains(name) || name.hasPrefix("torch") ? targetSource : cueSource
+        name == "beacon" ? beaconSource : ["pulse", "confirm"].contains(name) ? targetSource : cueSource
     }
 
     private func makeEvent(_ name: String) -> (UUID, PHASESoundEvent)? {
@@ -470,49 +460,4 @@ final class AudioGuide {
         onDiagnostic?(message)
     }
 
-    // MARK: Sounds (mono, 44.1 kHz float)
-
-    private static let rate = 44_100.0
-
-    /// A soft impact with inharmonic resonances and a brief, band-limited contact
-    /// sound. Higher modes decay first, like a small damped physical object.
-    private static func tap(hz: Double, seconds: Double) -> [Float] {
-        let n = Int(seconds * rate)
-        let modes: [(ratio: Double, gain: Double, decay: Double)] = [
-            (1.0, 1.0, 0.045), (1.53, 0.42, 0.027), (2.11, 0.24, 0.019),
-            (2.89, 0.13, 0.012), (4.17, 0.07, 0.008), (6.31, 0.035, 0.005),
-        ]
-        var noiseState: UInt32 = 0x74726964
-        var contact = 0.0
-        var low = 0.0
-        return (0..<n).map { i in
-            let t = Double(i) / rate
-            noiseState = 1_664_525 &* noiseState &+ 1_013_904_223
-            let noise = Double(noiseState >> 8) / 8_388_608 - 1
-            contact += 0.55 * (noise - contact)
-            low += 0.035 * (contact - low)
-            var value = 0.28 * (contact - low) * exp(-t / 0.009)
-            for mode in modes {
-                value += mode.gain * sin(2 * .pi * hz * mode.ratio * t) * exp(-t / mode.decay)
-            }
-            let envelope = min(1, t / 0.0018, (seconds - t) / 0.018)
-            return Float(0.42 * envelope * value)
-        }
-    }
-
-    private static func silence(_ seconds: Double) -> [Float] { Array(repeating: 0, count: Int(seconds * rate)) }
-
-    /// Tone sequence; a frequency of 0 is silence. `harmonic` adds a second partial for a softer timbre.
-    private static func tone(_ segments: [(hz: Double, seconds: Double)], harmonic: Float) -> [Float] {
-        segments.flatMap { hz, seconds -> [Float] in
-            let n = Int(seconds * rate)
-            return (0..<n).map { j in
-                guard hz > 0 else { return 0 }
-                let phase = 2 * Double.pi * hz * Double(j) / rate
-                let envelope = Float(min(1, Double(j) / (0.004 * rate), Double(n - j) / (0.012 * rate)))
-                let wave = Float(sin(phase)) + harmonic * Float(sin(2 * phase))
-                return 0.5 * envelope * wave / (1 + harmonic)
-            }
-        }
-    }
 }

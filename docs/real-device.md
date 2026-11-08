@@ -174,10 +174,12 @@ Beacon keeps the iPhone screen awake while open. Manually locking it or leaving 
 pauses capture. The viewer keeps the last scan and labels it paused until fresh frames return.
 All speech and spatial guidance play on the iPhone. The browser never opens an audio or
 microphone session and cannot change the phone's guidance state.
-Guidance plays spatial beeps at the found object's position by default. Settings →
-**Object sound** switches between **Beeps** and a continuous **Chest** sound with distance
-attenuation and a subtle small-room reverb. The chest sound lowers while the app speaks.
-For the voice controls and audio acceptance checks, use the
+Guidance defaults to **Beeps**: warm taps accelerate as the phone approaches the object,
+then become a short tick inside the close-distance threshold (normally 20 cm).
+Phone rotation does not change proximity feedback. Sounds retain distance attenuation
+and audible small-room reverb. Settings → **Object sound** also offers **Chest**, a
+continuous sound at the object that lowers while the app speaks.
+For voice controls and audio acceptance checks, use the
 [voice and audio test guide](voice-audio-testing.md).
 With AirPods on, face where the phone points and press **Calibrate** so head turns keep
 the sound aligned with the object. The reverb is a room preset, not measured room acoustics.
@@ -204,7 +206,8 @@ xcrun devicectl device process launch --device YOUR_DEVICE_ID --terminate-existi
   --console YOUR_BUNDLE_ID -- --audio-self-test
 ```
 
-After five seconds, it plays ten evenly spaced pulses. **Stop** cancels the sequence.
+After five seconds, it plays five approach taps followed by five close ticks, evenly spaced.
+**Stop** cancels the sequence.
 The console reports the active audio route, playback failures and completed sounds;
 confirm that the pulses are actually audible through the selected output. Launch the app
 again without `--audio-self-test` for normal use. Without headphones, audio defaults to

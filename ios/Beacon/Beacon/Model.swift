@@ -80,11 +80,8 @@ final class AppModel: ObservableObject {
     private var started = false
     private var ticker: Timer?
 
-    private var smoothedDistance: Float?
-    private var phoneInterval: Double?
-    private var phoneConfirm = false
+    private var proximity = TargetProximity()
     private var wasConfirming = false
-    private var torch = Torch()
     private var lastPulse = Date.distantPast
     private var lastBeacon = Date.distantPast
 
@@ -523,10 +520,7 @@ final class AppModel: ObservableObject {
                 audio.beaconPing(at: SIMD3(p[0], p[1], p[2]))
                 lastBeacon = now
             }
-        case "probe":
-            torchTick(g, now: now)
-        case "hotcold":
-            // Direct target proximity without routing (milestone 1 behaviour).
+        case "probe", "hotcold":
             probeTick(g, now: now)
         default:
             resetProbe()
@@ -536,30 +530,19 @@ final class AppModel: ObservableObject {
     private func probeTick(_ g: Guidance, now: Date) {
         let interval: Double?
         let confirming: Bool
-        if let d = phoneDistance(g) {
-            let smoothed = smoothedDistance.map { $0 + 0.3 * (d - $0) } ?? d
-            smoothedDistance = smoothed
-            let threshold = g.proximity?.threshold ?? 0.2
-            phoneConfirm = phoneConfirm ? smoothed < threshold * 1.3 : smoothed < threshold
-            let target = Self.pulseInterval(forDistance: smoothed)
-            if let current = phoneInterval, abs(target - current) / current < 0.08 {
-                interval = current
-            } else {
-                phoneInterval = target
-                interval = target
-            }
-            confirming = phoneConfirm
+        if let distance = phoneDistance(g),
+           let feedback = proximity.update(distance: distance, threshold: g.proximity?.threshold ?? 0.2) {
+            interval = feedback.interval
+            confirming = feedback.onObject
         } else {
-            smoothedDistance = nil
-            phoneInterval = nil
-            phoneConfirm = false
+            proximity.reset()
             interval = g.proximity?.pulseInterval
             confirming = g.proximity?.confirm ?? false
         }
 
         let source = g.target?.position.flatMap { $0.count == 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
         if confirming {
-            if !wasConfirming || now.timeIntervalSince(lastPulse) >= 0.8 {
+            if !wasConfirming || now.timeIntervalSince(lastPulse) >= 0.4 {
                 audio.confirm(at: source)
                 lastPulse = now
             }
@@ -570,54 +553,16 @@ final class AppModel: ObservableObject {
         wasConfirming = confirming
     }
 
-    /// Within reach the phone is a torch: the beep's pitch says whether it points at the object
-    /// (low, middle, high), its rate how near it is. Computed from the phone's own pose every tick.
-    private func torchTick(_ g: Guidance, now: Date) {
-        guard let target = g.target, target.valid, let pose, pose.tracking == "normal", pose.epoch == g.epoch,
-              let c = target.position, c.count == 3 else { return probeTick(g, now: now) }
-        let centre = SIMD3(c[0], c[1], c[2])
-        let surface = (target.surface ?? []).filter { $0.count == 3 }.map { SIMD3($0[0], $0[1], $0[2]) }
-        let out = torch.update(camera: pose.transform, centre: centre, extent: target.extent?.max() ?? 0.1,
-                               surface: surface)
-        let threshold = g.proximity?.threshold ?? 0.2
-        phoneConfirm = phoneConfirm ? out.distance < threshold * 1.3 : out.distance < threshold
-        if phoneConfirm {
-            if !wasConfirming || now.timeIntervalSince(lastPulse) >= 0.8 {
-                audio.confirm(at: centre)
-                lastPulse = now
-            }
-        } else if now.timeIntervalSince(lastPulse) >= out.interval {
-            audio.torch(out.aim, at: centre)
-            lastPulse = now
-        }
-        wasConfirming = phoneConfirm
-    }
-
     private func resetProbe() {
-        torch.reset()
-        smoothedDistance = nil
-        phoneInterval = nil
-        phoneConfirm = false
+        proximity.reset()
         wasConfirming = false
     }
 
-    /// Distance from the phone camera centre to the nearest target surface point, only when it can be trusted.
+    /// Use the nearest observed surface, or the centre until surface samples arrive.
     private func phoneDistance(_ g: Guidance) -> Float? {
         guard let target = g.target, target.valid, let pose, pose.tracking == "normal", pose.epoch == g.epoch,
-              let surface = target.surface, !surface.isEmpty else { return nil }
-        let c = pose.transform.columns.3
-        let camera = SIMD3<Float>(c.x, c.y, c.z)
-        return surface.lazy
-            .filter { $0.count == 3 }
-            .map { simd_distance(camera, SIMD3($0[0], $0[1], $0[2])) }
-            .min()
-    }
-
-    /// 0.08 s at ≤ 0.15 m to 1.2 s at ≥ 3 m, exponential so that small changes near the object are audible.
-    nonisolated static func pulseInterval(forDistance d: Float) -> Double {
-        // Calm range: distance is also heard as loudness, so the knocks need not race like a metal detector.
-        let near = 0.15, far = 3.0, fastest = 0.22, slowest = 1.0
-        let u = (min(max(Double(d), near), far) - near) / (far - near)
-        return fastest * pow(slowest / fastest, u)
+              let centre = target.position, centre.count == 3 else { return nil }
+        let surface = (target.surface ?? []).filter { $0.count == 3 }.map { SIMD3($0[0], $0[1], $0[2]) }
+        return TargetProximity.distance(camera: pose.transform, centre: SIMD3(centre[0], centre[1], centre[2]), surface: surface)
     }
 }

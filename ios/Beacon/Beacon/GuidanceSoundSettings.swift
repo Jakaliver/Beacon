@@ -15,7 +15,7 @@ struct GuidanceSoundSettings: View {
         } header: {
             Text("Object sound")
         } footer: {
-            Text("Chest plays continuously from the found object. Beeps use pulses. Pause or finish the search to stop the sound.")
+            Text("Chest plays continuously from the object. Beeps use warm taps as you approach, then ticks when the phone is close. Pause or finish to stop the sound.")
         }
     }
 }
