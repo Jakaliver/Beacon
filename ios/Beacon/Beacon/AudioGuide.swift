@@ -51,6 +51,7 @@ final class AudioGuide {
     private var mixerIDs: [String: String] = [:]
     private var clipDurations: [String: Double] = [:]
     private var cueTiming = GuidanceCueTiming()
+    private var lastRecovery = -Double.infinity
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
 
     private let headMotion = CMHeadphoneMotionManager()
@@ -567,10 +568,21 @@ final class AudioGuide {
                         self.prepared[name, default: []].append((id, event))
                     } else {
                         self.diagnostic("prepare \(name) failed: \(reason.rawValue)")
+                        self.recoverFromPrepareFailure()
                     }
                 }
             }
         }
+    }
+
+    /// A failed preparation means PHASE has lost its output although it still reports running (seen after
+    /// audio session and route changes). Nothing would play again, so restart it, at most every 2 s.
+    private func recoverFromPrepareFailure() {
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastRecovery > 2 else { return }
+        lastRecovery = now
+        diagnostic("restarting audio engine after a failed preparation")
+        restart()
     }
 
     private func diagnostic(_ message: String) {

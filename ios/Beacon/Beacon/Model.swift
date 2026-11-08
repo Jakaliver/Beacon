@@ -556,6 +556,16 @@ final class AppModel: ObservableObject {
 
     private var limitedTrackingSince: Date?
     private static let probeLimitedTracking: TimeInterval = 10  // matches the Mac's probe_limited_tracking_s
+    private static let touchReach: Float = 0.5  // the camera cannot see closer than this, so darkness here means touch
+    private var lastCloseAt: Date?  // last time, with normal tracking, the phone was within reach of the target
+
+    /// The camera went dark right after the phone was within reach: it is touching the target.
+    /// ARKit then reports limited tracking, which must not silence the arrival cue.
+    private var touchingTarget: Bool {
+        guard mode == "probe", tracking == "limited", let since = limitedTrackingSince, let close = lastCloseAt
+        else { return false }
+        return since.timeIntervalSince(close) < 1.5
+    }
 
     private func update(pose sample: PoseSample) {
         pose = sample
@@ -580,7 +590,7 @@ final class AppModel: ObservableObject {
         if audio.headTrackingLive != headTracking { headTracking = audio.headTrackingLive }
         let fresh = now.timeIntervalSince(guidanceAt) < 1
         if !fresh { autoStop("stale") }
-        guard !recording, !transcribing, foreground, !searchCleared, stopReason == nil, fresh, tracking == "normal", let g = guidance else {
+        guard !recording, !transcribing, foreground, !searchCleared, stopReason == nil, fresh, tracking == "normal" || touchingTarget, let g = guidance else {
             audio.stopTargetLoop()
             audio.updateTargetAlignment(at: nil)
             haptics.stop()
@@ -619,6 +629,12 @@ final class AppModel: ObservableObject {
                audio.beaconPing(at: SIMD3(p[0], p[1], p[2])) {
                 lastBeacon = now
             }
+        case "probe" where touchingTarget:
+            let source = g.target?.position.flatMap { $0.count == 3 ? SIMD3($0[0], $0[1], $0[2]) : nil }
+            if (!wasConfirming || now.timeIntervalSince(lastPulse) >= 0.8), audio.confirm(at: source) {
+                lastPulse = now
+                wasConfirming = true
+            }
         case "probe", "hotcold":
             probeTick(g, now: now)
         default:
@@ -631,6 +647,7 @@ final class AppModel: ObservableObject {
         let confirming: Bool
         if let distance = phoneDistance(g),
            let feedback = proximity.update(distance: distance, threshold: g.proximity?.threshold ?? 0.2) {
+            if distance < Self.touchReach { lastCloseAt = now }
             interval = feedback.interval
             confirming = feedback.onObject
         } else {
@@ -656,6 +673,7 @@ final class AppModel: ObservableObject {
     private func resetProbe() {
         proximity.reset()
         wasConfirming = false
+        lastCloseAt = nil
     }
 
     /// Use the nearest observed surface, or the centre until surface samples arrive.
