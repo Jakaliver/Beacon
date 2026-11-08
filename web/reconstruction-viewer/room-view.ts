@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { ScanCloud } from "./scan-cloud";
+import type { PhoneLocation } from "./phone-state";
 import type { Recon } from "./types";
 
 const MAX_POINTS = 60_000;
@@ -13,6 +14,20 @@ const decode = (base64: string) => {
   return bytes;
 };
 const PALETTE = [[0, 0, 0, 0], [48, 48, 48, 85], [108, 108, 108, 95], [52, 52, 52, 65], [38, 38, 38, 50]];
+const roundedRectangle = (width: number, height: number, radius: number) => {
+  const x = -width / 2, y = -height / 2;
+  const shape = new THREE.Shape();
+  shape.moveTo(x + radius, y);
+  shape.lineTo(x + width - radius, y);
+  shape.quadraticCurveTo(x + width, y, x + width, y + radius);
+  shape.lineTo(x + width, y + height - radius);
+  shape.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  shape.lineTo(x + radius, y + height);
+  shape.quadraticCurveTo(x, y + height, x, y + height - radius);
+  shape.lineTo(x, y + radius);
+  shape.quadraticCurveTo(x, y, x + radius, y);
+  return shape;
+};
 export type RoomViewMode = "3d" | "plan" | "first";
 
 /** Displays measured reconstruction snapshots without inventing unseen surfaces. */
@@ -25,6 +40,13 @@ export class RoomView {
   private hasPhonePose = false;
   private phonePosition = new THREE.Vector3();
   private phoneRotation = new THREE.Quaternion();
+  private firstPersonRotation = new THREE.Quaternion();
+  private phoneForward = new THREE.Vector3(0, 0, -1);
+  private phoneUp = new THREE.Vector3(0, 1, 0);
+  private phoneState: PhoneLocation["state"] = "waiting";
+  private phoneFloorY: number | null = null;
+  private phoneHeight: number | null = null;
+  private hasPhoneHeading = false;
   private phoneBasis = new THREE.Matrix4();
   private worldUp = new THREE.Vector3(0, 1, 0);
   private controls: OrbitControls;
@@ -63,7 +85,14 @@ export class RoomView {
   private route = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xb0b0b0, transparent: true, opacity: 0.65 }));
   private waypoint = new THREE.Mesh(new THREE.OctahedronGeometry(0.085), new THREE.MeshBasicMaterial({ color: 0xd4d4d4 }));
   private phone = new THREE.Group();
-  private phoneMaterial = new THREE.MeshBasicMaterial({ color: 0xe5e5e5, depthTest: false, side: THREE.DoubleSide });
+  private phoneModel = new THREE.Group();
+  private phoneHeading = new THREE.Group();
+  private phoneMaterial = new THREE.MeshBasicMaterial({ color: 0xb8e4eb, transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide });
+  private phoneOutlineMaterial = new THREE.LineBasicMaterial({ color: 0xb8e4eb, transparent: true, opacity: 0.85, depthTest: false, depthWrite: false });
+  private phoneSurfaces: THREE.MeshBasicMaterial[] = [];
+  private phoneHeightPositions = new Float32Array(6);
+  private phoneHeightLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xb8e4eb, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false }));
+  private phoneFootprint = new THREE.Mesh(new THREE.RingGeometry(0.085, 0.105, 24), this.phoneMaterial);
   private recon: Recon | null = null;
   private epoch: number | null = null;
   private needsFit = true;
@@ -78,12 +107,10 @@ export class RoomView {
   private delta = new THREE.Vector3();
   private label: HTMLElement;
   private scaleBar: HTMLElement;
-  private phoneLabel: HTMLElement;
 
-  constructor(canvas: HTMLCanvasElement, label: HTMLElement, scaleBar: HTMLElement, phoneLabel: HTMLElement) {
+  constructor(canvas: HTMLCanvasElement, label: HTMLElement, scaleBar: HTMLElement) {
     this.label = label;
     this.scaleBar = scaleBar;
-    this.phoneLabel = phoneLabel;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "low-power" });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
     this.renderer.setClearColor(0x181818, 0);
@@ -133,13 +160,47 @@ export class RoomView {
     this.cloud.frustumCulled = false;
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.visible = false;
+    const surface = (color: number) => {
+      const material = new THREE.MeshBasicMaterial({ color, transparent: true, depthTest: false, depthWrite: false });
+      this.phoneSurfaces.push(material);
+      return material;
+    };
+    // A solid phone, independent of the reconstruction: local −Z is the rear camera's
+    // optical direction, +Z is the screen, and +Y runs towards the top of the handset.
+    const bodyGeometry = new THREE.ExtrudeGeometry(roundedRectangle(0.09, 0.18, 0.012), { depth: 0.012, bevelEnabled: false, curveSegments: 4 });
+    bodyGeometry.translate(0, 0, -0.006);
+    const body = new THREE.Mesh(bodyGeometry, surface(0x30383d));
+    const outline = new THREE.LineSegments(new THREE.EdgesGeometry(bodyGeometry, 35), this.phoneOutlineMaterial);
+    const screen = new THREE.Mesh(new THREE.ShapeGeometry(roundedRectangle(0.076, 0.158, 0.008), 4), surface(0x416b78));
+    screen.position.z = 0.0065;
+    const earpiece = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.003, 0.001), surface(0x9ab6bd));
+    earpiece.position.set(0, 0.071, 0.0075);
+    const cameraHousing = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.043, 0.003), surface(0x536068));
+    cameraHousing.position.set(-0.024, 0.055, -0.0075);
+    const lensGeometry = new THREE.CylinderGeometry(0.006, 0.006, 0.002, 12);
+    const lensMaterial = surface(0x081b25);
+    for (const y of [0.045, 0.065]) {
+      const lens = new THREE.Mesh(lensGeometry, lensMaterial);
+      lens.rotation.x = Math.PI / 2;
+      lens.position.set(-0.024, y, -0.01);
+      this.phoneModel.add(lens);
+    }
+    this.phoneModel.add(body, outline, screen, earpiece, cameraHousing);
+    this.phoneModel.traverse(child => { child.renderOrder = 5; });
+    outline.renderOrder = 6;
     const arrow = new THREE.BufferGeometry();
-    arrow.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, -0.15, -0.075, 0, 0.08, 0, 0, 0.04, 0.075, 0, 0.08], 3));
+    arrow.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, -0.16, -0.035, 0, -0.10, 0, 0, -0.12, 0.035, 0, -0.10], 3));
     arrow.setIndex([0, 1, 2, 0, 2, 3]);
     const heading = new THREE.Mesh(arrow, this.phoneMaterial);
-    this.phone.add(heading);
-    this.phone.renderOrder = 4;
-    this.phone.children.forEach(child => { child.renderOrder = 4; });
+    heading.renderOrder = 4;
+    this.phoneHeading.add(heading);
+    this.phoneHeightLine.geometry.setAttribute("position", new THREE.BufferAttribute(this.phoneHeightPositions, 3).setUsage(THREE.DynamicDrawUsage));
+    this.phoneHeightLine.frustumCulled = false;
+    this.phoneHeightLine.renderOrder = 3;
+    this.phoneFootprint.rotation.x = -Math.PI / 2;
+    this.phoneFootprint.renderOrder = 4;
+    this.phone.add(this.phoneModel, this.phoneHeading, this.phoneHeightLine, this.phoneFootprint);
+    this.phoneHeightLine.visible = this.phoneFootprint.visible = false;
     this.phone.visible = this.waypoint.visible = false;
     this.scene.add(this.grid, this.floor, this.cloud, this.targets, this.route, this.waypoint, this.phone);
     this.resizeObserver = new ResizeObserver(() => this.resize(canvas));
@@ -180,13 +241,13 @@ export class RoomView {
     this.autoFit = !firstPerson;
     this.grid.visible = !firstPerson;
     this.floor.visible = !firstPerson && this.hasFloor;
-    this.phone.visible = !firstPerson && !!this.recon?.phone.position;
+    this.phone.visible = !firstPerson && this.hasPhonePose;
     this.route.visible = !firstPerson;
     this.waypoint.visible = !firstPerson && !!this.recon?.waypoint;
     if (firstPerson) {
       if (this.hasPhonePose) {
         this.firstPersonCamera.position.copy(this.phonePosition);
-        this.firstPersonCamera.quaternion.copy(this.phoneRotation);
+        this.firstPersonCamera.quaternion.copy(this.firstPersonRotation);
       }
       this.invalidate();
       return;
@@ -209,7 +270,64 @@ export class RoomView {
     (this.cloud.material as THREE.ShaderMaterial).uniforms.colourMode.value = Number(enabled);
     if (this.recon) this.update(this.recon);
   }
-  resetScan() { this.scan.clear(); this.decodedCount = 0; this.imageColors = null; this.scanId = undefined; this.mapVersion = undefined; this.needsFit = true; this.hasPhonePose = false; }
+  resetScan() {
+    this.resetReconstruction();
+    this.scanId = undefined;
+    this.epoch = null;
+    this.clearPhone();
+    this.invalidate();
+  }
+
+  private resetReconstruction() {
+    this.scan.clear();
+    this.decodedCount = this.pointCount = this.observedCells = 0;
+    this.imageColors = null;
+    this.mapVersion = undefined;
+    this.cloudKey = this.gridCells = this.routeKey = "";
+    this.cloudGeometry.setDrawRange(0, 0);
+    this.route.geometry.setDrawRange(0, 0);
+    this.hasFloor = false;
+    this.floor.visible = this.route.visible = this.waypoint.visible = false;
+    this.recon = null;
+    this.label.hidden = true;
+    this.needsFit = true;
+    for (const visual of this.targetVisuals.values()) {
+      this.targets.remove(visual.group);
+      visual.box.material.dispose();
+      visual.edges.material.dispose();
+    }
+    this.targetVisuals.clear();
+  }
+
+  private clearPhone() {
+    this.hasPhonePose = this.hasPhoneHeading = false;
+    this.phoneFloorY = this.phoneHeight = null;
+    this.phoneState = "waiting";
+    this.phonePosition.set(0, 0, 0);
+    this.phoneRotation.identity();
+    this.firstPersonRotation.identity();
+    this.phoneForward.set(0, 0, -1);
+    this.phone.visible = this.phoneHeightLine.visible = this.phoneFootprint.visible = false;
+  }
+
+  focusPhone() {
+    if (!this.hasPhonePose) return;
+    if (this.viewMode === "first") {
+      this.firstPersonCamera.position.copy(this.phonePosition);
+      this.firstPersonCamera.quaternion.copy(this.firstPersonRotation);
+    } else {
+      this.autoFit = false;
+      this.orbit = this.controls.autoRotate = false;
+      this.delta.copy(this.phonePosition).sub(this.controls.target);
+      this.camera.position.add(this.delta);
+      this.controls.target.copy(this.phonePosition);
+      const inspectZoom = 55 * (this.camera.top - this.camera.bottom) / (this.height * 0.18);
+      this.camera.zoom = THREE.MathUtils.clamp(Math.max(this.camera.zoom, inspectZoom), this.controls.minZoom, this.controls.maxZoom);
+      this.camera.updateProjectionMatrix();
+      this.controls.update(0);
+    }
+    this.invalidate();
+  }
   focusTarget() {
     if (this.viewMode === "first") return;
     const target = this.recon?.targets.find(t => t.selected);
@@ -224,12 +342,17 @@ export class RoomView {
   }
 
   fit() {
-    if (!this.recon || this.viewMode === "first") return;
+    if (this.viewMode === "first") return;
     const box = new THREE.Box3();
-    const count = this.cloudGeometry.drawRange.count;
+    const count = this.pointCount;
     for (let i = 0; i < count; i++) box.expandByPoint(this.project.fromArray(this.positions, i * 3));
-    for (const t of this.recon.targets) if (t.selected) box.expandByPoint(this.project.fromArray(t.position));
-    if (this.recon.phone.position) box.expandByPoint(this.project.fromArray(this.recon.phone.position));
+    for (const t of this.recon?.targets ?? []) if (t.selected) box.expandByPoint(this.project.fromArray(t.position));
+    if (this.hasPhonePose) {
+      box.expandByPoint(this.phonePosition);
+      if (this.phoneHeight !== null && this.phoneFloorY !== null) {
+        box.expandByPoint(this.project.set(this.phonePosition.x, this.phoneFloorY, this.phonePosition.z));
+      }
+    }
     if (box.isEmpty()) return;
     box.getCenter(this.anchor);
     // Centre the full height of the scan, not just its floor, to keep walls on screen.
@@ -262,30 +385,79 @@ export class RoomView {
     this.invalidate();
   }
 
-  private updatePhonePose(recon: Recon) {
-    const { position, forward, tracking } = recon.phone;
-    if (tracking !== "normal" || position?.length !== 3 || forward?.length !== 3
-      || !position.every(Number.isFinite) || !forward.every(Number.isFinite)) return;
-    this.project.fromArray(forward);
-    if (this.project.lengthSq() < 1e-6) return;
-    this.phonePosition.fromArray(position);
-    this.project.normalize().add(this.phonePosition);
-    // Follow the optical direction, including pitch, with a level horizon.
-    this.phoneBasis.lookAt(this.phonePosition, this.project, this.worldUp);
-    this.phoneRotation.setFromRotationMatrix(this.phoneBasis);
-    if (!this.hasPhonePose) {
-      this.firstPersonCamera.position.copy(this.phonePosition);
-      this.firstPersonCamera.quaternion.copy(this.phoneRotation);
+  updatePhone(location: PhoneLocation) {
+    const { position, forward, up } = location;
+    if (position?.length !== 3 || !position.every(Number.isFinite)) {
+      this.clearPhone();
+      this.invalidate();
+      return;
+    }
+    const firstPose = !this.hasPhonePose;
+    this.phoneState = location.state;
+    // Stale/tracking locations describe the last valid pose; never animate towards an
+    // untrusted update. A cached pose may still be the first one available after connecting.
+    if (location.state === "live" || firstPose) {
+      this.phonePosition.fromArray(position);
+      if (forward?.length === 3 && forward.every(Number.isFinite)) {
+        this.phoneForward.fromArray(forward);
+        if (this.phoneForward.lengthSq() > 1e-6) {
+          this.phoneForward.normalize();
+          this.phoneUp.copy(this.worldUp);
+          if (up?.length === 3 && up.every(Number.isFinite)) {
+            this.phoneUp.fromArray(up);
+            if (this.phoneUp.lengthSq() < 1e-6) this.phoneUp.copy(this.worldUp);
+            else this.phoneUp.normalize();
+          }
+          if (Math.abs(this.phoneForward.dot(this.phoneUp)) > 0.999) {
+            this.phoneUp.set(0, Math.abs(this.phoneForward.y) > 0.99 ? 0 : 1, Math.abs(this.phoneForward.y) > 0.99 ? 1 : 0);
+          }
+          this.delta.copy(this.phonePosition).add(this.phoneForward);
+          this.phoneBasis.lookAt(this.phonePosition, this.delta, this.phoneUp);
+          this.phoneRotation.setFromRotationMatrix(this.phoneBasis);
+          // Match pitch and position while keeping the follow view's horizon comfortable.
+          this.phoneBasis.lookAt(this.phonePosition, this.delta, this.worldUp);
+          this.firstPersonRotation.setFromRotationMatrix(this.phoneBasis);
+          this.hasPhoneHeading = Math.hypot(this.phoneForward.x, this.phoneForward.z) > 1e-3;
+          if (this.hasPhoneHeading) this.phoneHeading.rotation.y = Math.atan2(-this.phoneForward.x, -this.phoneForward.z);
+        }
+      }
     }
     this.hasPhonePose = true;
+    this.phone.position.copy(this.phonePosition);
+    this.phoneModel.quaternion.copy(this.phoneRotation);
+    this.phoneFloorY = location.floorY !== null && Number.isFinite(location.floorY) ? location.floorY : null;
+    this.phoneHeight = this.phoneFloorY !== null && location.height !== null && Number.isFinite(location.height) ? location.height : null;
+    const hasHeight = this.phoneHeight !== null && this.phoneFloorY !== null;
+    const floorOffset = hasHeight ? this.phoneFloorY! - this.phonePosition.y : 0;
+    this.phoneHeightPositions[4] = floorOffset;
+    this.phoneHeightLine.geometry.attributes.position.needsUpdate = true;
+    this.phoneHeightLine.visible = this.phoneFootprint.visible = hasHeight;
+    this.phoneFootprint.position.y = floorOffset + 0.015;
+    this.phoneHeading.position.y = hasHeight ? floorOffset + 0.02 : 0;
+    this.phoneHeading.visible = this.hasPhoneHeading;
+    this.phone.visible = this.viewMode !== "first";
+    const live = location.state === "live";
+    const color = live ? 0xb8e4eb : location.state === "tracking" ? 0xd9a663 : 0x858e94;
+    this.phoneMaterial.color.setHex(color);
+    this.phoneMaterial.opacity = live ? 0.8 : 0.45;
+    this.phoneOutlineMaterial.color.setHex(color);
+    this.phoneOutlineMaterial.opacity = live ? 0.95 : 0.6;
+    this.phoneHeightLine.material.color.setHex(color);
+    this.phoneHeightLine.material.opacity = live ? 0.6 : 0.32;
+    for (const material of this.phoneSurfaces) material.opacity = live ? 1 : 0.55;
+    if (firstPose || !live) {
+      this.firstPersonCamera.position.copy(this.phonePosition);
+      this.firstPersonCamera.quaternion.copy(this.firstPersonRotation);
+    }
+    if (firstPose && this.pointCount === 0) this.fit();
+    this.invalidate();
   }
 
   update(recon: Recon): { points: number; area: number } {
     if (recon.epoch !== this.epoch || recon.scan_id !== this.scanId) {
-      this.resetScan(); this.epoch = recon.epoch; this.scanId = recon.scan_id;
+      this.resetReconstruction(); this.epoch = recon.epoch; this.scanId = recon.scan_id;
     }
     this.recon = recon;
-    this.updatePhonePose(recon);
     const floorY = recon.floor_y ?? 0;
     this.grid.position.set(Math.round(recon.grid.origin[0] + recon.grid.w * recon.grid.res / 2), floorY - 0.04, Math.round(recon.grid.origin[1] + recon.grid.h * recon.grid.res / 2));
     const version = recon.points_version ?? recon.stats.map_version;
@@ -368,15 +540,9 @@ export class RoomView {
       this.route.geometry.dispose();
       this.route.geometry = new THREE.BufferGeometry().setFromPoints(recon.path.map(([x, z]) => new THREE.Vector3(x, floorY + 0.06, z)));
     }
-    this.waypoint.visible = this.route.visible && !!recon.waypoint;
+    this.route.visible = this.viewMode !== "first" && recon.path.length > 1;
+    this.waypoint.visible = this.viewMode !== "first" && !!recon.waypoint;
     if (recon.waypoint) this.waypoint.position.set(recon.waypoint[0], floorY + 0.09, recon.waypoint[1]);
-    this.phone.visible = this.viewMode !== "first" && !!recon.phone.position;
-    if (recon.phone.position) {
-      this.phone.position.set(recon.phone.position[0], floorY + 0.1, recon.phone.position[2]);
-      const f = recon.phone.forward;
-      if (f) this.phone.rotation.y = Math.atan2(-f[0], -f[2]);
-      this.phoneMaterial.color.setHex(recon.phone.tracking === "normal" ? 0xe5e5e5 : 0x999999);
-    }
     const now = performance.now();
     if (this.viewMode !== "first" && this.pointCount && (this.needsFit || this.autoFit && now - this.lastFit > 2000)) {
       this.fit(); this.needsFit = false; this.lastFit = now;
@@ -422,11 +588,11 @@ export class RoomView {
     const firstPerson = this.viewMode === "first";
     this.controls.autoRotate = this.orbit && this.cloudGeometry.drawRange.count > 0;
     if (firstPerson) {
-      if (this.hasPhonePose && (this.firstPersonCamera.position.distanceToSquared(this.phonePosition) > 1e-8
-        || this.firstPersonCamera.quaternion.angleTo(this.phoneRotation) > 1e-4)) {
+      if (this.hasPhonePose && this.phoneState === "live" && (this.firstPersonCamera.position.distanceToSquared(this.phonePosition) > 1e-8
+        || this.firstPersonCamera.quaternion.angleTo(this.firstPersonRotation) > 1e-4)) {
         const blend = 1 - Math.exp(-16 * deltaSeconds);
         this.firstPersonCamera.position.lerp(this.phonePosition, blend);
-        this.firstPersonCamera.quaternion.slerp(this.phoneRotation, blend);
+        this.firstPersonCamera.quaternion.slerp(this.firstPersonRotation, blend);
         this.invalidate();
       }
     } else {
@@ -438,6 +604,9 @@ export class RoomView {
     const pixelsPerMeter = firstPerson
       ? this.height / (2 * Math.tan(THREE.MathUtils.degToRad(this.firstPersonCamera.fov / 2)))
       : this.height / (this.camera.top - this.camera.bottom) * this.camera.zoom;
+    // Keep the handset recognisable at room-wide zoom. Only the symbol grows; its actual
+    // position, floor footprint and measured height line remain in world coordinates.
+    if (!firstPerson) this.phoneModel.scale.setScalar(THREE.MathUtils.clamp(34 / (pixelsPerMeter * 0.18), 1, 3));
     const uniforms = (this.cloud.material as THREE.ShaderMaterial).uniforms;
     uniforms.pointSize.value = THREE.MathUtils.clamp(pixelsPerMeter * 0.03, 1.8, 3.8) * this.renderer.getPixelRatio() * (this.colourMode ? 1.45 : 1);
     uniforms.perspectiveScale.value = firstPerson ? pixelsPerMeter * this.renderer.getPixelRatio() * (this.colourMode ? 0.027 : 0.021) : 0;
@@ -449,13 +618,6 @@ export class RoomView {
       this.label.hidden = Math.abs(this.project.x) > 0.92 || Math.abs(this.project.y) > 0.9 || Math.abs(this.project.z) > 1;
       this.label.style.left = `${(this.project.x + 1) * this.width / 2}px`;
       this.label.style.top = `${(1 - this.project.y) * this.height / 2}px`;
-    }
-    this.phoneLabel.hidden = firstPerson || !this.recon?.phone.position;
-    if (!firstPerson && this.recon?.phone.position) {
-      this.project.copy(this.phone.position).project(camera);
-      this.phoneLabel.hidden = Math.abs(this.project.x) > 0.90 || Math.abs(this.project.y) > 0.85;
-      this.phoneLabel.style.left = `${(this.project.x + 1) * this.width / 2}px`;
-      this.phoneLabel.style.top = `${(1 - this.project.y) * this.height / 2 + 28}px`;
     }
     this.scaleBar.style.width = `${pixelsPerMeter}px`;
   };

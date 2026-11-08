@@ -33,6 +33,8 @@ viewer_clients: set[WebSocket] = set()
 # The point cloud (up to ~1.5 MB) is resent only when it changed, and at most POINTS_HZ times a second.
 viewer_points = {"version": None, "new_viewer": False, "sent": 0.0}
 POINTS_HZ = 5
+PHONE_POSE_HZ = 30
+VIEWER_SEND_TIMEOUT = 0.25
 pending: dict = {"frame": None}
 # The newest sensor connection wins, so a forgotten simulator tab cannot fight a real phone.
 active_sensor: dict = {"ws": None}
@@ -62,13 +64,28 @@ mps_mb = {"value": 0}
 
 
 async def broadcast(clients: set[WebSocket], msgs: list[dict]) -> None:
-    texts = [json.dumps(m) for m in msgs]
+    await broadcast_text(clients, [json.dumps(m) for m in msgs])
+
+
+async def broadcast_text(clients: set[WebSocket], texts: list[str]) -> None:
     for ws in list(clients):
         try:
             for t in texts:
                 await ws.send_text(t)
         except Exception:
             clients.discard(ws)
+
+
+async def broadcast_viewer(text: str) -> None:
+    """Disconnect slow viewers instead of holding live poses behind their socket backlog."""
+    for ws in list(viewer_clients):
+        try:
+            await asyncio.wait_for(ws.send_text(text), timeout=VIEWER_SEND_TIMEOUT)
+        except Exception:
+            viewer_clients.discard(ws)
+            # Closing lets the browser reconnect, rather than leaving an open but silent feed.
+            with suppress(Exception):
+                await asyncio.wait_for(ws.close(code=1013), timeout=min(0.05, VIEWER_SEND_TIMEOUT))
 
 
 last_logged_mode = {"mode": None}
@@ -109,22 +126,69 @@ async def vision_worker() -> None:
 
 
 async def ticker() -> None:
-    """Keeps stop rules running even when pose updates stop arriving, and feeds the room view."""
-    period = 1 / max(1.0, CONFIG.viewer_hz)
-    last_guidance = 0.0
+    """Keep stop rules responsive independently of viewer work or viewer backpressure."""
     while True:
-        await asyncio.sleep(min(0.1, period))
+        await asyncio.sleep(0.1)
         try:
-            now = asyncio.get_running_loop().time()
-            if now - last_guidance >= 0.1:
-                last_guidance = now
-                await publish_guidance()
-            if viewer_clients:
-                snap = await asyncio.to_thread(engine.snapshot, wants_points(engine.surfaces.version, now))
-                snap["stats"].update(memory_stats())
-                await broadcast(viewer_clients, [snap])
+            await publish_guidance()
         except Exception:
-            log.exception("guidance/viewer tick failed")
+            log.exception("guidance tick failed")
+
+
+def encoded_viewer_snapshot(with_points: bool) -> tuple[dict, str]:
+    """Build and serialize the larger payload away from the event loop."""
+    snap = engine.snapshot(with_points)
+    snap["stats"].update(memory_stats())
+    return snap, json.dumps(snap)
+
+
+class ViewerPublisher:
+    """One WebSocket writer, one outstanding reconstruction, no queue of old poses."""
+    def __init__(self) -> None:
+        self.next_phone = self.next_recon = 0.0
+        self.pending_snapshot: asyncio.Task | None = None
+
+    async def tick(self, now: float) -> None:
+        if not viewer_clients:
+            if self.pending_snapshot is not None and self.pending_snapshot.done():
+                with suppress(Exception):
+                    self.pending_snapshot.result()
+                self.pending_snapshot = None
+            return
+        if now + 1e-9 >= self.next_phone:
+            # Deadlines advance from now, not the previous deadline: stalled sends skip
+            # intermediate poses instead of replaying them once the viewer catches up.
+            self.next_phone = now + 1 / PHONE_POSE_HZ
+            await broadcast_viewer(json.dumps(engine.phone_snapshot()))
+        if self.pending_snapshot is not None and self.pending_snapshot.done():
+            completed, self.pending_snapshot = self.pending_snapshot, None
+            try:
+                snap, text = completed.result()
+                if snap["scan_id"] == engine.phone_snapshot()["scan_id"]:
+                    await broadcast_viewer(text)
+                else:
+                    viewer_points["new_viewer"] = True  # discard work from a reset scan
+            except Exception:
+                viewer_points["new_viewer"] = True
+                log.exception("viewer snapshot failed")
+        if self.pending_snapshot is None and now + 1e-9 >= self.next_recon:
+            self.next_recon = now + 1 / max(1.0, CONFIG.viewer_hz)
+            with_points = wants_points(engine.surfaces.version, now)
+            self.pending_snapshot = asyncio.create_task(asyncio.to_thread(encoded_viewer_snapshot, with_points))
+
+
+async def viewer_publisher() -> None:
+    publisher = ViewerPublisher()
+    try:
+        while True:
+            await asyncio.sleep(1 / max(PHONE_POSE_HZ, CONFIG.viewer_hz))
+            try:
+                await publisher.tick(asyncio.get_running_loop().time())
+            except Exception:
+                log.exception("viewer tick failed")
+    finally:
+        if publisher.pending_snapshot is not None:
+            publisher.pending_snapshot.cancel()
 
 
 def wants_points(version: int, now: float) -> bool:
@@ -155,7 +219,7 @@ async def load_speech() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    tasks = [asyncio.create_task(t()) for t in (vision_worker, ticker, load_speech)]
+    tasks = [asyncio.create_task(t()) for t in (vision_worker, ticker, viewer_publisher, load_speech)]
     yield
     for t in tasks:
         t.cancel()

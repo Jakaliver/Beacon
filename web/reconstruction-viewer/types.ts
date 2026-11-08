@@ -1,4 +1,23 @@
-export type Recon = {
+export type Phone = {
+  position: number[] | null;
+  forward: number[] | null;
+  up?: number[] | null;
+  tracking: string | null;
+  seq?: number | null;
+  t?: number | null;
+};
+
+export type PhoneFrame = {
+  scan_id?: string;
+  epoch: number;
+  floor_y: number | null;
+  phone: Phone;
+  stats: Record<string, number | boolean | null>;
+};
+
+export type PhonePose = PhoneFrame & { type: "phone_pose" };
+
+export type Recon = PhoneFrame & {
   scan_id?: string;
   epoch: number; perception: string; mode: string; stop_reason: string | null; navigation: boolean;
   grid: { origin: [number, number]; res: number; w: number; h: number; cells: string };
@@ -6,7 +25,7 @@ export type Recon = {
   point_colors?: string;
   points_version?: number;
   points_fused?: boolean;
-  phone: { position: number[] | null; forward: number[] | null; tracking: string | null };
+  phone: Phone;
   listener: number[] | null;
   targets: { id: string; label: string; position: number[]; extent: number[]; sigma: number; age: number; valid: boolean; selected: boolean; injected: boolean; locked?: boolean }[];
   path: number[][]; waypoint: number[] | null;

@@ -14,8 +14,8 @@ to middle to high as the phone points nearer to the object, and it beeps faster 
 phone gets closer. A double beep means you have reached it. See the [voice and audio test guide](docs/voice-audio-testing.md)
 for installation, expected behavior and checks on a real iPhone.
 
-The browser is a **read-only room visualization**: grey LiDAR-style dots, a white iPhone
-marker, and the selected target in red. It connects only to `/ws/viewer`. It has no microphone,
+The browser is a **read-only room visualization**: grey LiDAR-style dots, a solid 3D iPhone
+with a screen and camera detail, and the selected target in red. It connects only to `/ws/viewer`. It has no microphone,
 audio playback, commands, guidance controls or simulated camera.
 
 ## Start
@@ -38,6 +38,15 @@ selected target. Right-drag to pan and scroll/pinch to zoom. In Overhead mode, d
 **First person** follows the iPhone's position and viewing direction through the point
 cloud, with a level horizon and perspective depth. Move the phone to look around. If
 tracking pauses, it holds the last valid view; choose **3D** to return to the room orbit.
+
+The phone model shows its actual position and orientation, with a vertical line and
+footprint on the detected floor. Its card shows **height above the floor** and **X/Y/Z
+room coordinates** in metres from the scan origin. **Locate phone** centres it. Height
+stays unknown until a floor estimate is available. Lost tracking freezes the last valid
+pose and labels it **Tracking limited** or **Last known**. Phone updates arrive up to
+30 times per second independently of the slower room scan; no extra vision inference is
+needed. The existing iPhone app supplies the pose, so this change only needs the updated
+Mac backend and browser viewer.
 
 **Colour** switches the grey LiDAR view to soft dots coloured from their source camera
 pixels. Selected targets remain red. The scan builds up to 60,000 points in 2.5 cm cells.
