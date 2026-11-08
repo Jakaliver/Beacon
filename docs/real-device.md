@@ -140,7 +140,13 @@ The colour preference survives a page refresh.
 Floor height is automatic: scan a wide floor patch. ARKit-classified floors are preferred;
 an unclassified plane must be stable, over 2 m² and at least 65 cm below the phone.
 Low surfaces are dark grey in monochrome mode; higher surfaces are brighter. The
-white **iPhone** arrow shows camera position and direction. Your selected object
+solid **iPhone** model shows the camera's actual position, direction and tilt. A line
+down to the floor makes its height visible, and **Locate phone** centres the model.
+The iPhone card shows floor-relative height and X/Y/Z coordinates from the scan origin,
+all in metres. It shows an unknown height until the floor is detected. Phone movement
+updates independently of room reconstruction, so **Live** phone tracking can coexist
+with a paused or slow room scan. Tracking loss holds the last valid phone position and
+labels it **Tracking limited** or **Last known**. Your selected object
 has a red outline and label; its distance appears in the bottom status bar.
 
 Use **3D** to see height, **Overhead** for a floor plan, and **Fit** to restore automatic
@@ -150,6 +156,15 @@ looking up and down. Move the phone to look around; a paused scan holds the last
 camera position. Select **3D** or **Overhead** to return to the external room views.
 Use **Talk to Beacon** in the iPhone app to select a target; the browser is read-only.
 The geometry comes from monocular depth estimates, not a hardware LiDAR scan.
+
+To check phone location on a real device, keep Beacon open and slowly lift, lower,
+turn and tilt it while looking at **3D** and **Overhead**. The solid model should follow;
+lifting 20 cm should increase the height readout by about 0.20 m once the floor is known.
+Try **Locate phone** and **First person**. Leave or lock the app: the marker must freeze
+and stop claiming to be live. Reopen and establish normal tracking to resume updates.
+Restarting the backend or resetting the scan must clear the previous world position.
+Update/restart the Mac backend and refresh the browser for this feature; reinstalling
+the iPhone app is not required.
 
 Beacon keeps the iPhone screen awake while open. Manually locking it or leaving the app
 pauses capture. The viewer keeps the last scan and labels it paused until fresh frames return.

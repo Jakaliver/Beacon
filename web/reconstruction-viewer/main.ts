@@ -1,6 +1,7 @@
 // Read-only room display. The iPhone owns commands, recording and guidance audio.
 import { RoomView, type RoomViewMode } from "./room-view";
-import type { Recon } from "./types";
+import { PhoneState } from "./phone-state";
+import type { PhonePose, Recon } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const params = new URLSearchParams(location.search);
@@ -16,9 +17,10 @@ let retry = 0;
 let destroyed = false;
 let pointCount = 0;
 let currentView: RoomViewMode = "3d";
+const phoneState = new PhoneState();
 
 try {
-  room = new RoomView($("roomCanvas"), $("targetLabel"), $("scaleBar"), $("phoneLabel"));
+  room = new RoomView($("roomCanvas"), $("targetLabel"), $("scaleBar"));
 } catch (error) {
   $("renderError").hidden = false;
   $("emptyState").hidden = true;
@@ -47,6 +49,10 @@ $("viewPlan").onclick = () => setView("plan");
 $("viewFirst").onclick = () => setView("first");
 $("fitRoom").onclick = () => room?.setAutoFit(true);
 $("focusTarget").onclick = () => room?.focusTarget();
+$("focusPhone").onclick = () => {
+  if (currentView === "first") setView("3d");
+  room?.focusPhone();
+};
 let colourEnabled = $("viewColour").getAttribute("aria-pressed") === "true";
 try {
   const saved = localStorage.getItem("beacon.viewer.colour") ?? localStorage.getItem("trident.viewer.colour");
@@ -61,39 +67,70 @@ $("viewColour").onclick = () => {
   try { localStorage.setItem("beacon.viewer.colour", String(enabled)); } catch { /* Optional preference. */ }
 };
 
+function clearScene() {
+  room?.resetScan();
+  recon = null;
+  lastSnapshot = 0;
+  pointCount = 0;
+  $("pointCount").textContent = "0";
+  $("mappedArea").textContent = "—";
+  $("targetCard").hidden = true;
+  $("noTarget").hidden = false;
+}
+
+function displayPhone(snapshot: PhonePose) {
+  const result = phoneState.update(snapshot, performance.now());
+  if (!result.accepted) return;
+  if (result.reset) clearScene();
+  updateFreshness();
+}
+
 function displaySnapshot(snapshot: Recon) {
+  const result = phoneState.update(snapshot, performance.now());
+  if (!phoneState.isCurrentWorld(snapshot)) return;
+  if (result.reset) clearScene();
   recon = snapshot;
   lastSnapshot = performance.now();
   const metric = room?.update(snapshot);
   pointCount = metric?.points ?? 0;
-  $<HTMLButtonElement>("viewFirst").disabled = !snapshot.phone.position || !snapshot.phone.forward || snapshot.phone.tracking !== "normal";
   $("pointCount").textContent = pointCount.toLocaleString();
   $("mappedArea").textContent = metric ? metric.area.toFixed(1) : "—";
-  $("emptyState").hidden = !room || pointCount > 0;
   $("injected").hidden = snapshot.perception !== "injected";
   const target = snapshot.targets.find(t => t.selected);
   $("targetCard").hidden = !target;
   $("noTarget").hidden = !!target;
   if (target) {
     $("targetName").textContent = target.label;
-    const phone = snapshot.phone.position;
-    const distance = phone ? Math.hypot(...target.position.map((v, i) => v - phone[i])).toFixed(1) : null;
-    $("targetDistance").textContent = distance ? `${distance} m` : "—";
     $("targetLabelText").textContent = target.label;
   }
   updateFreshness();
 }
 
 function updateFreshness() {
+  const phone = phoneState.location(performance.now(), connected);
+  room?.updatePhone(phone);
+  $("phoneCard").dataset.state = phone.state;
+  $("phoneStatus").textContent = { live: "Live", stale: "Last known", tracking: "Tracking limited", waiting: "Waiting" }[phone.state];
+  $("phoneHeight").textContent = phone.height === null ? "—" : phone.height.toFixed(2);
+  $("phoneHeightNote").textContent = phone.height !== null ? "above the floor"
+    : phone.position ? "Waiting for floor estimate" : "Waiting for phone tracking";
+  const format = (value: number) => (Math.abs(value) < 0.005 ? 0 : value).toFixed(2);
+  for (const [index, axis] of ["X", "Y", "Z"].entries()) {
+    $("phone" + axis).textContent = phone.position ? format(phone.position[index]) : "—";
+  }
+  $("phoneUpdated").textContent = phone.state === "live" ? "Position updating live"
+    : phone.ageMs === null ? "Open Beacon on your iPhone"
+    : `Last position ${(phone.ageMs / 1000).toFixed(1)}s ago`;
+  $<HTMLButtonElement>("focusPhone").disabled = !room || !phone.position;
+  $<HTMLButtonElement>("viewFirst").disabled = !phone.position || !phone.forward;
+  $("emptyState").hidden = !room || pointCount > 0 || !!phone.position;
   const elapsed = lastSnapshot ? performance.now() - lastSnapshot : Infinity;
   const age = recon?.stats.observation_age_ms;
   const frameAge = typeof age === "number" ? age + Number(recon?.stats.frame_age_ms ?? 0) + elapsed : Infinity;
-  const poseAge = recon?.stats.pose_age_ms;
   const live = connected && elapsed < 1500 && frameAge < 2500
-    && typeof poseAge === "number" && poseAge + elapsed < 1000
-    && recon?.stats.sensor_connected === true && recon.phone.tracking === "normal";
+    && phone.state === "live";
   const injected = recon?.perception === "injected";
-  if (currentView === "first") $("interactionHint").textContent = live
+  if (currentView === "first") $("interactionHint").textContent = phone.state === "live"
     ? "Following iPhone · Move the phone to look around"
     : "Last iPhone view · Waiting for live tracking";
   $("connection").dataset.state = live ? "live" : recon ? "paused" : "waiting";
@@ -108,6 +145,8 @@ function updateFreshness() {
     : "Open Beacon on your iPhone and scan the room.";
   const target = recon?.targets.find(t => t.selected);
   if (target) {
+    const distance = phone.position ? Math.hypot(...target.position.map((v, i) => v - phone.position![i])) : null;
+    $("targetDistance").textContent = distance === null ? "—" : `${distance.toFixed(1)} m`;
     const stale = !live || target.age + elapsed / 1000 > 1.5;
     $("targetState").textContent = !target.valid ? "Unverified" : !live ? "" : stale ? "Last seen" : "Tracked";
   }
@@ -117,11 +156,13 @@ function connect() {
   if (destroyed) return;
   const ws = new WebSocket(socketURL);
   socket = ws;
-  ws.onopen = () => { room?.resetScan(); connected = true; updateFreshness(); };
+  ws.onopen = () => { phoneState.reset(); clearScene(); connected = true; updateFreshness(); };
   ws.onmessage = event => {
     try {
-      const snapshot = JSON.parse(event.data) as Recon;
-      if (snapshot.grid && snapshot.phone && Array.isArray(snapshot.targets) && (typeof snapshot.points === "string" || snapshot.points === undefined)) displaySnapshot(snapshot);
+      const snapshot = JSON.parse(event.data) as Recon | PhonePose;
+      if ("type" in snapshot && snapshot.type === "phone_pose") displayPhone(snapshot as PhonePose);
+      else if ("grid" in snapshot && snapshot.grid && snapshot.phone && Array.isArray(snapshot.targets)
+        && (typeof snapshot.points === "string" || snapshot.points === undefined)) displaySnapshot(snapshot);
     } catch (error) { console.warn("Skipped invalid reconstruction snapshot", error); }
   };
   ws.onclose = () => {
@@ -130,7 +171,7 @@ function connect() {
     if (!destroyed) retry = window.setTimeout(connect, 1000);
   };
 }
-const freshnessTimer = window.setInterval(updateFreshness, 500);
+const freshnessTimer = window.setInterval(updateFreshness, 250);
 connect();
 
 function dispose() {

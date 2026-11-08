@@ -9,7 +9,7 @@ Server: `http://<mac-host>:8787`.
 |---|---|---|
 | `ws /ws/sensor` | source → Mac | binary camera frames, JSON pose updates |
 | `ws /ws/control` | both ways | JSON commands in, JSON guidance/speech out |
-| `ws /ws/viewer` | Mac → viewer | JSON reconstruction snapshots (read-only) |
+| `ws /ws/viewer` | Mac → viewer | JSON live phone poses and reconstruction snapshots (read-only) |
 | `POST /api/transcribe` | client → Mac | 16 kHz mono 16-bit PCM WAV body, returns `{"text": ...}` |
 | `GET /api/health` | | status |
 
@@ -171,16 +171,49 @@ last guidance message is under 1 s old. It must not treat a cached target as
 continuously verified: `observed_now` says whether the latest processed frame
 saw it.
 
-## Viewer messages (Mac → viewer, `/ws/viewer`, ~5 Hz)
+## Viewer messages (Mac → viewer, `/ws/viewer`)
+
+`phone_pose` is a lightweight live update sent up to 30 Hz, independently of depth,
+detection, and reconstruction. It uses the latest received ARKit pose, without
+building a grid or encoding a point cloud. Missed send intervals are skipped;
+the server does not queue intermediate phone positions for later playback.
 
 ```json
 {
-  "type": "recon", "epoch": 0, "perception": "real",
+  "type": "phone_pose", "scan_id": "opaque-scan-id", "epoch": 0,
+  "floor_y": -1.32,
+  "phone": {
+    "position": [0.12, 0.23, -0.45], "forward": [0, 0, -1], "up": [0, 1, 0],
+    "tracking": "normal", "seq": 901, "t": 1234.600
+  },
+  "stats": {"sensor_connected": true, "pose_age_ms": 12}
+}
+```
+
+`phone.position` is the camera centre in world metres, `forward` is its world-space
+−Z axis, and `up` is its world-space +Y axis. Forward and up together preserve phone
+tilt and roll. Vectors are null before a pose arrives or if their values are not finite;
+`tracking`, `seq`, and `t` are null before the first pose. `floor_y` remains null until
+the existing floor estimator has a measured floor; it is never replaced with zero.
+Height above the floor is `phone.position[1] - floor_y` only when both are known.
+
+The pose's `seq` and `t` are copied from the source; they are not viewer message
+counters. Repeated updates can carry the same pose while `pose_age_ms` grows, including
+after disconnection. Clients should show stale/disconnected poses as last-known positions.
+
+`recon` contains the room reconstruction at `BEACON_VIEWER_HZ` (default 5 Hz).
+There is at most one reconstruction job in flight, and both message types share one
+WebSocket publisher. Point-cloud payloads remain limited to changed versions at up to
+5 Hz, with a full cloud sent for a newly connected viewer.
+
+```json
+{
+  "type": "recon", "scan_id": "opaque-scan-id", "epoch": 0, "perception": "real", "floor_y": -1.32,
   "grid": {"origin": [x0, z0], "res": 0.1, "w": 80, "h": 80, "cells": "<base64 uint8>"},
   "points": "<base64 float32 xyz...>",
   "point_colors": "<base64 uint8 RGB, one triple per point in the same order>",
   "points_fused": true, "points_version": 1,
-  "phone": {"position": [..], "forward": [..], "tracking": "normal"},
+  "phone": {"position": [..], "forward": [..], "up": [..], "tracking": "normal", "seq": 901, "t": 1234.600},
   "listener": [..], "mode": "probe",
   "targets": [{"id", "label", "position", "extent", "sigma", "age", "selected"}],
   "path": [[x, z], ...], "waypoint": [x, z] | null,
@@ -198,6 +231,13 @@ Viewer `stats` also includes `sensor_connected` (boolean), `observation_age_ms`
 for every snapshot, even when the sensor stops sending. `frame_age_ms` remains
 the capture-to-processing latency measured for the last frame. The room viewer
 uses the elapsed ages plus time since receipt to distinguish live and cached data.
+
+Phone metadata in `recon` uses the same ordering fields as `phone_pose`. A reconstruction
+job can finish after a newer live pose has already arrived: within the same `scan_id`,
+clients must keep the newer phone `seq` (and source `t`) rather than letting the older
+snapshot move the phone backwards. Apply its room geometry independently. A new `scan_id`
+starts a new world and resets pose ordering; sequence numbers may restart after a sensor
+reconnection. Do not compare source timestamps across different scans/sessions.
 
 `scan_id` is an opaque string that changes whenever the backend resets its world,
 including reconnects with a new sensor session and tracking resets within the same

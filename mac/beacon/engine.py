@@ -77,6 +77,8 @@ def describe_direction(az: float) -> str:
 class Engine:
     def __init__(self) -> None:
         self.lock = threading.RLock()
+        # Phone telemetry must not wait for point-cloud encoding under the world lock.
+        self._phone_lock = threading.Lock()
         self.perception = None
         self.labels: set[str] = set()
         self.reset_world(epoch=0)
@@ -111,6 +113,7 @@ class Engine:
     def reset_world(self, epoch: int) -> None:
         self.epoch = epoch
         self.scan_id = str(time.monotonic_ns())
+        self.pose: Pose | None = None
         self.map = GridMap()
         self.surfaces = SurfaceMap()
         self.planes: list[dict] = []
@@ -122,6 +125,7 @@ class Engine:
         self.frame_meta = {"seq": None, "t": None}
         self.last_frame_processed = 0.0
         self._last_plan = (0.0, -1)
+        self._cache_phone_pose()
 
     def say(self, text: str) -> None:
         self.last_said = text
@@ -172,8 +176,9 @@ class Engine:
                 self.stats["pose_hz"] = 0.9 * self.stats["pose_hz"] + 0.1 / max(dt, 1e-3)
             self._last_pose_rx = now
             head = msg.get("head")
-            self.pose = Pose(pose_matrix(msg["pose"]), msg["t"], msg["seq"], msg["tracking"],
-                             head["q"] if head and head.get("available") else None, now)
+            pose = Pose(pose_matrix(msg["pose"]), msg["t"], msg["seq"], msg["tracking"],
+                        head["q"] if head and head.get("available") else None, now)
+            self.pose = pose
             # Not in Probe mode: there the hand may reach over furniture the body cannot cross.
             if msg["tracking"] == "normal" and self.map.floor_y is not None and self.mode != "probe":
                 self.map.mark_walked(self.walking_body()[[0, 2]], now)
@@ -186,6 +191,10 @@ class Engine:
             if "planes" in msg and msg["tracking"] == "normal":
                 self.planes = plane_snapshot(msg["planes"])
                 self.plane_version += 1
+            # Learning the first metric floor can reset the map above. This pose belongs
+            # to that same new scan, unlike any pose from a previous sensor/world epoch.
+            self.pose = pose
+            self._cache_phone_pose()
 
     def process_frame(self, header: dict, jpeg: bytes, injected_depth: np.ndarray | None) -> None:
         """Runs in a worker thread. Heavy model calls happen outside the lock."""
@@ -261,6 +270,7 @@ class Engine:
             if self.clock_offset is not None:
                 self.stats["frame_age_ms"] = round(1000 * (done - (header["t"] + self.clock_offset)))
             self.perception_mode = "injected" if injected else "real"
+            self._cache_phone_pose()  # floor estimates can also improve with depth frames
 
     # Commands --------------------------------------------------------------
     def command(self, text: str) -> None:
@@ -618,15 +628,44 @@ class Engine:
                 "valid": t.valid_at(now), "observed_now": t.observed_now, "locked": t.locked, "injected": t.injected}
 
     # Viewer snapshot -------------------------------------------------------
+    def _phone_fields(self) -> dict:
+        pose = self.pose
+
+        def vector(value):
+            return value.round(3).tolist() if np.isfinite(value).all() else None
+
+        return {"position": vector(pose.T[:3, 3]) if pose else None,
+                "forward": vector(forward(pose.T)) if pose else None,
+                "up": vector(pose.T[:3, 1]) if pose else None,
+                "tracking": pose.tracking if pose else None,
+                "seq": pose.seq if pose else None, "t": pose.t if pose else None}
+
+    def _cache_phone_pose(self) -> None:
+        """Called under the world lock; publish a tiny immutable view for the live feed."""
+        state = (self.scan_id, self.epoch, self._viewer_floor_y(), self._phone_fields(),
+                 self.pose.received if self.pose else None)
+        with self._phone_lock:
+            self._viewer_phone = state
+
+    def _viewer_floor_y(self) -> float | None:
+        floor_y = self.map.floor_y
+        return floor_y if floor_y is not None and math.isfinite(floor_y) else None
+
+    def phone_snapshot(self) -> dict:
+        """Latest AR pose only: no grid, target, surface, model, or point-cloud work."""
+        with self._phone_lock:
+            scan_id, epoch, floor_y, phone, received = self._viewer_phone
+        return {"type": "phone_pose", "scan_id": scan_id, "epoch": epoch, "floor_y": floor_y,
+                "phone": {key: value.copy() if isinstance(value, list) else value for key, value in phone.items()},
+                "stats": {"sensor_connected": self.sensor_connected,
+                          "pose_age_ms": max(0, round(1000 * (time.monotonic() - received)))
+                          if received is not None else None}}
+
     def snapshot(self, with_points: bool = True) -> dict:
         import base64
         with self.lock:
             now = time.monotonic()
             states = self.map.states()
-            phone = forward_vec = None
-            if self.pose is not None:
-                phone = self.pose.T[:3, 3].round(3).tolist()
-                forward_vec = forward(self.pose.T).round(3).tolist()
             snap = {
                 "type": "recon", "epoch": self.epoch, "perception": self.perception_mode,
                 "mode": self.mode, "stop_reason": self.stop_reason, "navigation": self.navigation,
@@ -634,11 +673,10 @@ class Engine:
                 "grid": {"origin": self.map.origin.tolist(), "res": self.map.res,
                          "w": self.map.n, "h": self.map.n,
                          "cells": base64.b64encode(states.tobytes()).decode()},
-                "floor_y": self.map.floor_y,
+                "floor_y": self._viewer_floor_y(),
                 "points_version": self.surfaces.version,
                 "points_fused": True,
-                "phone": {"position": phone, "forward": forward_vec,
-                          "tracking": self.pose.tracking if self.pose else None},
+                "phone": self._phone_fields(),
                 "listener": self.body_position().round(3).tolist() if self.pose is not None else None,
                 "targets": [{"id": t.id, "label": t.label, "position": t.position.round(3).tolist(),
                              "extent": t.extent.round(3).tolist(), "sigma": round(t.sigma_at(now), 3),
