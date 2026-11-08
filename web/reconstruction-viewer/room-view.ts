@@ -477,16 +477,19 @@ export class RoomView {
       this.cloudKey = "";
     }
     const selected = recon.targets.find(t => t.selected && t.valid);
-    const cloudKey = [this.mapVersion, this.colourMode, floorY, selected?.id, selected?.position, selected?.extent].join("|");
+    const cloudKey = [this.mapVersion, this.colourMode, floorY, selected?.id, selected?.position, selected?.extent, selected?.yaw].join("|");
     if (!recon.points_fused || cloudKey !== this.cloudKey) {
       this.cloudKey = cloudKey;
       const count = this.pointCount = recon.points_fused ? this.decodedCount : this.scan.writeTo(this.positions);
+      const yawCos = Math.cos(selected?.yaw ?? 0), yawSin = Math.sin(selected?.yaw ?? 0);
       for (let j = 0; j < count * 3; j += 3) {
         const x = this.positions[j], y = this.positions[j + 1], z = this.positions[j + 2];
+        // The box is turned by yaw about +Y: test the point in the box's own axes.
+        const dx = x - (selected?.position[0] ?? 0), dz = z - (selected?.position[2] ?? 0);
         const inTarget = selected
-          && Math.abs(x - selected.position[0]) < selected.extent[0] / 2 + 0.025
+          && Math.abs(dx * yawCos - dz * yawSin) < selected.extent[0] / 2 + 0.025
           && Math.abs(y - selected.position[1]) < selected.extent[1] / 2 + 0.025
-          && Math.abs(z - selected.position[2]) < selected.extent[2] / 2 + 0.025;
+          && Math.abs(dx * yawSin + dz * yawCos) < selected.extent[2] / 2 + 0.025;
         // Quiet floor returns; bright furniture and walls make height legible.
         const shade = THREE.MathUtils.clamp(0.20 + (y - floorY) * 0.40, 0.16, 0.9);
         if (this.colourMode && this.imageColors && this.imageColors.length >= count * 3) {
@@ -573,6 +576,7 @@ export class RoomView {
       }
       const color = RED;
       visual.group.position.fromArray(t.position);
+      visual.group.rotation.y = t.yaw ?? 0;
       const size = t.extent.map(v => Math.max(0.06, v));
       visual.box.scale.fromArray(size); visual.edges.scale.fromArray(size);
       visual.box.material.color.setHex(color); visual.edges.material.color.setHex(color);

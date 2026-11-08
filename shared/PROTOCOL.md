@@ -137,7 +137,7 @@ protocol compatibility; the current room visualization does not send control mes
   "perception": "real" | "injected",
   "target": null | {
     "id": "bottle-1", "label": "bottle",
-    "position": [x, y, z], "extent": [ex, ey, ez],
+    "position": [x, y, z], "extent": [across, up, along], "yaw": 0.4,
     "surface": [[x, y, z], ...],
     "sigma": 0.12, "age": 0.4, "valid": true, "observed_now": true
   },
@@ -215,7 +215,7 @@ WebSocket publisher. Point-cloud payloads remain limited to changed versions at 
   "points_fused": true, "points_version": 1,
   "phone": {"position": [..], "forward": [..], "up": [..], "tracking": "normal", "seq": 901, "t": 1234.600},
   "listener": [..], "mode": "probe",
-  "targets": [{"id", "label", "position", "extent", "sigma", "age", "selected"}],
+  "targets": [{"id", "label", "position", "extent", "yaw", "sigma", "age", "selected"}],
   "path": [[x, z], ...], "waypoint": [x, z] | null,
   "proximity": {...} | null,
   "stats": {"vision_fps": 7.9, "frame_age_ms": 120, "pose_hz": 30, "rss_mb": 2100, "mps_mb": 900, "budget_mb": 16384, "dropped_frames": 12}
@@ -257,3 +257,8 @@ for older snapshots. Display geometry never feeds navigation.
 Fresh sightings refine position, extent and target surface, with greater weight for
 closer views. Larger corrections require three agreeing sightings. `age` and
 `observed_now` describe how recently the target was actually seen.
+
+A target's box is `extent` = [across, up, along] metres, turned by `yaw` radians about +Y
+(three.js `rotation.y`; local +Z is the direction it was viewed from). `position` is the box
+centre. The camera sees only an object's front, so the box extends behind it as deep as it
+is wide (at most 0.6 m); doors, windows, light switches, power outlets and TVs stay flat.

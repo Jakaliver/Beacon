@@ -623,7 +623,7 @@ class Engine:
     @staticmethod
     def _target_json(t, now: float) -> dict:
         return {"id": t.id, "label": t.label, "position": t.position.round(3).tolist(),
-                "extent": t.extent.round(3).tolist(), "surface": t.surface.round(3).tolist(),
+                "extent": t.extent.round(3).tolist(), "yaw": round(t.yaw, 3), "surface": t.surface.round(3).tolist(),
                 "sigma": round(t.sigma_at(now), 3), "age": round(now - t.last_seen, 2),
                 "valid": t.valid_at(now), "observed_now": t.observed_now, "locked": t.locked, "injected": t.injected}
 
@@ -679,7 +679,8 @@ class Engine:
                 "phone": self._phone_fields(),
                 "listener": self.body_position().round(3).tolist() if self.pose is not None else None,
                 "targets": [{"id": t.id, "label": t.label, "position": t.position.round(3).tolist(),
-                             "extent": t.extent.round(3).tolist(), "sigma": round(t.sigma_at(now), 3),
+                             "extent": t.extent.round(3).tolist(), "yaw": round(t.yaw, 3),
+                             "sigma": round(t.sigma_at(now), 3),
                              "age": round(now - t.last_seen, 1), "valid": t.valid_at(now),
                              "selected": t.id == self.selected, "injected": t.injected, "locked": t.locked}
                             for t in self.tracker.tracks.values() if t.valid_at(now) or t.id == self.selected],

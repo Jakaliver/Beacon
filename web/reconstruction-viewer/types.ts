@@ -27,7 +27,7 @@ export type Recon = PhoneFrame & {
   points_fused?: boolean;
   phone: Phone;
   listener: number[] | null;
-  targets: { id: string; label: string; position: number[]; extent: number[]; sigma: number; age: number; valid: boolean; selected: boolean; injected: boolean; locked?: boolean }[];
+  targets: { id: string; label: string; position: number[]; extent: number[]; yaw?: number; sigma: number; age: number; valid: boolean; selected: boolean; injected: boolean; locked?: boolean }[];
   path: number[][]; waypoint: number[] | null;
   stats: Record<string, number | boolean | null>;
 };

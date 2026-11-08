@@ -11,6 +11,8 @@ IGNORED = {"person"}
 # COCO splits drink containers inconsistently: a real flask flipped between "cup" and "bottle".
 # Track them as one family so a request for either keeps one stable target.
 FAMILY = {"cup": "bottle", "vase": "bottle", "wine glass": "bottle"}
+# Flat things on a wall: their box keeps the depth that was seen instead of an assumed one.
+FLAT = {"door", "window", "light switch", "power outlet", "tv"}
 
 
 def canonical(label: str) -> str:
@@ -25,6 +27,7 @@ class Observation:
     surface: np.ndarray
     sigma: float
     depth: float
+    yaw: float = 0.0  # box rotation about +Y; extent is [across, up, along] in that frame
 
 
 @dataclass
@@ -45,6 +48,7 @@ class Track:
     relocate: list = field(default_factory=list)  # recent sightings away from a locked target
     observed_now: bool = True
     injected: bool = False
+    yaw: float = 0.0
     refinements: list = field(default_factory=list)
 
     def sigma_at(self, now: float) -> float:
@@ -84,9 +88,35 @@ def observe(label: str, mask: np.ndarray, depth: np.ndarray, K, T: np.ndarray,
         world = cam + (world - cam) * s
         med *= s
     surface = world[np.random.default_rng(0).choice(len(world), min(48, len(world)), replace=False)]
-    lo, hi = np.percentile(world, 10, axis=0), np.percentile(world, 90, axis=0)
-    return Observation(label, np.median(world, axis=0), np.maximum(hi - lo, 0.03), surface,
-                       0.05 + 0.1 * med, med)
+    centre, extent, yaw = view_box(label, world, cam)
+    return Observation(label, centre, extent, surface, 0.05 + 0.1 * med, med, yaw)
+
+
+def view_box(label: str, world: np.ndarray, cam: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
+    """Box (centre, [across, up, along] size, yaw) from the visible surface, in the camera's view frame.
+
+    The camera sees only an object's front, so the box extends behind it: as deep as it is wide
+    (at most 0.6 m), except for flat wall objects. Its centre is then the same from every viewpoint.
+    """
+    ray = np.median(world, axis=0) - cam
+    yaw = float(np.arctan2(ray[0], ray[2]))  # three.js rotation.y that turns local +Z along the view
+    along = np.array([np.sin(yaw), 0.0, np.cos(yaw)])
+    across = np.array([along[2], 0.0, -along[0]])
+    local = np.stack([world @ across, world[:, 1], world @ along], axis=1)
+    lo, hi = np.percentile(local, 5, axis=0), np.percentile(local, 95, axis=0)
+    size = np.maximum(hi - lo, 0.03)
+    if label not in FLAT:
+        size[2] = max(size[2], min(size[0], 0.6))
+    mid = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2] + size[2] / 2])
+    centre = mid[0] * across + mid[2] * along
+    centre[1] = mid[1]
+    return centre, size, yaw
+
+
+def blend_yaw(a: float, b: float, gain: float) -> float:
+    # A box looks the same turned half a turn, so blend across the shorter way modulo pi.
+    d = (b - a + np.pi / 2) % np.pi - np.pi / 2
+    return float(a + gain * d)
 
 
 class Tracker:
@@ -167,7 +197,7 @@ class Tracker:
         self.counter[obs.label] = n
         tid = f"{obs.label.replace(' ', '-')}-{n}"
         self.tracks[tid] = Track(tid, obs.label, obs.position, obs.extent, obs.surface, obs.sigma,
-                                 now, injected=injected, best_depth=obs.depth)
+                                 now, injected=injected, best_depth=obs.depth, yaw=obs.yaw)
 
     @staticmethod
     def _closer_on_same_ray(t: Track, obs: Observation, transform: np.ndarray) -> bool:
@@ -187,7 +217,7 @@ class Tracker:
             # Average the agreeing observations so a single last-frame spike cannot win.
             centre = np.mean([o.position for _, o in t.refinements], axis=0)
             agreed = Observation(obs.label, centre, obs.extent,
-                                 obs.surface + centre - obs.position, obs.sigma, obs.depth)
+                                 obs.surface + centre - obs.position, obs.sigma, obs.depth, obs.yaw)
             Tracker._fuse(t, agreed, now, prefer_new=True)
             t.refinements = []
 
@@ -202,6 +232,7 @@ class Tracker:
             t.position = np.mean([p for _, p in t.relocate], axis=0)
             t.surface = obs.surface + (t.position - obs.position)
             t.extent = obs.extent.copy()
+            t.yaw = obs.yaw
             t.sigma = obs.sigma
             t.best_depth = obs.depth
             t.last_seen = now
@@ -225,6 +256,7 @@ class Tracker:
         t.surface = obs.surface + (pos - obs.position)
         t.position = pos
         t.extent = (1 - gain) * t.extent + gain * obs.extent
+        t.yaw = blend_yaw(t.yaw, obs.yaw, gain)
         # Repeated views of a biased monocular estimate are not independent: keep a floor.
         t.sigma = max(0.06, 0.6 * obs.sigma, 1 / np.sqrt(wt + wo))
         t.last_seen = now
@@ -255,7 +287,11 @@ if __name__ == "__main__":
     mask = np.zeros((480, 640), bool)
     mask[195:285, 295:345] = True  # mask a bit larger than the object
     obs = observe("bottle", mask, depth, K, T)
-    assert obs and abs(obs.position[2] + 1.5) < 0.02, obs
+    # The box centre sits behind the visible face, half the bottle's width deeper.
+    assert obs and abs(obs.position[2] + 1.5 + obs.extent[2] / 2) < 0.02, obs
+    # 40 x 80 px at 1.5 m is 0.12 x 0.24 m; as deep as it is wide.
+    assert abs(obs.extent[0] - 0.12) < 0.025 and abs(obs.extent[1] - 0.24) < 0.04, obs.extent
+    assert abs(obs.extent[2] - obs.extent[0]) < 1e-6, obs.extent
     tr = Tracker()
     tr.update([obs], depth, K, T, 0.0, False)
     tr.update([obs], depth, K, T, 0.1, False)
