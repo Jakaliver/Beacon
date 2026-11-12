@@ -137,7 +137,7 @@ should discard that recording, with no request sent when you return.
 
 ### Reading the room view
 
-The view builds up to 60,000 depth points. Move slowly and revisit areas from closer views:
+The view builds up to 240,000 depth points. Move slowly and revisit areas from closer views:
 a second sighting confirms new dots, repeated observations refine them, and three consistent
 depth readings repair incorrect geometry. Confirmed dots stay when you turn away; they
 only leave when overwritten, the scan resets, or the point budget fills. **Colour** uses

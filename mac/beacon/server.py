@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import CONFIG
 from .engine import DEBUG_DIR, Engine
+from .mac_audio import MacAudio
 
 log = logging.getLogger("beacon")
 # Event log: what the user sent and what Beacon answered. Goes to the server's stderr.
@@ -28,9 +29,10 @@ events.setLevel(logging.INFO)
 events.propagate = False
 faulthandler.register(signal.SIGUSR1)  # `kill -USR1 <pid>` prints all thread stacks
 engine = Engine()
+mac_audio = MacAudio()
 control_clients: set[WebSocket] = set()
 viewer_clients: set[WebSocket] = set()
-# The point cloud (up to ~1.5 MB) is resent only when it changed, and at most POINTS_HZ times a second.
+# The point cloud (up to ~4.8 MB) is resent only when it changed, and at most POINTS_HZ times a second.
 viewer_points = {"version": None, "new_viewer": False, "sent": 0.0}
 POINTS_HZ = 5
 PHONE_POSE_HZ = 30
@@ -104,6 +106,7 @@ async def publish_guidance() -> None:
     if g:
         msgs.append(g)
     if msgs:
+        mac_audio.publish(msgs)
         await broadcast(control_clients, msgs)
 
 
@@ -219,10 +222,12 @@ async def load_speech() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    await mac_audio.start()
     tasks = [asyncio.create_task(t()) for t in (vision_worker, ticker, viewer_publisher, load_speech)]
     yield
     for t in tasks:
         t.cancel()
+    await mac_audio.close()
 
 
 app = FastAPI(title="Beacon", lifespan=lifespan)
@@ -232,6 +237,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 @app.get("/api/health")
 def health() -> dict:
     return {"vision_ready": engine.perception is not None, "speech_ready": speech["model"] is not None,
+            "mac_audio_ready": mac_audio.process is not None and mac_audio.process.returncode is None,
             "sensor_connected": engine.sensor_connected, "mode": engine.mode, **memory_stats()}
 
 

@@ -115,9 +115,24 @@ class SurfaceTests(unittest.TestCase):
             moved = self.T.copy()
             moved[0, 3] = frame * 0.1
             self.scan_wall(scan, transform=moved, start=frame)
-            self.assertLessEqual(len(scan.points), 200)
+            self.assertLessEqual(len(scan.points), 220)  # 200 confirmed + 20 tentative
             self.assertLessEqual(scan.payload["count"], 200)
         self.assertGreater(self.displayed(scan)[:, 0].max(), 1)
+
+    def test_unconfirmed_samples_cannot_evict_a_full_confirmed_scan(self):
+        scan = SurfaceMap(limit=200)
+        self.scan_wall(scan, frames=20)
+        original = self.displayed(scan).copy()
+        self.assertGreater(len(original), 0)
+        turn = self.T.copy()
+        turn[0, 0] = turn[2, 2] = -1
+        self.scan_wall(scan, transform=turn, start=100, frames=1)
+        np.testing.assert_array_equal(self.displayed(scan), original)
+        self.assertLessEqual(len(scan.points), 220)
+        # Real revisits still admit new geometry and respect the display budget.
+        self.scan_wall(scan, transform=turn, start=101, frames=20)
+        self.assertTrue((self.displayed(scan)[:, 2] > 0).any())
+        self.assertLessEqual(scan.payload['count'], 200)
 
     def test_plane_validation_rejects_invalid_indices_and_nonfinite_vertices(self):
         plane = {"id": "wall", "kind": "wall", "vertices": [[0, 0, -2], [1, 0, -2], [0, 1, -2]], "indices": [0, 1, 2]}

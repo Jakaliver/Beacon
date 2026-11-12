@@ -243,7 +243,7 @@ reconnection. Do not compare source timestamps across different scans/sessions.
 `scan_id` is an opaque string that changes whenever the backend resets its world,
 including reconnects with a new sensor session and tracking resets within the same
 AR epoch. `stats.map_version` increments when depth observations are integrated.
-When `points_fused` is true, `points` is the complete current display scan: up to 60,000
+When `points_fused` is true, `points` is the complete current display scan: up to 240,000
 samples fused within 2.5 cm voxels from valid neighbouring depth pixels. New points need
 two sightings before display. Revisits refine depth and RGB; removing contradicted points
 requires three consistent observations. Occluded and out-of-view confirmed points persist

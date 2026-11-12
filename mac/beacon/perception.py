@@ -10,6 +10,8 @@ from .config import CONFIG, DA2_DIR, DEPTH_CHECKPOINT, DETECTOR_CHECKPOINT
 
 sys.path.insert(0, str(DA2_DIR / "metric_depth"))
 from depth_anything_v2.dpt import DepthAnythingV2  # noqa: E402
+from depth_anything_v2.dinov2_layers.attention import Attention  # noqa: E402
+from .attention import use_native_attention
 
 # Household targets COCO lacks, as detector prompt -> target label. Several wordings can name
 # one target: on test photos "wall switch" and "switch plate" found switches that "light switch" missed.
@@ -41,6 +43,7 @@ class Perception:
         model = DepthAnythingV2(encoder="vits", features=64, out_channels=[48, 96, 192, 384],
                                 max_depth=CONFIG.depth_max)
         model.load_state_dict(torch.load(DEPTH_CHECKPOINT, map_location="cpu"))
+        use_native_attention(model, Attention)
         # Half precision on the GPU: twice as fast, depth within 0.2% of float32 (p99, measured).
         self.dtype = torch.float16 if self.device == "mps" else torch.float32
         self.depth_model = model.to(self.device, self.dtype).eval()

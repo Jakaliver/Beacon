@@ -22,6 +22,12 @@ The browser is a **read-only room visualization**: grey LiDAR-style dots, a soli
 with a screen and camera detail, and the selected target in red. It connects only to `/ws/viewer`. It has no microphone,
 audio playback, commands, guidance controls or simulated camera.
 
+The Mac also mirrors Beacon's speech and guidance beeps through its current audio output.
+The iPhone continues playing its own spatial audio and haptics unchanged. The Mac mirror
+uses the same synthesized beep samples, pauses beeps during its speech, and stops guidance
+beeps when stopped or when guidance is stale. It does not require the browser to be open.
+Set `BEACON_MAC_AUDIO=0` in `mac/local.env` to disable only the laptop mirror.
+
 ## Start
 
 ```sh
@@ -51,11 +57,13 @@ slower room scan; no extra vision inference is needed. The existing iPhone app s
 the pose, so this change only needs the updated Mac backend and browser viewer.
 
 **Colour** switches the grey LiDAR view to soft dots coloured from their source camera
-pixels. Selected targets remain red. The scan builds up to 60,000 points in 2.5 cm cells.
+pixels. Selected targets remain red. The scan builds up to 240,000 points in 2.5 cm cells.
 Repeated sightings refine depth and colour; confirmed points remain when you turn away.
 New points need two sightings, and removing incorrect geometry requires three consistent
 depth observations. Occluded walls are preserved. There is no time expiry for confirmed
-points; the oldest observations leave only when the point budget is full. Closer, consistent
+points; the oldest observations leave only when the confirmed point budget is full.
+Up to 24,000 tentative samples are staged separately, so an unconfirmed frame cannot
+push established dots out of the scan. Closer, consistent
 sightings also refine the target position. Paused or disconnected scans are labelled.
 A fresh camera session clears the old room.
 This is estimated monocular depth, not hardware LiDAR or a complete model of unseen surfaces.
@@ -82,6 +90,10 @@ external model assets, shadows or postprocessing.
 Floor height is automatic. The iPhone prefers an ARKit-classified floor, otherwise waits
 for a stable, large plane below the phone. Scan a wide floor patch from normal holding
 height; camera geometry can still display while floor detection settles.
+
+Depth inference uses native PyTorch scaled-dot-product attention with the original
+model weights and 518-pixel input size. This avoids materializing the full attention
+matrix on supported GPU kernels without reducing scan resolution.
 
 ## Configuration and checks
 

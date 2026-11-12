@@ -4,7 +4,7 @@ import { ScanCloud } from "./scan-cloud";
 import type { PhoneLocation } from "./phone-state";
 import type { Recon } from "./types";
 
-const MAX_POINTS = 60_000;
+const MAX_POINTS = 240_000;
 const RED = 0xee5252;
 const ORBIT_ELEVATION = Math.PI / 6;
 const decode = (base64: string) => {
@@ -503,7 +503,14 @@ export class RoomView {
         }
       }
       this.cloudGeometry.setDrawRange(0, count);
-      this.cloudGeometry.attributes.position.needsUpdate = this.cloudGeometry.attributes.color.needsUpdate = true;
+      for (const name of ["position", "color"]) {
+        const attribute = this.cloudGeometry.getAttribute(name) as THREE.BufferAttribute;
+        attribute.clearUpdateRanges();
+        if (count) {
+          attribute.addUpdateRange(0, count * 3);
+          attribute.needsUpdate = true;
+        }
+      }
     }
 
     const { w, h, res, origin } = recon.grid;

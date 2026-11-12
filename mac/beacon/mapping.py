@@ -151,7 +151,9 @@ class GridMap:
         sub = pts[:: max(1, len(pts) // 1500)]
         vec = sub - cam
         dist = np.linalg.norm(vec, axis=1)
-        steps = np.arange(0.2, 8.0, self.res)
+        # Samples beyond the farthest retained hit always fail `valid` below.
+        # Avoid allocating/projecting those rays (most are outside our 4 m map range).
+        steps = np.arange(0.2, max(0.2, float(dist.max()) - 0.2) if len(dist) else 0.2, self.res)
         frac = steps[None, :] / np.maximum(dist[:, None], 1e-6)
         valid = steps[None, :] < dist[:, None] - 0.2
         samples = cam + frac[..., None] * vec[:, None, :]

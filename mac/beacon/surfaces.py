@@ -48,7 +48,7 @@ class SurfaceMap:
     _fields = ("points", "colors", "weights", "best_range", "hits", "seen",
                "conflicts", "candidate", "candidate_since", "candidate_last")
 
-    def __init__(self, limit: int = 60_000, voxel: float = 0.025):
+    def __init__(self, limit: int = 240_000, voxel: float = 0.025):
         self.limit = max(1, limit)
         self.voxel = voxel
         self.points = np.empty((0, 3), np.float32)
@@ -177,11 +177,18 @@ class SurfaceMap:
         # Existing refined samples win over new duplicates. Re-voxelising also
         # merges points that converged after small depth corrections.
         self._select(self._unique(self.points))
-        if len(self.points) > self.limit:
-            # Bound memory without a time limit: evict least recently seen points
-            # only when new room detail actually needs their space.
-            keep = np.argpartition(self.seen, -self.limit)[-self.limit:]
-            self._select(np.sort(keep))
+        # Stage tentative samples separately: a noisy frame must not evict a
+        # confirmed wall. Only newly confirmed geometry competes for its budget.
+        confirmed = np.flatnonzero(self.hits >= 2)
+        tentative = np.flatnonzero(self.hits < 2)
+        tentative_limit = max(1, self.limit // 10)
+        if len(confirmed) > self.limit or len(tentative) > tentative_limit:
+            def newest(ids, limit):
+                if len(ids) <= limit:
+                    return ids
+                return ids[np.argpartition(self.seen[ids], -limit)[-limit:]]
+            self._select(np.sort(np.concatenate((newest(confirmed, self.limit),
+                                                 newest(tentative, tentative_limit)))))
         self.version += 1
 
     @property

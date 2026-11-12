@@ -15,7 +15,7 @@ implementation comes from the main iPhone app and uses PHASE.
 - Only observed surfaces appear. Missing walls, floors or furniture are not filled in.
   An incomplete point cloud is not a complete room model.
 - Navigation integrates map points within 4 m. The display samples depth up to 6 m, with
-  up to 60,000 points in 2.5 cm cells. Confirmed points have no time expiry; the oldest
+  up to 240,000 points in 2.5 cm cells. Confirmed points have no time expiry; the oldest
   observations are evicted only when the budget fills. A new world clears history.
 - Display points need two sightings. Revisits average small depth and colour changes;
   removing points in observed free space needs three consistent depth observations.
